@@ -1,60 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AITaskFlo</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background-color: #0d1117;
-      color: #f0f6fc;
-      text-align: center;
-    }
-    header img {
-      width: 100%;
-      max-height: 400px;
-      object-fit: cover;
-      display: block;
-    }
-    .hero {
-      padding: 3rem 1rem;
-    }
-    .hero h1 {
-      font-size: 2.5rem;
-      margin-bottom: 1rem;
-    }
-    .hero p {
-      font-size: 1.25rem;
-      margin-bottom: 2rem;
-    }
-    .btn {
-      display: inline-block;
-      padding: 0.75rem 1.5rem;
-      background: #238636;
-      color: #fff;
-      text-decoration: none;
-      border-radius: 6px;
-      font-weight: bold;
-      transition: background 0.3s ease;
-    }
-    .btn:hover {
-      background: #2ea043;
-    }
-  </style>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AITaskFlo — Automation • Intelligence • Scale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d1117;--card:#0f141b;--fg:#e6edf3;--muted:#9aa4b2;--brand:#00d4ff;--accent:#ff9800;--line:#1f2630}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+a{color:var(--brand);text-decoration:none} img{max-width:100%}
+header{text-align:center;padding:8px 0 0}
+.label{margin:0;color:#a7b0bc;font-weight:600;letter-spacing:2px;font-size:13px;text-transform:uppercase}
+.banner{width:100%;max-height:420px;object-fit:cover;display:block;margin-top:8px}
+nav{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;gap:16px;justify-content:center;background:#0f141b;padding:12px 10px;border-bottom:1px solid var(--line)}
+nav a{color:#e6edf3} nav a.active{color:var(--brand);font-weight:700}
+.wrap{max-width:1000px;margin:0 auto;padding:28px 16px;text-align:center}
+h1{margin:12px 0 8px;font-size:36px;line-height:1.15} .tag{margin:0 0 12px;color:var(--muted)}
+.cta{display:inline-block;margin:6px;padding:12px 18px;border-radius:10px;font-weight:600;color:#000}
+.inv{background:#007acc;color:#fff} .demo{background:#238636;color:#fff} .start{background:var(--accent)} .factory{background:#6f42c1;color:#fff}
+.cards{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-top:26px}
+.card{background:var(--card);padding:16px;border:1px solid var(--line);border-radius:12px;text-align:left}
+.card h3{margin:0 0 6px;font-size:18px}
+footer{color:var(--muted);font-size:13px;text-align:center;padding:24px 16px 40px;border-top:1px solid var(--line)}
+@media (min-width:900px){h1{font-size:44px}}
+</style>
 </head>
 <body>
   <header>
-    <img src="assets/D6840FC5-BA1E-478B-9B49-B49DFD3F6D2.PNG" 
-         alt="AI TaskFlo Banner">
+    <p class="label">AI TaskFlo</p>
+    <img class="banner" src="assets/aitaskflo_banner.png" alt="AITaskFlo Banner">
   </header>
 
-  <section class="hero">
-    <h1>AITaskFlo</h1>
-    <p>Automation • Intelligence • Scale</p>
-    <p>An AI ecosystem engineered for businesses that refuse to slow down.</p>
-    <a class="btn" href="mailto:aitaskflo@gmail.com">Investor Relations</a>
-  </section>
+  <nav>
+    <a class="active" href="index.html">🏠 Home</a>
+    <a href="factory.html">⚙️ Factory</a>
+    <a href="pricing.html">💳 Pricing</a>
+    <a href="waitlist.html">📝 Demo / Waitlist</a>
+    <a href="docs/index.html">📚 Docs</a>
+    <a href="roadmap.html">📈 Roadmap</a>
+    <a href="status.html">📡 Status</a>
+    <a href="privacy.html">🛡️ Privacy</a>
+    <a href="terms.html">📜 Terms</a>
+  </nav>
+
+  <main class="wrap">
+    <h1>Automation • Intelligence • Scale</h1>
+    <p class="tag">An AI ecosystem engineered for businesses that refuse to slow down.</p>
+
+    <div>
+      <a class="cta inv" href="mailto:aitaskflo@gmail.com?subject=Investor%20Relations">Investor Relations</a>
+      <a class="cta demo" href="mailto:aitaskflo@gmail.com?subject=Request%20a%20Demo">Request a Demo</a>
+      <a class="cta start" href="mailto:aitaskflo@gmail.com?subject=Get%20Started">Get Started</a>
+      <a class="cta factory" href="factory.html">Automation Factory ⚙️</a>
+    </div>
+
+    <section class="cards">
+      <article class="card"><h3>Agent Workflows</h3><p>Multi-step automations that handle intake, action, and follow-up on their own.</p></article>
+      <article class="card"><h3>Enterprise Guardrails</h3><p>Audit trails, rate limits, and human-in-the-loop for safety and control.</p></article>
+      <article class="card"><h3>Scales With Demand</h3><p>From first prototype to production — designed for reliability at volume.</p></article>
+    </section>
+  </main>
+
+  <footer>
+    © <span id="y"></span> AITaskFlo • <a href="mailto:aitaskflo@gmail.com">aitaskflo@gmail.com</a> • <a href="privacy.html">Privacy</a> • <a href="terms.html">Terms</a> • <a href="status.html">Status</a>
+  </footer>
+  <script>document.getElementById('y').textContent=new Date().getFullYear()</script>
 </body>
 </html>
