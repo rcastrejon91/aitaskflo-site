@@ -48,7 +48,14 @@ a.link{color:var(--info)}
   <div id="msg" class="note hidden"></div>
 
   <!-- Replace action with your Formspree endpoint when ready -->
-  <form id="waitlist" action="https://formspree.io/f/your-id" method="POST" class="grid" novalidate>
+  <form id="waitlist"
+  action="https://formspree.io/f/your-id"
+  method="POST"
+  class="grid"
+  novalidate>
+
+  <!-- Redirect after success -->
+  <input type="hidden" name="_redirect" value="thank-you.html">
     <!-- Human fields -->
     <div class="row">
       <label>Full Name
