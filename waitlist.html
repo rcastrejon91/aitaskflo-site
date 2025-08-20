@@ -2,30 +2,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Join the Waitlist — AITaskFlo</title>
-<meta name="description" content="Join the AITaskFlo waitlist for early access to plug-and-play AI automation blueprints.">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0d1117;--fg:#e6edf3;--muted:#9aa4b2;--line:#1f2630;--panel:#0f141b;--accent:#ff9800;--info:#00d4ff;--ok:#2ecc71;--err:#ff4d4f}
+:root{--bg:#0d1117;--fg:#e6edf3;--muted:#9aa4b2;--line:#1f2630;--panel:#0f141b;--accent:#ff9800;--info:#00d4ff}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 Inter,system-ui}
 nav{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;background:var(--panel);padding:12px 10px;border-bottom:1px solid var(--line)}
 nav a{text-decoration:none;color:#e6edf3}
 nav a.active{color:var(--info);font-weight:700}
 .wrap{max-width:720px;margin:40px auto;padding:0 16px}
-h1{margin:0 0 6px}
-p.lead{color:var(--muted);margin:0 0 18px}
+h1{margin:0 0 8px}
+p.lead{color:var(--muted);margin:0 0 16px}
 .grid{display:grid;gap:12px}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 input,textarea,select{padding:12px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--fg);width:100%}
 label{font-size:14px;color:var(--muted);display:grid;gap:6px}
 button{padding:12px 16px;border:none;border-radius:8px;background:var(--accent);color:#000;font-weight:700;cursor:pointer}
-button[disabled]{opacity:.6;cursor:not-allowed}
 .micro{font-size:12px;color:var(--muted)}
 .note{border:1px solid var(--line);background:rgba(255,255,255,.02);padding:12px;border-radius:8px;margin-top:12px}
-.success{border-color:rgba(46,204,113,.35);background:rgba(46,204,113,.08);color:var(--fg)}
-.error{border-color:rgba(255,77,79,.35);background:rgba(255,77,79,.08);color:var(--fg)}
-a.link{color:var(--info)}
-.hidden{display:none !important}
 </style>
 
 <nav>
@@ -44,19 +38,15 @@ a.link{color:var(--info)}
   <h1>Join the Waitlist</h1>
   <p class="lead">We’ll notify you when AITaskFlo is ready for your workspace.</p>
 
-  <!-- Inline messages -->
-  <div id="msg" class="note hidden"></div>
+  <!-- SIMPLE: posts straight to your inbox via Formsubmit.co -->
+  <form action="https://formsubmit.co/aitaskflo@gmail.com" method="POST" class="grid" novalidate>
+    <!-- Redirect to thank you page after success -->
+    <input type="hidden" name="_next" value="thank-you.html">
+    <!-- Optional tweaks -->
+    <input type="hidden" name="_captcha" value="false">
+    <input type="hidden" name="_subject" value="New AITaskFlo Waitlist Signup">
+    <input type="hidden" name="_template" value="table">
 
-  <!-- Replace action with your Formspree endpoint when ready -->
-  <form id="waitlist"
-  action="https://formspree.io/f/your-id"
-  method="POST"
-  class="grid"
-  novalidate>
-
-  <!-- Redirect after success -->
-  <input type="hidden" name="_redirect" value="thank-you.html">
-    <!-- Human fields -->
     <div class="row">
       <label>Full Name
         <input name="name" placeholder="Your name" autocomplete="name" required>
@@ -108,92 +98,11 @@ a.link{color:var(--info)}
       <textarea name="use_case" placeholder="e.g., book more sales calls, automate support, billing, social content…" rows="4"></textarea>
     </label>
 
-    <!-- Consent -->
-    <label style="align-items:center;grid-template-columns:auto 1fr;gap:10px">
-      <input type="checkbox" name="consent" value="yes" required>
-      <span class="micro">I agree to the <a class="link" href="terms.html">Terms</a> and <a class="link" href="privacy.html">Privacy Policy</a>.</span>
-    </label>
-
-    <!-- Anti-spam honeypot -->
-    <input type="text" name="_hp" tabindex="-1" autocomplete="off" class="hidden">
-
-    <!-- Tracking (auto-filled by JS) -->
-    <input type="hidden" name="utm_source">
-    <input type="hidden" name="utm_medium">
-    <input type="hidden" name="utm_campaign">
-    <input type="hidden" name="utm_term">
-    <input type="hidden" name="utm_content">
-    <input type="hidden" name="referrer">
-    <input type="hidden" name="timestamp_iso">
-
-    <button id="submitBtn" type="submit">Request Access</button>
-    <p class="micro">Prefer email? <a class="link" href="mailto:aitaskflo@gmail.com?subject=Waitlist">aitaskflo@gmail.com</a></p>
+    <button type="submit">Request Access</button>
+    <p class="micro">Prefer email? <a href="mailto:aitaskflo@gmail.com" style="color:var(--info)">aitaskflo@gmail.com</a></p>
   </form>
+
+  <div class="note micro">
+    First submission triggers a one-time verification email from Formsubmit to confirm <strong>aitaskflo@gmail.com</strong>.
+  </div>
 </div>
-
-<script>
-(function(){
-  // Fill UTM + referrer + timestamp
-  const params = new URLSearchParams(window.location.search);
-  const setIf = (k) => {
-    const el = document.querySelector('[name="'+k+'"]');
-    if (el) el.value = params.get(k) || '';
-  };
-  ['utm_source','utm_medium','utm_campaign','utm_term','utm_content'].forEach(setIf);
-  const refEl = document.querySelector('[name="referrer"]');
-  if (refEl) refEl.value = document.referrer || '';
-  const tsEl = document.querySelector('[name="timestamp_iso"]');
-  if (tsEl) tsEl.value = new Date().toISOString();
-
-  // Form handling
-  const form = document.getElementById('waitlist');
-  const msg  = document.getElementById('msg');
-  const btn  = document.getElementById('submitBtn');
-
-  function show(type, text){
-    msg.className = 'note ' + (type === 'ok' ? 'success' : 'error');
-    msg.textContent = text;
-    msg.classList.remove('hidden');
-    msg.scrollIntoView({behavior:'smooth', block:'center'});
-  }
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    // Basic client-side checks
-    const hp = form.querySelector('[name="_hp"]');
-    if (hp && hp.value) return; // bot
-
-    if (!form.checkValidity()){
-      show('err', 'Please complete required fields.');
-      return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = 'Submitting…';
-
-    try{
-      const data = new FormData(form);
-      const res = await fetch(form.action, {
-        method: 'POST',
-        headers: { 'Accept': 'application/json' },
-        body: data
-      });
-
-      if (res.ok){
-        form.reset();
-        show('ok', 'Thanks! You’re on the list. We’ll email you soon.');
-      } else {
-        const out = await res.json().catch(()=>({}));
-        const detail = out && out.errors ? out.errors.map(e=>e.message).join(', ') : 'Please try again.';
-        show('err', 'Submission failed. ' + detail);
-      }
-    } catch(err){
-      show('err', 'Network error. Please try again in a moment.');
-    } finally{
-      btn.disabled = false;
-      btn.textContent = 'Request Access';
-    }
-  });
-})();
-</script>
