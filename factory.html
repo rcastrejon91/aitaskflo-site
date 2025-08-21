@@ -26,6 +26,19 @@
       cursor: pointer;
     }
     button:hover { background: #ff9800; }
+
+    /* Log Panel */
+    #log-panel {
+      margin-top: 40px;
+      text-align: left;
+      background: #111;
+      padding: 15px;
+      border-radius: 10px;
+      color: #0f0;
+      font-family: monospace;
+      max-height: 200px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
@@ -35,21 +48,48 @@
   <div class="machine">
     <h2>Email Bot</h2>
     <p>Automatically respond to customer emails in seconds.</p>
-    <button onclick="alert('Email Bot Activated! 📧')">Run Bot</button>
+    <button onclick="runBot('receptionist')">Run Email Bot</button>
   </div>
 
   <div class="machine">
     <h2>Task Manager</h2>
     <p>Assign, track, and complete tasks without lifting a finger.</p>
-    <button onclick="alert('Tasks automated! ✅')">Run Task Manager</button>
+    <button onclick="runBot('billing')">Run Task Manager</button>
   </div>
 
   <div class="machine">
     <h2>Analytics Engine</h2>
     <p>Get instant insights on your business performance.</p>
-    <button onclick="alert('Analytics generated! 📊')">Run Analytics</button>
+    <button onclick="runBot('analytics')">Run Analytics</button>
+  </div>
+
+  <!-- Log Panel -->
+  <div id="log-panel">
+    <strong>📜 Bot Logs:</strong>
+    <pre id="logs"></pre>
   </div>
 
   <a href="index.html" style="display:inline-block; margin-top:30px; padding:10px 20px; background:#ff9800; color:#fff; text-decoration:none; border-radius:5px;">⬅ Back to Home</a>
+
+  <script>
+    async function runBot(botName) {
+      const logBox = document.getElementById("logs");
+      logBox.innerHTML += `[Orchestrator] Dispatching task → ${botName} Bot\n`;
+
+      try {
+        const res = await fetch(`http://localhost:3001/run/${botName}`, { method: "POST" });
+        const data = await res.json();
+        
+        // Animate logs line by line
+        for (const line of data.logs) {
+          await new Promise(r => setTimeout(r, 600)); // delay effect
+          logBox.innerHTML += line + "\n";
+          logBox.scrollTop = logBox.scrollHeight;
+        }
+      } catch (err) {
+        logBox.innerHTML += `[System] ❌ Error talking to ${botName} Bot\n`;
+      }
+    }
+  </script>
 </body>
 </html>
