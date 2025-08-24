@@ -72,6 +72,17 @@
   <a href="index.html" style="display:inline-block; margin-top:30px; padding:10px 20px; background:#ff9800; color:#fff; text-decoration:none; border-radius:5px;">⬅ Back to Home</a>
 
   <script>
+    const SLACK_WEBHOOK = "https://hooks.slack.com/services/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"; // posts to #projects
+
+    async function notifySlack(botName, logs) {
+      const message = `🚀 *New Bot Run in Automation Factory*\n*Bot:* ${botName}\n*Logs:*\n${logs.join("\n")}`;
+      await fetch(SLACK_WEBHOOK, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: message })
+      });
+    }
+
     async function runBot(botName) {
       const logBox = document.getElementById("logs");
       logBox.innerHTML += `[Orchestrator] Dispatching task → ${botName} Bot\n`;
@@ -79,15 +90,21 @@
       try {
         const res = await fetch(`http://localhost:3001/run/${botName}`, { method: "POST" });
         const data = await res.json();
-        
-        // Animate logs line by line
+
+        const allLogs = [];
         for (const line of data.logs) {
           await new Promise(r => setTimeout(r, 600)); // delay effect
           logBox.innerHTML += line + "\n";
           logBox.scrollTop = logBox.scrollHeight;
+          allLogs.push(line);
         }
+
+        // Send summary to Slack #projects
+        await notifySlack(botName, allLogs);
+
       } catch (err) {
         logBox.innerHTML += `[System] ❌ Error talking to ${botName} Bot\n`;
+        await notifySlack(botName, ["❌ Error running bot"]);
       }
     }
   </script>
