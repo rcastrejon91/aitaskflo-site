@@ -2,16 +2,75 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pricing — AITaskFlo</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/aos@2.3.1/dist/aos.css" />
 <style>
-:root{--bg:#0d1117;--card:#0f141b;--fg:#e6edf3;--muted:#9aa4b2;--line:#1f2630}
-*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 Inter,system-ui}
-nav{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;background:#0f141b;padding:12px 10px;border-bottom:1px solid var(--line)}
-nav a{text-decoration:none;color:#e6edf3} nav a.active{color:#00d4ff;font-weight:700}
-.wrap{max-width:1000px;margin:40px auto;padding:0 16px}
-.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
-a.btn{display:inline-block;margin-top:8px;background:#ff9800;color:#000;padding:10px 14px;border-radius:8px;text-decoration:none;font-weight:700}
+:root {
+  --bg1:#0d1117; --bg2:#0f141b; --bg3:#001f33; --bg4:#003d66;
+  --card:#0f141b; --fg:#e6edf3; --muted:#9aa4b2; --line:#1f2630;
+  --highlight:#00d4ff; --cta:#ff9800;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;color:var(--fg);font:16px/1.6 Inter,system-ui;
+  background: linear-gradient(-45deg,var(--bg1),var(--bg2),var(--bg3),var(--bg4));
+  background-size:400% 400%;
+  animation: gradientShift 15s ease infinite;
+}
+@keyframes gradientShift {
+  0%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0% 50%}
+}
+nav{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;background:#0f141b;
+    padding:12px 10px;border-bottom:1px solid var(--line)}
+nav a{text-decoration:none;color:#e6edf3}
+nav a.active{color:var(--highlight);font-weight:700}
+.wrap{max-width:1000px;margin:40px auto;padding:0 16px;text-align:center}
+.grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;
+  position:relative;transition:transform .3s ease, box-shadow .3s ease;
+}
+.card:hover{
+  transform: translateY(-6px) scale(1.03);
+  box-shadow:0 8px 24px rgba(0,212,255,0.4);
+}
+.card.popular{border:2px solid var(--highlight);box-shadow:0 0 20px rgba(0,212,255,.3)}
+.badge{
+  position:absolute;top:-12px;left:50%;transform:translateX(-50%);
+  background:var(--highlight);color:#000;font-size:0.75em;font-weight:700;
+  padding:4px 10px;border-radius:8px;animation:pulse 2s infinite;
+}
+@keyframes pulse {
+  0%{transform:translateX(-50%) scale(1);box-shadow:0 0 0 0 rgba(0,212,255,.6);}
+  70%{transform:translateX(-50%) scale(1.08);box-shadow:0 0 12px 6px rgba(0,212,255,0);}
+  100%{transform:translateX(-50%) scale(1);}
+}
+a.btn{
+  display:inline-block;margin-top:16px;padding:12px 16px;border-radius:8px;
+  text-decoration:none;font-weight:700;background:var(--cta);color:#000;
+  transition:all .2s ease;
+}
+a.btn:hover{
+  transform:translateY(-2px) scale(1.05);
+  box-shadow:0 6px 14px rgba(0,212,255,.4);
+}
+a.btn.cta{background:var(--highlight);color:#000}
+p.muted{color:var(--muted);font-size:0.9em;margin-top:20px}
+
+/* Typing Effect */
+.typing {
+  display:inline-block;
+  border-right: 2px solid var(--highlight);
+  white-space: nowrap;
+  overflow: hidden;
+  width: 0;
+  animation: typing 3s steps(20,end) forwards, blink 1s step-end infinite;
+}
+@keyframes typing { from {width: 0} to {width: 100%} }
+@keyframes blink { 50% {border-color: transparent} }
 </style>
+
 <nav>
   <a href="index.html">🏠 Home</a>
   <a href="factory.html">⚙️ Factory</a>
@@ -23,17 +82,52 @@ a.btn{display:inline-block;margin-top:8px;background:#ff9800;color:#000;padding:
   <a href="privacy.html">🛡️ Privacy</a>
   <a href="terms.html">📜 Terms</a>
 </nav>
+
 <div class="wrap">
-  <h1>Pricing</h1>
+  <h1><span class="typing">Choose Your Plan</span></h1>
+  <p data-aos="fade-up" data-aos-delay="150">⚡ Join <strong>120+ teams</strong> already automating smarter with AITaskFlo.</p>
+  
   <div class="grid">
-    <section class="card"><h2>Starter</h2><p>$49/mo • Small teams</p>
-      <ul><li>Up to 3 automations</li><li>Email & task bots</li><li>Community support</li></ul>
-      <a class="btn" href="waitlist.html">Get Started</a></section>
-    <section class="card"><h2>Pro</h2><p>$199/mo • Growing teams</p>
-      <ul><li>Unlimited workflows</li><li>Analytics engine</li><li>Priority support</li></ul>
-      <a class="btn" style="background:#00d4ff" href="waitlist.html">Start Trial</a></section>
-    <section class="card"><h2>Enterprise</h2><p>Custom</p>
-      <ul><li>SOC2-ready guardrails</li><li>SLA & SSO</li><li>Dedicated solutions</li></ul>
-      <a class="btn" style="background:#007acc;color:#fff" href="mailto:aitaskflo@gmail.com?subject=Enterprise%20Inquiry">Talk to Sales</a></section>
+    <!-- Starter -->
+    <section class="card" data-aos="fade-up" data-aos-delay="300">
+      <h2>Starter</h2>
+      <p><del>$59</del> <strong>$48.99</strong> /mo</p>
+      <ul>
+        <li>Up to 3 automations</li>
+        <li>Email & task bots</li>
+        <li>Community support</li>
+      </ul>
+      <a class="btn" href="factory.html?tier=Starter">🌱 Dip Your Toes In</a>
+    </section>
+
+    <!-- Pro (highlighted) -->
+    <section class="card popular" data-aos="fade-up" data-aos-delay="500">
+      <div class="badge">Most Popular</div>
+      <h2>Pro</h2>
+      <p><del>$249</del> <strong>$198.99</strong> /mo</p>
+      <ul>
+        <li>Unlimited workflows</li>
+        <li>Analytics engine</li>
+        <li>Priority support</li>
+      </ul>
+      <a class="btn cta" href="factory.html?tier=Pro">🚀 Unlock Unlimited Power</a>
+    </section>
+
+    <!-- Enterprise -->
+    <section class="card" data-aos="fade-up" data-aos-delay="700">
+      <h2>Enterprise</h2>
+      <p>Custom Pricing</p>
+      <ul>
+        <li>SOC2-ready guardrails</li>
+        <li>SLA & SSO</li>
+        <li>Dedicated solutions</li>
+      </ul>
+      <a class="btn" href="factory.html?tier=Enterprise">💼 Let’s Dominate Together</a>
+    </section>
   </div>
+
+  <p class="muted" data-aos="fade-up" data-aos-delay="900">Cancel anytime. Upgrade or downgrade plans as your team grows.</p>
 </div>
+
+<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+<script>AOS.init();</script>
