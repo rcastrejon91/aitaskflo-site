@@ -1,100 +1,63 @@
-import express from "express";
-import fs from "fs";
-import fetch from "node-fetch";
+// server.js
+const express = require("express");
+const cors = require("cors");
 
 const app = express();
-app.use(express.json());
-
 const PORT = 3001;
 
-// --- Bot Personalities ---
-const personalities = {
-  emailBot: { intro: "💌 EmailBot: Ready to craft messages ✨" },
-  taskBot: { intro: "📋 TaskBot: Focused on deadlines ✅" },
-  analyticsBot: { intro: "📊 AnalyticsBot: Reporting insights 📈" },
-  researchBot: { intro: "🔍 ResearchBot: Digging deeper 🕵️" }
+app.use(cors());
+app.use(express.json());
+
+// Simulated bot personalities
+const bots = {
+  emailBot: (input) => [
+    `[EmailBot] You said: "${input}"`,
+    "[EmailBot] 💌 Drafting a friendly reply...",
+    "[EmailBot] ✅ Reply sent!"
+  ],
+  taskBot: (input) => [
+    `[TaskBot] Task received: "${input}"`,
+    "[TaskBot] 🗂️ Logging into task manager...",
+    "[TaskBot] ✅ Task assigned successfully."
+  ],
+  analyticsBot: (input) => [
+    `[AnalyticsBot] Question: "${input}"`,
+    "[AnalyticsBot] 📊 Running analysis...",
+    "[AnalyticsBot] ✅ Insight: Engagement up 12% this week!"
+  ],
+  researchBot: (input) => [
+    `[ResearchBot] Query: "${input}"`,
+    "[ResearchBot] 🔍 Searching sources...",
+    "[ResearchBot] ✅ Found 3 relevant articles."
+  ]
 };
 
-// --- Memory Helpers ---
-function getMemory(botName) {
-  const path = `./memory/${botName}.json`;
-  if (!fs.existsSync(path)) {
-    return { requests: [] };
-  }
-  return JSON.parse(fs.readFileSync(path));
-}
-
-function saveMemory(botName, data) {
-  const dir = "./memory";
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir);
-
-  const path = `${dir}/${botName}.json`;
-  let file = getMemory(botName);
-
-  file.requests.push({
-    input: data.input,
-    output: data.output,
-    timestamp: new Date().toISOString(),
-  });
-
-  fs.writeFileSync(path, JSON.stringify(file, null, 2));
-}
-
-function summarizeKnowledge(memory) {
-  if (memory.requests.length === 0) return "Still learning... 🍼";
-  const lastFew = memory.requests.slice(-3).map(r => r.input);
-  return `I’ve noticed you often ask about: ${lastFew.join(", ")}.`;
-}
-
-// --- Run Single Bot ---
+// --- Run a single bot ---
 app.post("/run-bot", (req, res) => {
   const { botName, input } = req.body;
-  const memory = getMemory(botName);
-
-  const personality = personalities[botName] || { intro: "🤖 Unknown bot" };
-  let friendlyContext = "";
-
-  if (memory.requests.length > 0) {
-    const last = memory.requests[memory.requests.length - 1];
-    friendlyContext = ` Last time, you asked: "${last.input}".`;
+  if (bots[botName]) {
+    res.json({ logs: bots[botName](input) });
+  } else {
+    res.status(404).json({ logs: [`❌ No bot found: ${botName}`] });
   }
-
-  const knowledgeSummary = summarizeKnowledge(memory);
-  const reply = `${personality.intro}\nYou said: "${input}".${friendlyContext}\n${knowledgeSummary}`;
-
-  saveMemory(botName, { input, output: reply });
-
-  res.json({ logs: [reply] });
 });
 
-// --- Run Crew Mode ---
+// --- Run the whole crew ---
 app.post("/team-run", (req, res) => {
   const { input } = req.body;
-  const crew = ["emailBot", "taskBot", "analyticsBot", "researchBot"];
   let logs = [];
 
   logs.push(`🧑‍🤝‍🧑 Crew Meeting — Topic: "${input}"`);
 
-  crew.forEach(bot => {
-    const memory = getMemory(bot);
-    const personality = personalities[bot];
-    const last = memory.requests[memory.requests.length - 1];
-    const knowledgeSummary = summarizeKnowledge(memory);
-    let context = last ? ` (Last time: "${last.input}")` : "";
+  logs.push(...bots.emailBot(input));
+  logs.push(...bots.taskBot(input));
+  logs.push(...bots.analyticsBot(input));
+  logs.push(...bots.researchBot(input));
 
-    logs.push(`${personality.intro}\n"${input}" → ${knowledgeSummary}${context}`);
-  });
-
-  // Crew banter
-  logs.push("💡 TaskBot: 'AnalyticsBot, I back up your numbers!'");
-  logs.push("😂 EmailBot: 'But add some ✨sparkle✨!'");
-  logs.push("🔍 ResearchBot: 'I found a tool we should test.'");
-
-  // Crew conclusion
-  const summary = "✅ Crew Summary: Automate follow-ups + track churn + test onboarding tool.";
-  logs.push(summary);
-
-  saveMemory("team", { input, output: logs.join("\n") });
+  logs.push("💡 TaskBot: I agree with AnalyticsBot’s numbers!");
+  logs.push("😂 EmailBot: But don’t forget to add ✨sparkle✨!");
+  logs.push("🔍 ResearchBot: I found a tool we should test.");
+  logs.push("✅ Crew Summary: Automate follow-ups + track metrics + test new tools.");
 
   res.json({ logs });
 });
