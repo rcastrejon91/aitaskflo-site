@@ -1,65 +1,203 @@
-<script>
-  const BASE_URL = "https://workspace.ricardomcastrej.replit.dev"; 
-  // 👆 this points to your live Replit backend
-
-  async function runBot(botName) {
-    const logBox = document.getElementById("logs");
-    logBox.innerHTML += `[Orchestrator] Dispatching task → ${botName}\n`;
-
-    try {
-      const res = await fetch(`${BASE_URL}/run-bot`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ botName, input: "Test input from Factory" })
-      });
-
-      const data = await res.json();
-      for (const line of data.logs) {
-        await typeLine(logBox, line, botName);
-      }
-    } catch {
-      logBox.innerHTML += `[System] ❌ Error running ${botName}\n`;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Automation Factory - AITaskFlo</title>
+  <style>
+    body { 
+      font-family: 'Inter', sans-serif; 
+      text-align: center; 
+      padding: 40px; 
+      background:#0d1117; 
+      color:#fff; 
+      overflow-x:hidden;
+      position: relative;
+      min-height: 100vh;
     }
-  }
 
-  async function runTeamBot() {
-    const input = document.getElementById("teamInput").value;
-    const outputBox = document.getElementById("teamOutput");
-    outputBox.innerHTML = "🧑‍🤝‍🧑 Crew is discussing...\n";
-
-    try {
-      const res = await fetch(`${BASE_URL}/team-run`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input })
-      });
-      const data = await res.json();
-
-      for (const line of data.logs) {
-        let botName = "";
-        if (line.toLowerCase().includes("emailbot")) botName = "emailBot";
-        if (line.toLowerCase().includes("taskbot")) botName = "taskBot";
-        if (line.toLowerCase().includes("analyticsbot")) botName = "analyticsBot";
-        if (line.toLowerCase().includes("researchbot")) botName = "researchBot";
-
-        await typeLine(outputBox, line, botName);
-      }
-    } catch {
-      outputBox.innerHTML += "❌ Error connecting to the crew.\n";
+    /* Background animation */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: radial-gradient(circle at 20% 20%, rgba(0,212,255,0.2), transparent 50%),
+                  radial-gradient(circle at 80% 80%, rgba(255,152,0,0.15), transparent 50%),
+                  radial-gradient(circle at 50% 50%, rgba(0,212,255,0.1), transparent 60%);
+      background-size: 200% 200%;
+      animation: pulseBg 12s ease-in-out infinite alternate;
+      z-index: -1;
     }
-  }
+    @keyframes pulseBg {
+      from { background-position: 0% 0%, 100% 100%, 50% 50%; }
+      to   { background-position: 100% 0%, 0% 100%, 50% 80%; }
+    }
 
-  async function typeLine(box, text, botName="") {
-    let avatar = botName 
-      ? `<span class="bot-avatar ${botName}"></span>` 
-      : "";
+    h1 { 
+      font-size: 2.5em; 
+      color:#00d4ff; 
+      animation: glow 2s ease-in-out infinite alternate;
+    }
+    @keyframes glow {
+      from { text-shadow: 0 0 10px #00d4ff, 0 0 20px #00d4ff; }
+      to   { text-shadow: 0 0 20px #ff9800, 0 0 30px #ff9800; }
+    }
 
-    box.innerHTML += avatar;
-    for (let i = 0; i < text.length; i++) {
-      box.innerHTML += text[i];
+    .machine {
+      margin: 30px auto;
+      padding: 20px;
+      width: 80%;
+      border: 2px solid #00d4ff;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.05);
+      box-shadow: 0 0 10px rgba(0,212,255,0.3);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .machine:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 0 20px rgba(255,152,0,0.7);
+    }
+
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      border: none;
+      border-radius: 6px;
+      background: linear-gradient(90deg, #00d4ff, #007acc);
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    button:hover { background: linear-gradient(90deg, #ff9800, #ff5722); }
+
+    textarea {
+      width: 80%; 
+      padding: 10px;
+      border-radius: 6px;
+      border: none;
+      outline: none;
+      font-family: monospace;
+      margin-bottom: 10px;
+    }
+
+    #log-panel, #teamOutput {
+      margin-top: 20px;
+      text-align: left;
+      background: #111;
+      padding: 15px;
+      border-radius: 10px;
+      color: #0f0;
+      font-family: monospace;
+      max-height: 250px;
+      overflow-y: auto;
+      box-shadow: inset 0 0 10px #00d4ff;
+    }
+  </style>
+</head>
+<body>
+  <h1>⚙️ Welcome to the Automation Factory ⚙️</h1>
+  <p>Here’s where ideas turn into automated workflows. Pick a bot or ask the whole crew!</p>
+
+  <!-- Single Bots -->
+  <div class="machine">
+    <h2>💌 Email Bot</h2>
+    <p>Automatically respond to customer emails in seconds.</p>
+    <button onclick="runBot('emailBot')">Run Email Bot</button>
+  </div>
+
+  <div class="machine">
+    <h2>📋 Task Manager</h2>
+    <p>Assign, track, and complete tasks without lifting a finger.</p>
+    <button onclick="runBot('taskBot')">Run Task Manager</button>
+  </div>
+
+  <div class="machine">
+    <h2>📊 Analytics Engine</h2>
+    <p>Get instant insights on your business performance.</p>
+    <button onclick="runBot('analyticsBot')">Run Analytics</button>
+  </div>
+
+  <div class="machine">
+    <h2>🔍 Research Bot</h2>
+    <p>Search, fetch facts, and uncover insights.</p>
+    <button onclick="runBot('researchBot')">Run Research Bot</button>
+  </div>
+
+  <!-- Team Mode -->
+  <div class="machine">
+    <h2>🤖 AI Agent (Team Mode)</h2>
+    <p>Ask the whole crew a question, and they’ll discuss it together.</p>
+    <textarea id="teamInput" placeholder="Type your question for the crew..."></textarea>
+    <br>
+    <button onclick="runTeamBot()">🧑‍🤝‍🧑 Ask the Crew</button>
+    <pre id="teamOutput"></pre>
+  </div>
+
+  <!-- Log Panel -->
+  <div id="log-panel">
+    <strong>📜 Bot Logs:</strong>
+    <pre id="logs"></pre>
+  </div>
+
+  <a href="index.html" style="display:inline-block; margin-top:30px; padding:10px 20px; background:#ff9800; color:#fff; text-decoration:none; border-radius:5px;">⬅ Back to Home</a>
+
+  <script>
+    // Use current domain automatically
+    const BASE_URL = window.location.origin;
+
+    async function runBot(botName) {
+      const logBox = document.getElementById("logs");
+      logBox.innerHTML += `[Orchestrator] Dispatching task → ${botName}\n`;
+
+      try {
+        const res = await fetch(`${BASE_URL}/run-bot`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ botName, input: "Test input from Factory" })
+        });
+
+        const data = await res.json();
+        for (const line of data.logs) {
+          await typeLine(logBox, line, botName);
+        }
+      } catch {
+        logBox.innerHTML += `[System] ❌ Error running ${botName}\n`;
+      }
+    }
+
+    async function runTeamBot() {
+      const input = document.getElementById("teamInput").value;
+      const outputBox = document.getElementById("teamOutput");
+      outputBox.innerHTML = "🧑‍🤝‍🧑 Crew is discussing...\n";
+
+      try {
+        const res = await fetch(`${BASE_URL}/team-run`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ input })
+        });
+        const data = await res.json();
+
+        for (const line of data.logs) {
+          let botName = "";
+          if (line.toLowerCase().includes("emailbot")) botName = "emailBot";
+          if (line.toLowerCase().includes("taskbot")) botName = "taskBot";
+          if (line.toLowerCase().includes("analyticsbot")) botName = "analyticsBot";
+          if (line.toLowerCase().includes("researchbot")) botName = "researchBot";
+
+          await typeLine(outputBox, line, botName);
+        }
+      } catch {
+        outputBox.innerHTML += "❌ Error connecting to the crew.\n";
+      }
+    }
+
+    async function typeLine(box, text, botName="") {
+      box.innerHTML += (botName ? `[${botName}] ` : "") + text + "\n";
       box.scrollTop = box.scrollHeight;
       await new Promise(r => setTimeout(r, 20));
     }
-    box.innerHTML += "\n";
-  }
-</script>
+  </script>
+</body>
+</html>
