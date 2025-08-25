@@ -9,7 +9,20 @@ const PORT = 3001;
 app.use(cors());
 app.use(express.json());
 
-// Utility: load memory
+// --- SAFETY NET: Ensure core files exist ---
+if (!fs.existsSync("admins.json")) {
+  fs.writeFileSync("admins.json", JSON.stringify([
+    { email: "admin@taskflo.com", password: "taskflo_01", active: true }
+  ], null, 2));
+  console.log("⚠️ Created default admins.json with 1 admin (admin@taskflo.com / taskflo_01)");
+}
+
+if (!fs.existsSync("db.json")) {
+  fs.writeFileSync("db.json", JSON.stringify({ users: [], billing: [] }, null, 2));
+  console.log("⚠️ Created empty db.json for customer accounts + billing");
+}
+
+// --- Bot Memory Utilities ---
 function getMemory(botName) {
   const path = `./memory/${botName}.json`;
   if (!fs.existsSync("./memory")) fs.mkdirSync("./memory");
@@ -17,7 +30,6 @@ function getMemory(botName) {
   return JSON.parse(fs.readFileSync(path));
 }
 
-// Utility: save memory
 function saveMemory(botName, input, output) {
   const path = `./memory/${botName}.json`;
   const memory = getMemory(botName);
@@ -29,7 +41,7 @@ function saveMemory(botName, input, output) {
   fs.writeFileSync(path, JSON.stringify(memory, null, 2));
 }
 
-// Bot personalities
+// --- Bot personalities ---
 const bots = {
   emailBot: (input, memory) => [
     `[EmailBot] You said: "${input}"`,
@@ -97,6 +109,25 @@ app.post("/team-run", (req, res) => {
 
   saveMemory("team", input, logs);
   res.json({ logs });
+});
+
+// --- Admin Login ---
+app.post("/admin-login", (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const admins = JSON.parse(fs.readFileSync("admins.json"));
+    const admin = admins.find(a => a.email === email && a.password === password && a.active);
+
+    if (admin) {
+      res.json({ success: true, message: `✅ Welcome back, ${email}` });
+    } else {
+      res.status(401).json({ success: false, message: "❌ Invalid email or password" });
+    }
+  } catch (err) {
+    console.error("Error reading admins.json:", err);
+    res.status(500).json({ success: false, message: "⚠️ Server error" });
+  }
 });
 
 // --- Start Server ---
