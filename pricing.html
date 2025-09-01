@@ -1,79 +1,950 @@
-<!doctype html>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pricing — AITaskFlo</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/aos@2.3.1/dist/aos.css" />
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enterprise Pricing - AITaskFlo</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg1:#0d1117; --bg2:#0f141b; --bg3:#001f33; --bg4:#003d66;
-  --card:#0f141b; --fg:#e6edf3; --muted:#9aa4b2; --line:#1f2630;
-  --highlight:#00d4ff; --cta:#ff9800;
+  --bg: #0a0e1a; --card: #0f1419; --fg: #e6edf3; --muted: #8b949e;
+  --brand: #00d4ff; --accent: #ff9800; --line: #21262d;
+  --success: #238636; --warning: #f85149; --purple: #8b5cf6;
+  --gradient1: linear-gradient(135deg, #00d4ff, #0088cc);
+  --gradient2: linear-gradient(135deg, #ff9800, #f57c00);
+  --gradient3: linear-gradient(135deg, #8b5cf6, #7c3aed);
 }
-*{box-sizing:border-box}
-body{
-  margin:0;color:var(--fg);font:16px/1.6 Inter,system-ui;
-  background: linear-gradient(-45deg,var(--bg1),var(--bg2),var(--bg3),var(--bg4));
-  background-size:400% 400%;
-  animation: gradientShift 15s ease infinite;
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.6 Inter, system-ui;
+  overflow-x: hidden;
 }
-@keyframes gradientShift {
-  0%{background-position:0% 50%}
-  50%{background-position:100% 50%}
-  100%{background-position:0% 50%}
+
+/* Animated Background */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 20%, rgba(0,212,255,0.1), transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255,152,0,0.08), transparent 50%),
+    radial-gradient(circle at 50% 10%, rgba(139,92,246,0.06), transparent 60%);
+  background-size: 300% 300%;
+  animation: gradientMove 15s ease-in-out infinite alternate;
+  z-index: -1;
 }
-nav{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;background:#0f141b;
-    padding:12px 10px;border-bottom:1px solid var(--line)}
-nav a{text-decoration:none;color:#e6edf3}
-nav a.active{color:var(--highlight);font-weight:700}
-.wrap{max-width:1000px;margin:40px auto;padding:0 16px;text-align:center}
-.grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-.card{
-  background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;
-  position:relative;transition:transform .3s ease, box-shadow .3s ease;
+@keyframes gradientMove {
+  0% { background-position: 0% 0%, 100% 100%, 50% 0%; }
+  50% { background-position: 100% 50%, 0% 50%, 80% 100%; }
+  100% { background-position: 0% 100%, 100% 0%, 20% 50%; }
 }
-.card:hover{
-  transform: translateY(-6px) scale(1.03);
-  box-shadow:0 8px 24px rgba(0,212,255,0.4);
+
+/* Navigation */
+.nav {
+  background: rgba(15, 20, 25, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+  padding: 16px 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
-.card.popular{border:2px solid var(--highlight);box-shadow:0 0 20px rgba(0,212,255,.3)}
-.badge{
-  position:absolute;top:-12px;left:50%;transform:translateX(-50%);
-  background:var(--highlight);color:#000;font-size:0.75em;font-weight:700;
-  padding:4px 10px;border-radius:8px;animation:pulse 2s infinite;
+.nav-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+}
+.nav-brand {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--brand);
+  text-decoration: none;
+}
+.nav-links {
+  display: flex;
+  gap: 32px;
+  align-items: center;
+}
+.nav-links a {
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+.nav-links a:hover, .nav-links a.active {
+  color: var(--brand);
+}
+
+/* Header */
+.header {
+  text-align: center;
+  padding: 80px 24px 60px;
+  position: relative;
+}
+.header::before {
+  content: "";
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 800px; height: 800px;
+  background: radial-gradient(circle, rgba(0,212,255,0.1), transparent 70%);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  animation: pulse 6s ease-in-out infinite;
 }
 @keyframes pulse {
-  0%{transform:translateX(-50%) scale(1);box-shadow:0 0 0 0 rgba(0,212,255,.6);}
-  70%{transform:translateX(-50%) scale(1.08);box-shadow:0 0 12px 6px rgba(0,212,255,0);}
-  100%{transform:translateX(-50%) scale(1);}
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+  50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
 }
-a.btn{
-  display:inline-block;margin-top:16px;padding:12px 16px;border-radius:8px;
-  text-decoration:none;font-weight:700;background:var(--cta);color:#000;
-  transition:all .2s ease;
-}
-a.btn:hover{
-  transform:translateY(-2px) scale(1.05);
-  box-shadow:0 6px 14px rgba(0,212,255,.4);
-}
-a.btn.cta{background:var(--highlight);color:#000}
-p.muted{color:var(--muted);font-size:0.9em;margin-top:20px}
 
-/* Typing Effect */
-.typing {
-  display:inline-block;
-  border-right: 2px solid var(--highlight);
-  white-space: nowrap;
+.header-content { position: relative; z-index: 10; }
+.header h1 {
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  font-weight: 800;
+  margin: 0 0 20px;
+  background: linear-gradient(135deg, var(--brand), var(--accent), var(--purple));
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradientShift 4s ease-in-out infinite;
+}
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.header p {
+  font-size: 1.4rem;
+  color: var(--muted);
+  margin: 0 auto 30px;
+  max-width: 600px;
+}
+
+/* Billing Toggle */
+.billing-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 50px;
+  padding: 8px;
+  margin-bottom: 60px;
+}
+.toggle-option {
+  padding: 12px 24px;
+  border-radius: 50px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+.toggle-option.active {
+  background: var(--gradient1);
+  color: #000;
+  box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+}
+.toggle-option:not(.active) {
+  color: var(--muted);
+}
+.savings-badge {
+  background: var(--success);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  animation: bounce 2s ease-in-out infinite;
+}
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* Pricing Grid */
+.pricing-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+}
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 32px;
+  margin-bottom: 60px;
+}
+
+/* Pricing Cards */
+.pricing-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 40px 32px;
+  position: relative;
+  transition: all 0.4s ease;
   overflow: hidden;
-  width: 0;
-  animation: typing 3s steps(20,end) forwards, blink 1s step-end infinite;
 }
-@keyframes typing { from {width: 0} to {width: 100%} }
-@keyframes blink { 50% {border-color: transparent} }
-</style>
+.pricing-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 4px;
+  background: var(--line);
+  transition: all 0.4s ease;
+}
+.pricing-card:hover {
+  transform: translateY(-12px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
 
-<nav>
-  <a href="index.html">🏠 Home</a>
-  <a href="factory.html">⚙️ Factory</a>
+.pricing-card.popular {
+  border-color: var(--brand);
+  box-shadow: 0 0 30px rgba(0, 212, 255, 0.2);
+  scale: 1.05;
+}
+.pricing-card.popular::before {
+  background: var(--gradient1);
+}
+.pricing-card.popular:hover {
+  box-shadow: 0 25px 70px rgba(0, 212, 255, 0.3);
+}
+
+.pricing-card.enterprise::before {
+  background: var(--gradient3);
+}
+.pricing-card.enterprise:hover {
+  box-shadow: 0 25px 70px rgba(139, 92, 246, 0.2);
+}
+
+.popular-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--gradient1);
+  color: #000;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: 20px;
+  animation: glow 2s ease-in-out infinite alternate;
+}
+@keyframes glow {
+  from { box-shadow: 0 0 10px rgba(0, 212, 255, 0.5); }
+  to { box-shadow: 0 0 20px rgba(0, 212, 255, 0.8); }
+}
+
+.plan-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: var(--fg);
+}
+.plan-description {
+  color: var(--muted);
+  margin: 0 0 24px;
+  font-size: 0.95rem;
+}
+
+.price-container {
+  margin: 24px 0 32px;
+}
+.price {
+  font-size: 3rem;
+  font-weight: 800;
+  color: var(--fg);
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.price-currency {
+  font-size: 1.5rem;
+  color: var(--muted);
+}
+.price-period {
+  font-size: 1rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+.price-original {
+  font-size: 1.2rem;
+  color: var(--muted);
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+.price-savings {
+  font-size: 0.9rem;
+  color: var(--success);
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.features-list {
+  list-style: none;
+  padding: 0;
+  margin: 32px 0;
+}
+.features-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+.feature-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: #fff;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.feature-icon.premium {
+  background: var(--brand);
+}
+.feature-icon.enterprise {
+  background: var(--purple);
+}
+
+.cta-button {
+  width: 100%;
+  padding: 16px 24px;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+}
+.cta-button::before {
+  content: "";
+  position: absolute;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.6s ease;
+}
+.cta-button:hover::before { left: 100%; }
+
+.cta-primary {
+  background: var(--gradient1);
+  color: #000;
+}
+.cta-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(0, 212, 255, 0.4);
+}
+
+.cta-secondary {
+  background: rgba(255, 152, 0, 0.1);
+  color: var(--accent);
+  border: 2px solid var(--accent);
+}
+.cta-secondary:hover {
+  background: var(--accent);
+  color: #000;
+  transform: translateY(-2px);
+}
+
+.cta-enterprise {
+  background: var(--gradient3);
+  color: #fff;
+}
+.cta-enterprise:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(139, 92, 246, 0.4);
+}
+
+/* Enterprise Features */
+.enterprise-features {
+  background: linear-gradient(135deg, rgba(139,92,246,0.1), rgba(0,212,255,0.05));
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 48px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.enterprise-features::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="enterprise" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="1" fill="%238b5cf6" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23enterprise)"/></svg>');
+  opacity: 0.5;
+}
+.enterprise-content { position: relative; z-index: 10; }
+.enterprise-features h2 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  margin: 0 0 20px;
+  background: var(--gradient3);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  margin-top: 40px;
+}
+.feature-item {
+  background: rgba(15, 20, 25, 0.8);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: left;
+  transition: all 0.3s ease;
+}
+.feature-item:hover {
+  transform: translateY(-4px);
+  border-color: var(--purple);
+}
+.feature-item h4 {
+  margin: 0 0 12px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.feature-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* FAQ */
+.faq-section {
+  margin: 80px 0;
+  text-align: center;
+}
+.faq-section h2 {
+  font-size: 2.2rem;
+  font-weight: 700;
+  margin: 0 0 40px;
+  color: var(--fg);
+}
+.faq-grid {
+  display: grid;
+  gap: 16px;
+  text-align: left;
+  max-width: 800px;
+  margin: 0 auto;
+}
+.faq-item {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.faq-question {
+  padding: 20px 24px;
+  font-weight: 600;
+  color: var(--fg);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.3s ease;
+}
+.faq-question:hover {
+  background: rgba(0, 212, 255, 0.05);
+}
+.faq-answer {
+  padding: 0 24px 20px;
+  color: var(--muted);
+  line-height: 1.6;
+  display: none;
+}
+.faq-item.active .faq-answer {
+  display: block;
+  animation: slideDown 0.3s ease;
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Stats */
+.stats-section {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 48px 24px;
+  margin: 60px 0;
+  text-align: center;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 40px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+.stat {
+  text-align: center;
+}
+.stat-number {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--brand);
+  display: block;
+  margin-bottom: 8px;
+}
+.stat-label {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .pricing-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .pricing-card.popular {
+    scale: 1;
+  }
+  .header h1 {
+    font-size: 2.5rem;
+  }
+  .header p {
+    font-size: 1.1rem;
+  }
+  .billing-toggle {
+    flex-direction: column;
+    gap: 0;
+  }
+  .enterprise-features {
+    padding: 24px;
+  }
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-brand">AITaskFlo</a>
+      <div class="nav-links">
+        <a href="index.html">Home</a>
+        <a href="factory.html">Factory</a>
+        <a href="pricing.html" class="active">Pricing</a>
+        <a href="waitlist.html">Demo</a>
+        <a href="docs/index.html">Docs</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-content">
+      <h1>Simple, Transparent Pricing</h1>
+      <p>Scale your automation from startup to enterprise with our flexible pricing plans</p>
+      
+      <!-- Billing Toggle -->
+      <div class="billing-toggle">
+        <div class="toggle-option active" onclick="toggleBilling('monthly')">Monthly</div>
+        <div class="toggle-option" onclick="toggleBilling('annual')">
+          Annual
+          <span class="savings-badge">Save 30%</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Pricing Container -->
+  <div class="pricing-container">
+    <!-- Pricing Grid -->
+    <div class="pricing-grid" id="pricingGrid">
+      <!-- Starter Plan -->
+      <div class="pricing-card">
+        <div class="plan-name">Starter</div>
+        <div class="plan-description">Perfect for small teams getting started with automation</div>
+        
+        <div class="price-container">
+          <div class="price">
+            <span class="price-currency">$</span>
+            <span class="price-amount" data-monthly="29" data-annual="20">29</span>
+            <span class="price-period">/month</span>
+          </div>
+          <div class="price-original" style="display: none;">
+            <span data-monthly="$39" data-annual="$29">$39</span>
+          </div>
+          <div class="price-savings" style="display: none;">
+            Save <span data-monthly="$108" data-annual="$228">$108</span> annually
+          </div>
+        </div>
+
+        <ul class="features-list">
+          <li>
+            <span class="feature-icon">✓</span>
+            Up to 3 AI agents
+          </li>
+          <li>
+            <span class="feature-icon">✓</span>
+            500 automations/month
+          </li>
+          <li>
+            <span class="feature-icon">✓</span>
+            Email & Slack integrations
+          </li>
+          <li>
+            <span class="feature-icon">✓</span>
+            Basic analytics dashboard
+          </li>
+          <li>
+            <span class="feature-icon">✓</span>
+            Community support
+          </li>
+          <li>
+            <span class="feature-icon">✓</span>
+            30-day free trial
+          </li>
+        </ul>
+
+        <a href="factory.html?plan=starter" class="cta-button cta-secondary">Start Free Trial</a>
+      </div>
+
+      <!-- Growth Plan (Popular) -->
+      <div class="pricing-card popular">
+        <div class="popular-badge">Most Popular</div>
+        <div class="plan-name">Growth</div>
+        <div class="plan-description">Perfect for growing teams scaling their automation</div>
+        
+        <div class="price-container">
+          <div class="price">
+            <span class="price-currency">$</span>
+            <span class="price-amount" data-monthly="79" data-annual="55">79</span>
+            <span class="price-period">/month</span>
+          </div>
+          <div class="price-original" style="display: none;">
+            <span data-monthly="$99" data-annual="$79">$99</span>
+          </div>
+          <div class="price-savings" style="display: none;">
+            Save <span data-monthly="$288" data-annual="$528">$288</span> annually
+          </div>
+        </div>
+
+        <ul class="features-list">
+          <li>
+            <span class="feature-icon premium">✓</span>
+            Up to 10 AI agents
+          </li>
+          <li>
+            <span class="feature-icon premium">✓</span>
+            3,000 automations/month
+          </li>
+          <li>
+            <span class="feature-icon premium">✓</span>
+            50+ integrations
+          </li>
+          <li>
+            <span class="feature-icon premium">✓</span>
+            Advanced analytics & reporting
+          </li>
+          <li>
+            <span class="feature-icon premium">✓</span>
+            Priority email support
+          </li>
+          <li>
+            <span class="feature-icon premium">✓</span>
+            Custom workflows
+          </li>
+          <li>
+            <span class="feature-icon premium">✓</span>
+            Team collaboration tools
+          </li>
+          <li>
+            <span class="feature-icon premium">✓</span>
+            API access (basic)
+          </li>
+        </ul>
+
+        <a href="factory.html?plan=growth" class="cta-button cta-primary">Get Started</a>
+      </div>
+
+      <!-- Professional Plan -->
+      <div class="pricing-card enterprise">
+        <div class="plan-name">Professional</div>
+        <div class="plan-description">Advanced features for established businesses and teams</div>
+        
+        <div class="price-container">
+          <div class="price">
+            <span class="price-currency">$</span>
+            <span class="price-amount" data-monthly="199" data-annual="140">199</span>
+            <span class="price-period">/month</span>
+          </div>
+          <div class="price-original" style="display: none;">
+            <span data-monthly="$249" data-annual="$199">$249</span>
+          </div>
+          <div class="price-savings" style="display: none;">
+            Save <span data-monthly="$708" data-annual="$1,308">$708</span> annually
+          </div>
+        </div>
+
+        <ul class="features-list">
+          <li>
+            <span class="feature-icon enterprise">✓</span>
+            Unlimited AI agents
+          </li>
+          <li>
+            <span class="feature-icon enterprise">✓</span>
+            15,000 automations/month
+          </li>
+          <li>
+            <span class="feature-icon enterprise">✓</span>
+            200+ integrations
+          </li>
+          <li>
+            <span class="feature-icon enterprise">✓</span>
+            Advanced analytics & insights
+          </li>
+          <li>
+            <span class="feature-icon enterprise">✓</span>
+            Priority phone & email support
+          </li>
+          <li>
+            <span class="feature-icon enterprise">✓</span>
+            Advanced security features
+          </li>
+          <li>
+            <span class="feature-icon enterprise">✓</span>
+            Full API access & webhooks
+          </li>
+          <li>
+            <span class="feature-icon enterprise">✓</span>
+            Team management & roles
+          </li>
+        </ul>
+
+        <a href="factory.html?plan=professional" class="cta-button cta-enterprise">Get Started</a>
+      </div>
+    </div>
+
+    <!-- Enterprise CTA Section -->
+    <div class="enterprise-cta" style="background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 40px; text-align: center; margin: 40px 0;">
+      <h2 style="margin: 0 0 16px; font-size: 1.8rem; color: var(--fg);">Need Enterprise Features?</h2>
+      <p style="color: var(--muted); margin: 0 0 24px; font-size: 1.1rem;">Custom pricing starting at $299/month for unlimited automations, dedicated support, and enterprise security.</p>
+      <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+        <a href="waitlist.html?plan=enterprise" class="cta-button cta-enterprise" style="display: inline-block; width: auto; padding: 14px 28px;">Contact Sales</a>
+        <a href="factory.html?demo=enterprise" class="cta-button cta-secondary" style="display: inline-block; width: auto; padding: 14px 28px;">Request Demo</a>
+      </div>
+    </div>
+
+    <!-- Stats Section -->
+    <div class="stats-section">
+      <div class="stats-grid">
+        <div class="stat">
+          <span class="stat-number">150+</span>
+          <div class="stat-label">Beta Customers</div>
+        </div>
+        <div class="stat">
+          <span class="stat-number">500K+</span>
+          <div class="stat-label">Tasks Automated</div>
+        </div>
+        <div class="stat">
+          <span class="stat-number">99.5%</span>
+          <div class="stat-label">Success Rate</div>
+        </div>
+        <div class="stat">
+          <span class="stat-number">68%</span>
+          <div class="stat-label">Average Time Saved</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Enterprise Features -->
+    <div class="enterprise-features">
+      <div class="enterprise-content">
+        <h2>Enterprise-Grade Features</h2>
+        <p style="font-size: 1.1rem; color: var(--muted); margin: 0 0 40px;">Built for the most demanding enterprise requirements</p>
+        
+        <div class="feature-grid">
+          <div class="feature-item">
+            <h4>🛡️ Advanced Security</h4>
+            <p>SOC2 compliant with end-to-end encryption, SAML SSO, and comprehensive audit trails</p>
+          </div>
+          <div class="feature-item">
+            <h4>🏢 Dedicated Infrastructure</h4>
+            <p>Private cloud deployment with dedicated resources and guaranteed performance</p>
+          </div>
+          <div class="feature-item">
+            <h4>👥 Premium Support</h4>
+            <p>24/7 priority support with dedicated customer success manager and training</p>
+          </div>
+          <div class="feature-item">
+            <h4>⚙️ Custom Integrations</h4>
+            <p>Bespoke integrations with your existing systems and custom API development</p>
+          </div>
+          <div class="feature-item">
+            <h4>📊 Advanced Analytics</h4>
+            <p>Detailed performance metrics, custom reporting, and predictive insights</p>
+          </div>
+          <div class="feature-item">
+            <h4>🔄 Unlimited Scale</h4>
+            <p>No limits on agents, automations, or data processing with auto-scaling infrastructure</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FAQ Section -->
+    <div class="faq-section">
+      <h2>Frequently Asked Questions</h2>
+      <div class="faq-grid">
+        <div class="faq-item">
+          <div class="faq-question" onclick="toggleFaq(this)">
+            What's included in the free trial?
+            <span>+</span>
+          </div>
+          <div class="faq-answer">
+            The 30-day free trial includes full access to all Starter plan features: 5 AI agents, 1,000 automations, core integrations, and community support. No credit card required.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question" onclick="toggleFaq(this)">
+            Can I upgrade or downgrade my plan?
+            <span>+</span>
+          </div>
+          <div class="faq-answer">
+            Yes, you can change your plan at any time. Upgrades take effect immediately, while downgrades take effect at the next billing cycle. We'll prorate any differences.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question" onclick="toggleFaq(this)">
+            What happens if I exceed my automation limits?
+            <span>+</span>
+          </div>
+          <div class="faq-answer">
+            We'll notify you before you reach your limits. You can upgrade your plan or purchase additional automation credits. We never shut off your automations without warning.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question" onclick="toggleFaq(this)">
+            Is my data secure and compliant?
+            <span>+</span>
+          </div>
+          <div class="faq-answer">
+            Absolutely. We're SOC2 Type II certified with enterprise-grade security. All data is encrypted in transit and at rest, with comprehensive access controls and audit logging.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question" onclick="toggleFaq(this)">
+            Do you offer custom enterprise pricing?
+            <span>+</span>
+          </div>
+          <div class="faq-answer">
+            Yes, we offer flexible pricing for large enterprises with specific requirements. Contact our sales team to discuss volume discounts and custom features.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentBilling = 'monthly';
+
+    function toggleBilling(type) {
+      currentBilling = type;
+      
+      // Update toggle appearance
+      document.querySelectorAll('.toggle-option').forEach(opt => opt.classList.remove('active'));
+      event.target.classList.add('active');
+      
+      // Update all prices
+      document.querySelectorAll('.price-amount').forEach(amount => {
+        const monthlyPrice = amount.dataset.monthly;
+        const annualPrice = amount.dataset.annual;
+        amount.textContent = type === 'monthly' ? monthlyPrice : annualPrice;
+      });
+      
+      // Show/hide original prices and savings
+      const showAnnualSavings = type === 'annual';
+      document.querySelectorAll('.price-original').forEach(orig => {
+        orig.style.display = showAnnualSavings ? 'block' : 'none';
+      });
+      document.querySelectorAll('.price-savings').forEach(savings => {
+        savings.style.display = showAnnualSavings ? 'block' : 'none';
+      });
+    }
+
+    function toggleFaq(element) {
+      const item = element.parentElement;
+      const isActive = item.classList.contains('active');
+      
+      // Close all FAQ items
+      document.querySelectorAll('.faq-item').forEach(faq => {
+        faq.classList.remove('active');
+        faq.querySelector('.faq-question span').textContent = '+';
+      });
+      
+      // Open clicked item if it wasn't active
+      if (!isActive) {
+        item.classList.add('active');
+        element.querySelector('span').textContent = '−';
+      }
+    }
+
+    // Add scroll animations
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.style.opacity = '1';
+          entry.target.style.transform = 'translateY(0)';
+        }
+      });
+    }, observerOptions);
+
+    // Observe pricing cards
+    document.querySelectorAll('.pricing-card').forEach((card, index) => {
+      card.style.opacity = '0';
+      card.style.transform = 'translateY(50px)';
+      card.style.transition = `opacity 0.8s ease ${index * 0.2}s, transform 0.8s ease ${index * 0.2}s`;
+      observer.observe(card);
+    });
+
+    // Observe other sections
+    document.querySelectorAll('.stats-section, .enterprise-features, .faq-section').forEach(section => {
+      section.style.opacity = '0';
+      section.style.transform = 'translateY(30px)';
+      section.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+      observer.observe(section);
+    });
+  </script>
+</body>
+</html>  <a href="factory.html">⚙️ Factory</a>
   <a class="active" href="pricing.html">💳 Pricing</a>
   <a href="waitlist.html">📝 Demo / Waitlist</a>
   <a href="docs/index.html">📚 Docs</a>
