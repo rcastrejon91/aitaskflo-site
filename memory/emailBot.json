@@ -1,0 +1,22 @@
+{
+  "history": [
+    {
+      "input": "Hello, test message",
+      "output": [
+        "[EmailBot] You said: \"Hello, test message\"",
+        "[EmailBot] This is our first chat! 💌",
+        "[EmailBot] ✅ Reply sent!"
+      ],
+      "timestamp": "2025-09-02T22:53:11.346Z"
+    },
+    {
+      "input": "Test team collaboration",
+      "output": [
+        "[EmailBot] You said: \"Test team collaboration\"",
+        "[EmailBot] Last time you asked: \"Hello, test message\"",
+        "[EmailBot] ✅ Reply sent!"
+      ],
+      "timestamp": "2025-09-02T22:53:16.727Z"
+    }
+  ]
+}
