@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Careers — AITaskFlo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0e1a;--card:#0f1419;--fg:#e6edf3;--muted:#8b949e;
+  --brand:#00d4ff;--accent:#ff9800;--line:#21262d;--success:#238636;
+  --gradient-1:#00d4ff;--gradient-2:#0066cc;--gradient-3:#ff9800;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--bg);color:var(--fg);
+  font:16px/1.6 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  overflow-x:hidden;
+}
+
+/* Animated background */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 20%, rgba(0,212,255,0.15), transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255,152,0,0.1), transparent 50%),
+    radial-gradient(circle at 50% 10%, rgba(0,212,255,0.08), transparent 60%);
+  background-size: 300% 300%;
+  animation: gradientFloat 20s ease-in-out infinite alternate;
+  z-index: -1;
+}
+@keyframes gradientFloat {
+  0% { background-position: 0% 0%, 100% 100%, 50% 0%; }
+  50% { background-position: 100% 50%, 0% 50%, 80% 100%; }
+  100% { background-position: 0% 100%, 100% 0%, 20% 50%; }
+}
+
+a{color:var(--brand);text-decoration:none;transition:color 0.3s ease}
+a:hover{color:var(--accent)}
+
+/* Navigation */
+nav{
+  position:sticky;top:0;z-index:100;
+  backdrop-filter:blur(20px);background:rgba(10,14,26,0.8);
+  border-bottom:1px solid var(--line);
+  padding:16px 0;
+}
+.nav-container{
+  max-width:1200px;margin:0 auto;display:flex;align-items:center;
+  justify-content:space-between;padding:0 24px;
+}
+.logo{font-weight:800;font-size:20px;color:var(--brand)}
+.nav-links{display:flex;gap:32px;align-items:center}
+.nav-links a{color:var(--muted);font-weight:500;transition:all 0.3s ease}
+.nav-links a:hover, .nav-links a.active{color:var(--brand)}
+.login-btn{
+  background:linear-gradient(135deg,var(--brand),var(--gradient-2));
+  color:#000;padding:10px 20px;border-radius:6px;font-weight:600;
+  transition:transform 0.3s ease, box-shadow 0.3s ease;
+}
+.login-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 8px 25px rgba(0,212,255,0.3);
+}
+
+/* Main Content */
+.main{
+  max-width:1200px;margin:0 auto;padding:60px 24px;
+}
+
+.page-header{
+  text-align:center;margin-bottom:80px;
+}
+.page-header h1{
+  font-size:clamp(2.5rem, 6vw, 4rem);font-weight:800;margin:0 0 24px;
+  background:linear-gradient(135deg,var(--brand),var(--accent));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.page-header p{
+  font-size:1.3rem;color:var(--muted);max-width:600px;margin:0 auto;
+}
+
+/* Company Section */
+.company-section{
+  background:var(--card);padding:60px;border-radius:16px;
+  border:1px solid var(--line);margin-bottom:80px;
+  background: linear-gradient(135deg, var(--card), rgba(0,212,255,0.05));
+}
+.company-section h2{
+  font-size:2rem;font-weight:700;margin:0 0 24px;color:var(--fg);
+}
+.company-section p{
+  color:var(--muted);line-height:1.8;margin-bottom:24px;font-size:1.1rem;
+}
+
+/* Benefits Grid */
+.benefits{
+  margin-bottom:80px;
+}
+.benefits h2{
+  text-align:center;font-size:2.2rem;font-weight:700;margin:0 0 50px;
+  color:var(--fg);
+}
+.benefits-grid{
+  display:grid;gap:24px;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+}
+.benefit-card{
+  background:var(--card);padding:32px;border-radius:12px;
+  border:1px solid var(--line);
+  transition:all 0.3s ease;
+}
+.benefit-card:hover{
+  transform:translateY(-4px);
+  box-shadow:0 12px 25px rgba(0,212,255,0.1);
+}
+.benefit-icon{
+  font-size:2rem;margin-bottom:16px;display:block;
+}
+.benefit-card h3{
+  margin:0 0 12px;font-size:1.2rem;font-weight:600;color:var(--fg);
+}
+.benefit-card p{
+  color:var(--muted);margin:0;line-height:1.6;
+}
+
+/* Job Listings */
+.jobs{
+  margin-bottom:80px;
+}
+.jobs h2{
+  text-align:center;font-size:2.2rem;font-weight:700;margin:0 0 50px;
+  color:var(--fg);
+}
+.job-card{
+  background:var(--card);padding:40px;border-radius:16px;
+  border:1px solid var(--line);margin-bottom:24px;
+  transition:all 0.3s ease;
+  background: linear-gradient(135deg, var(--card), rgba(0,212,255,0.02));
+}
+.job-card:hover{
+  transform:translateY(-4px);
+  box-shadow:0 12px 25px rgba(0,212,255,0.15);
+  border-color:var(--brand);
+}
+.job-header{
+  display:flex;justify-content:space-between;align-items:start;
+  margin-bottom:20px;
+}
+.job-header h3{
+  margin:0;font-size:1.5rem;font-weight:600;color:var(--fg);
+}
+.job-meta{
+  text-align:right;color:var(--muted);font-size:0.9rem;
+}
+.job-description{
+  color:var(--muted);line-height:1.7;margin-bottom:20px;
+}
+.job-requirements{
+  margin-bottom:24px;
+}
+.job-requirements h4{
+  margin:0 0 12px;font-size:1.1rem;font-weight:600;color:var(--fg);
+}
+.job-requirements ul{
+  margin:0;padding-left:20px;color:var(--muted);
+}
+.job-requirements li{
+  margin-bottom:6px;
+}
+.apply-btn{
+  background:linear-gradient(135deg,var(--brand),var(--gradient-2));
+  color:#000;padding:12px 24px;border-radius:8px;font-weight:600;
+  display:inline-block;transition:all 0.3s ease;
+}
+.apply-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 8px 20px rgba(0,212,255,0.3);
+  color:#000;
+}
+
+/* Footer */
+footer{
+  background:var(--card);border-top:1px solid var(--line);
+  padding:60px 24px 40px;margin-top:120px;
+}
+.footer-content{
+  max-width:1200px;margin:0 auto;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+  gap:40px;
+}
+.footer-section h4{color:var(--fg);margin:0 0 20px;font-weight:600}
+.footer-section a{
+  color:var(--muted);display:block;margin:8px 0;
+  transition:color 0.3s ease;
+}
+.footer-section a:hover{color:var(--brand)}
+.footer-bottom{
+  max-width:1200px;margin:40px auto 0;padding-top:40px;
+  border-top:1px solid var(--line);text-align:center;
+  color:var(--muted);font-size:0.9rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .nav-links{gap:20px;font-size:0.9rem}
+  .main{padding:40px 20px}
+  .company-section{padding:40px 30px}
+  .job-header{flex-direction:column;gap:10px}
+  .job-meta{text-align:left}
+  .benefits-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav>
+    <div class="nav-container">
+      <a href="index.html" class="logo">AITaskFlo</a>
+      <div class="nav-links">
+        <a href="index.html#features">Features</a>
+        <a href="factory.html">Factory</a>
+        <a href="pricing.html">Pricing</a>
+        <a href="waitlist.html">Demo</a>
+        <a href="docs/index.html">Docs</a>
+        <a href="login.html" class="login-btn">Login</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main">
+    <!-- Page Header -->
+    <section class="page-header">
+      <h1>Join Our Team</h1>
+      <p>Help us build the future of enterprise automation. We're looking for passionate individuals who want to revolutionize how businesses work.</p>
+    </section>
+
+    <!-- Company Section -->
+    <section class="company-section">
+      <h2>About AITaskFlo</h2>
+      <p>At AITaskFlo, we're on a mission to transform how enterprises approach automation. Our platform empowers businesses to deploy intelligent AI agents that think, learn, and execute complex workflows at scale.</p>
+      <p>We're a fast-growing company serving 500+ enterprise clients, processing over 2 million automated tasks, and maintaining 99.9% uptime. Our team is passionate about innovation, collaboration, and creating solutions that make a real impact.</p>
+      <p>Join us in building the next generation of enterprise automation tools and be part of a team that's defining the future of work.</p>
+    </section>
+
+    <!-- Benefits -->
+    <section class="benefits">
+      <h2>Why Work With Us</h2>
+      <div class="benefits-grid">
+        <div class="benefit-card">
+          <span class="benefit-icon">💰</span>
+          <h3>Competitive Compensation</h3>
+          <p>Top-tier salaries, equity packages, and performance bonuses. We believe in rewarding exceptional talent.</p>
+        </div>
+        <div class="benefit-card">
+          <span class="benefit-icon">🏥</span>
+          <h3>Health & Wellness</h3>
+          <p>Comprehensive health insurance, dental, vision, and mental health support for you and your family.</p>
+        </div>
+        <div class="benefit-card">
+          <span class="benefit-icon">🏠</span>
+          <h3>Remote-First</h3>
+          <p>Work from anywhere with flexible hours. We provide home office setup allowance and co-working spaces.</p>
+        </div>
+        <div class="benefit-card">
+          <span class="benefit-icon">📚</span>
+          <h3>Learning & Growth</h3>
+          <p>$3,000 annual learning budget, conference attendance, and mentorship programs to advance your career.</p>
+        </div>
+        <div class="benefit-card">
+          <span class="benefit-icon">🌴</span>
+          <h3>Time Off</h3>
+          <p>Unlimited PTO policy, sabbatical programs, and company-wide recharge weeks to maintain work-life balance.</p>
+        </div>
+        <div class="benefit-card">
+          <span class="benefit-icon">🚀</span>
+          <h3>Innovation Time</h3>
+          <p>20% time for personal projects, hackathons, and exploring new technologies that interest you.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Job Listings -->
+    <section class="jobs">
+      <h2>Open Positions</h2>
+
+      <div class="job-card">
+        <div class="job-header">
+          <h3>Senior Software Engineer</h3>
+          <div class="job-meta">
+            <div>Engineering</div>
+            <div>Full-time</div>
+            <div>Remote/San Francisco</div>
+          </div>
+        </div>
+        <div class="job-description">
+          <p>We're looking for a Senior Software Engineer to help build and scale our enterprise automation platform. You'll work on core infrastructure, APIs, and user-facing features that serve millions of automated tasks.</p>
+        </div>
+        <div class="job-requirements">
+          <h4>Requirements:</h4>
+          <ul>
+            <li>5+ years of software engineering experience</li>
+            <li>Strong expertise in Node.js, Python, or Go</li>
+            <li>Experience with distributed systems and microservices</li>
+            <li>Knowledge of cloud platforms (AWS, GCP, Azure)</li>
+            <li>Experience with databases (PostgreSQL, MongoDB, Redis)</li>
+          </ul>
+        </div>
+        <a href="mailto:careers@aitaskflo.com?subject=Application: Senior Software Engineer" class="apply-btn">Apply Now</a>
+      </div>
+
+      <div class="job-card">
+        <div class="job-header">
+          <h3>AI/ML Engineer</h3>
+          <div class="job-meta">
+            <div>Engineering</div>
+            <div>Full-time</div>
+            <div>Remote</div>
+          </div>
+        </div>
+        <div class="job-description">
+          <p>Join our AI team to develop intelligent agents that can understand, reason, and execute complex workflows. You'll work on cutting-edge NLP, machine learning models, and agent architectures.</p>
+        </div>
+        <div class="job-requirements">
+          <h4>Requirements:</h4>
+          <ul>
+            <li>3+ years of ML/AI experience</li>
+            <li>Strong background in NLP and large language models</li>
+            <li>Experience with PyTorch, TensorFlow, or JAX</li>
+            <li>Knowledge of transformer architectures and fine-tuning</li>
+            <li>Experience with MLOps and model deployment</li>
+          </ul>
+        </div>
+        <a href="mailto:careers@aitaskflo.com?subject=Application: AI/ML Engineer" class="apply-btn">Apply Now</a>
+      </div>
+
+      <div class="job-card">
+        <div class="job-header">
+          <h3>Product Manager</h3>
+          <div class="job-meta">
+            <div>Product</div>
+            <div>Full-time</div>
+            <div>Remote/San Francisco</div>
+          </div>
+        </div>
+        <div class="job-description">
+          <p>Drive product strategy and execution for our enterprise automation platform. You'll work closely with engineering, design, and customers to build features that solve real business problems.</p>
+        </div>
+        <div class="job-requirements">
+          <h4>Requirements:</h4>
+          <ul>
+            <li>4+ years of product management experience</li>
+            <li>Experience with B2B/enterprise products</li>
+            <li>Strong analytical and data-driven decision making</li>
+            <li>Understanding of automation, AI, or workflow tools</li>
+            <li>Excellent communication and stakeholder management</li>
+          </ul>
+        </div>
+        <a href="mailto:careers@aitaskflo.com?subject=Application: Product Manager" class="apply-btn">Apply Now</a>
+      </div>
+
+      <div class="job-card">
+        <div class="job-header">
+          <h3>DevOps Engineer</h3>
+          <div class="job-meta">
+            <div>Engineering</div>
+            <div>Full-time</div>
+            <div>Remote</div>
+          </div>
+        </div>
+        <div class="job-description">
+          <p>Build and maintain the infrastructure that powers our enterprise automation platform. You'll work on CI/CD, monitoring, security, and scaling systems to handle millions of automated tasks.</p>
+        </div>
+        <div class="job-requirements">
+          <h4>Requirements:</h4>
+          <ul>
+            <li>4+ years of DevOps/Infrastructure experience</li>
+            <li>Expertise with Kubernetes, Docker, and containerization</li>
+            <li>Experience with cloud platforms and Infrastructure as Code</li>
+            <li>Knowledge of monitoring tools (Prometheus, Grafana, etc.)</li>
+            <li>Strong security and compliance background</li>
+          </ul>
+        </div>
+        <a href="mailto:careers@aitaskflo.com?subject=Application: DevOps Engineer" class="apply-btn">Apply Now</a>
+      </div>
+
+      <div class="job-card">
+        <div class="job-header">
+          <h3>Customer Success Manager</h3>
+          <div class="job-meta">
+            <div>Customer Success</div>
+            <div>Full-time</div>
+            <div>Remote</div>
+          </div>
+        </div>
+        <div class="job-description">
+          <p>Help our enterprise customers succeed with AITaskFlo. You'll manage relationships, drive adoption, and ensure customers achieve their automation goals while identifying expansion opportunities.</p>
+        </div>
+        <div class="job-requirements">
+          <h4>Requirements:</h4>
+          <ul>
+            <li>3+ years of customer success or account management experience</li>
+            <li>Experience with enterprise B2B software</li>
+            <li>Strong communication and relationship building skills</li>
+            <li>Understanding of automation or workflow tools preferred</li>
+            <li>Data-driven approach to customer health and success metrics</li>
+          </ul>
+        </div>
+        <a href="mailto:careers@aitaskflo.com?subject=Application: Customer Success Manager" class="apply-btn">Apply Now</a>
+      </div>
+
+      <div class="job-card">
+        <div class="job-header">
+          <h3>Data Scientist</h3>
+          <div class="job-meta">
+            <div>Data</div>
+            <div>Full-time</div>
+            <div>Remote</div>
+          </div>
+        </div>
+        <div class="job-description">
+          <p>Analyze automation performance, user behavior, and system metrics to drive product decisions and optimize our platform. You'll work with large datasets and build models to improve automation success rates.</p>
+        </div>
+        <div class="job-requirements">
+          <h4>Requirements:</h4>
+          <ul>
+            <li>3+ years of data science experience</li>
+            <li>Strong skills in Python, SQL, and statistical analysis</li>
+            <li>Experience with data visualization tools (Tableau, etc.)</li>
+            <li>Knowledge of machine learning and predictive modeling</li>
+            <li>Experience with big data tools (Spark, Kafka, etc.)</li>
+          </ul>
+        </div>
+        <a href="mailto:careers@aitaskflo.com?subject=Application: Data Scientist" class="apply-btn">Apply Now</a>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-content">
+      <div class="footer-section">
+        <h4>Product</h4>
+        <a href="factory.html">Automation Factory</a>
+        <a href="pricing.html">Pricing</a>
+        <a href="docs/index.html">Documentation</a>
+        <a href="docs/roadmap.html">Roadmap</a>
+      </div>
+      <div class="footer-section">
+        <h4>Company</h4>
+        <a href="#about">About</a>
+        <a href="careers.html">Careers</a>
+        <a href="#press">Press</a>
+        <a href="#contact">Contact</a>
+      </div>
+      <div class="footer-section">
+        <h4>Support</h4>
+        <a href="docs/index.html">Help Center</a>
+        <a href="#status">Status</a>
+        <a href="#security">Security</a>
+        <a href="#api">API Reference</a>
+      </div>
+      <div class="footer-section">
+        <h4>Legal</h4>
+        <a href="docs/terms.html">Terms of Service</a>
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="#compliance">Compliance</a>
+        <a href="#cookies">Cookie Policy</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      © <span id="year"></span> AITaskFlo. All rights reserved. • 
+      <a href="mailto:aitaskflo@gmail.com">aitaskflo@gmail.com</a>
+    </div>
+  </footer>
+
+  <script>
+    // Set current year
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
