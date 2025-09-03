@@ -1,19 +1,865 @@
 <!doctype html>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Docs — AITaskFlo</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-<body style="font-family:Inter,system-ui;background:#0d1117;color:#e6edf3;max-width:900px;margin:40px auto;padding:0 16px">
-<nav style="display:flex;flex-wrap:wrap;gap:16px;justify-content:center;background:#0f141b;padding:12px 10px;border:1px solid #1f2630;border-radius:12px">
-  <a href="../index.html" style="color:#e6edf3;text-decoration:none">🏠 Home</a>
-  <a href="../factory.html" style="color:#e6edf3;text-decoration:none">⚙️ Factory</a>
-  <a href="../pricing.html" style="color:#e6edf3;text-decoration:none">💳 Pricing</a>
-  <a href="../waitlist.html" style="color:#e6edf3;text-decoration:none">📝 Demo / Waitlist</a>
-  <a href="index.html" style="color:#00d4ff;text-decoration:none;font-weight:700">📚 Docs</a>
-</nav>
-<h1 style="margin-top:24px">Documentation</h1>
-<p>Getting started, API, and examples — coming soon.</p>
-<ul>
-  <li><a href="../factory.html" style="color:#00d4ff">Explore the Automation Factory</a></li>
-  <li><a href="../waitlist.html" style="color:#00d4ff">Join the Waitlist</a></li>
-</ul>
-</body>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Documentation — AITaskFlo</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: Inter, system-ui;
+      background: #0d1117;
+      color: #e6edf3;
+      margin: 0;
+      line-height: 1.6;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+    
+    /* Navigation */
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: center;
+      background: #0f141b;
+      padding: 12px 20px;
+      border: 1px solid #1f2630;
+      border-radius: 12px;
+      margin: 20px 0;
+    }
+    
+    .nav a {
+      color: #e6edf3;
+      text-decoration: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+    }
+    
+    .nav a:hover {
+      background: #1f2630;
+      color: #00d4ff;
+    }
+    
+    .nav a.active {
+      color: #00d4ff;
+      font-weight: 700;
+      background: #0a1421;
+    }
+    
+    /* Layout */
+    .docs-layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 40px;
+      margin-top: 30px;
+    }
+    
+    /* Sidebar */
+    .sidebar {
+      background: #0f141b;
+      border-radius: 12px;
+      border: 1px solid #1f2630;
+      padding: 24px;
+      height: fit-content;
+      position: sticky;
+      top: 20px;
+    }
+    
+    .sidebar h3 {
+      margin: 0 0 16px 0;
+      color: #ff9800;
+      font-size: 1.1rem;
+    }
+    
+    .sidebar ul {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 24px 0;
+    }
+    
+    .sidebar li {
+      margin: 8px 0;
+    }
+    
+    .sidebar a {
+      color: #9aa4b2;
+      text-decoration: none;
+      display: block;
+      padding: 6px 12px;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+      font-size: 0.9rem;
+    }
+    
+    .sidebar a:hover {
+      background: #1f2630;
+      color: #00d4ff;
+    }
+    
+    .sidebar a.active {
+      background: #0a1421;
+      color: #00d4ff;
+      font-weight: 600;
+    }
+    
+    /* Main content */
+    .main-content {
+      background: #0f141b;
+      border-radius: 12px;
+      border: 1px solid #1f2630;
+      padding: 40px;
+    }
+    
+    .main-content h1 {
+      margin: 0 0 16px 0;
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #ff9800, #f57c00);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .main-content h2 {
+      color: #00d4ff;
+      margin: 32px 0 16px 0;
+      font-size: 1.8rem;
+      border-bottom: 2px solid #1f2630;
+      padding-bottom: 8px;
+    }
+    
+    .main-content h3 {
+      color: #ff9800;
+      margin: 24px 0 12px 0;
+      font-size: 1.3rem;
+    }
+    
+    .main-content h4 {
+      color: #e6edf3;
+      margin: 20px 0 8px 0;
+      font-size: 1.1rem;
+    }
+    
+    .main-content p {
+      color: #9aa4b2;
+      margin: 16px 0;
+    }
+    
+    /* Code blocks */
+    .code-block {
+      background: #0a0e13;
+      border: 1px solid #1f2630;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 16px 0;
+      overflow-x: auto;
+    }
+    
+    .code-block pre {
+      margin: 0;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 0.9rem;
+      color: #e6edf3;
+    }
+    
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #161b22;
+      padding: 8px 16px;
+      border-radius: 8px 8px 0 0;
+      border: 1px solid #1f2630;
+      border-bottom: none;
+      font-size: 0.8rem;
+      color: #9aa4b2;
+    }
+    
+    .copy-btn {
+      background: #0d1117;
+      border: 1px solid #1f2630;
+      color: #9aa4b2;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+    
+    .copy-btn:hover {
+      background: #1f2630;
+      color: #00d4ff;
+    }
+    
+    /* API endpoint styling */
+    .endpoint {
+      background: #0a0e13;
+      border-left: 4px solid #00d4ff;
+      padding: 16px;
+      margin: 16px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    
+    .method {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 0.8rem;
+      margin-right: 12px;
+    }
+    
+    .method.get { background: #28a745; color: white; }
+    .method.post { background: #007bff; color: white; }
+    .method.put { background: #ffc107; color: black; }
+    .method.delete { background: #dc3545; color: white; }
+    
+    .url {
+      font-family: 'Monaco', 'Menlo', monospace;
+      color: #e6edf3;
+      font-weight: 600;
+    }
+    
+    /* Feature cards */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin: 24px 0;
+    }
+    
+    .feature-card {
+      background: #161b22;
+      border: 1px solid #1f2630;
+      border-radius: 12px;
+      padding: 24px;
+      transition: all 0.3s ease;
+    }
+    
+    .feature-card:hover {
+      border-color: #00d4ff;
+      transform: translateY(-2px);
+    }
+    
+    .feature-card h4 {
+      margin: 0 0 12px 0;
+      color: #ff9800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    /* Table styling */
+    .table-container {
+      overflow-x: auto;
+      margin: 20px 0;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #0a0e13;
+      border-radius: 8px;
+      border: 1px solid #1f2630;
+    }
+    
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid #1f2630;
+    }
+    
+    th {
+      background: #161b22;
+      color: #ff9800;
+      font-weight: 600;
+    }
+    
+    td {
+      color: #9aa4b2;
+    }
+    
+    /* Responsive design */
+    @media (max-width: 768px) {
+      .docs-layout {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+      
+      .sidebar {
+        position: static;
+      }
+      
+      .main-content {
+        padding: 24px;
+      }
+      
+      .nav {
+        padding: 8px 12px;
+        gap: 8px;
+      }
+      
+      .nav a {
+        padding: 6px 8px;
+        font-size: 0.9rem;
+      }
+    }
+    
+    /* Status badges */
+    .status {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+    
+    .status.live { background: #28a745; color: white; }
+    .status.beta { background: #ffc107; color: black; }
+    .status.coming { background: #6c757d; color: white; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <nav class="nav">
+      <a href="../index.html">🏠 Home</a>
+      <a href="../factory.html">⚙️ Factory</a>
+      <a href="../pricing.html">💳 Pricing</a>
+      <a href="../waitlist.html">📝 Waitlist</a>
+      <a href="#" class="active">📚 Docs</a>
+    </nav>
+    
+    <div class="docs-layout">
+      <aside class="sidebar">
+        <h3>🚀 Getting Started</h3>
+        <ul>
+          <li><a href="#overview" class="sidebar-link">Overview</a></li>
+          <li><a href="#quick-start" class="sidebar-link">Quick Start</a></li>
+          <li><a href="#authentication" class="sidebar-link">Authentication</a></li>
+        </ul>
+        
+        <h3>🤖 AI Bots</h3>
+        <ul>
+          <li><a href="#email-bot" class="sidebar-link">Email Bot</a></li>
+          <li><a href="#task-bot" class="sidebar-link">Task Bot</a></li>
+          <li><a href="#analytics-bot" class="sidebar-link">Analytics Bot</a></li>
+          <li><a href="#research-bot" class="sidebar-link">Research Bot</a></li>
+          <li><a href="#team-collaboration" class="sidebar-link">Team Mode</a></li>
+        </ul>
+        
+        <h3>🌐 Free APIs</h3>
+        <ul>
+          <li><a href="#weather-api" class="sidebar-link">Weather Data</a></li>
+          <li><a href="#news-api" class="sidebar-link">News Feed</a></li>
+          <li><a href="#currency-api" class="sidebar-link">Currency Exchange</a></li>
+          <li><a href="#utility-apis" class="sidebar-link">Utility APIs</a></li>
+        </ul>
+        
+        <h3>📊 Platform</h3>
+        <ul>
+          <li><a href="#analytics" class="sidebar-link">Analytics</a></li>
+          <li><a href="#file-upload" class="sidebar-link">File Management</a></li>
+          <li><a href="#websockets" class="sidebar-link">Real-time Features</a></li>
+          <li><a href="#admin" class="sidebar-link">Admin Tools</a></li>
+        </ul>
+        
+        <h3>🔧 Advanced</h3>
+        <ul>
+          <li><a href="#rate-limits" class="sidebar-link">Rate Limits</a></li>
+          <li><a href="#errors" class="sidebar-link">Error Handling</a></li>
+          <li><a href="#security" class="sidebar-link">Security</a></li>
+          <li><a href="#webhooks" class="sidebar-link">Webhooks <span class="status coming">Coming</span></a></li>
+        </ul>
+      </aside>
+      
+      <main class="main-content">
+        <section id="overview">
+          <h1>AITaskFlo Documentation</h1>
+          <p><strong>Automation. Intelligence. Scale.</strong></p>
+          <p>Welcome to the complete AITaskFlo platform documentation. This guide covers everything from basic bot interactions to advanced enterprise features.</p>
+          
+          <div class="feature-grid">
+            <div class="feature-card">
+              <h4>🤖 AI Bot Factory</h4>
+              <p>4 specialized bots with memory, collaboration, and API integration capabilities.</p>
+            </div>
+            <div class="feature-card">
+              <h4>🌐 15+ Free APIs</h4>
+              <p>Weather, news, currency, utilities, and more - all integrated and ready to use.</p>
+            </div>
+            <div class="feature-card">
+              <h4>🔒 Enterprise Security</h4>
+              <p>JWT auth, rate limiting, input validation, and comprehensive security headers.</p>
+            </div>
+            <div class="feature-card">
+              <h4>📊 Real-time Analytics</h4>
+              <p>Live dashboards, usage tracking, and performance monitoring.</p>
+            </div>
+          </div>
+        </section>
+        
+        <section id="quick-start">
+          <h2>Quick Start</h2>
+          <p>Get up and running with AITaskFlo in minutes.</p>
+          
+          <h3>1. Run Your First Bot</h3>
+          <div class="endpoint">
+            <span class="method post">POST</span>
+            <span class="url">/run-bot</span>
+          </div>
+          
+          <div class="code-header">
+            <span>JavaScript Example</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <div class="code-block">
+            <pre><code>const response = await fetch('/run-bot', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-User-Id': 'your-user-id'
+  },
+  body: JSON.stringify({
+    botName: 'emailBot',
+    input: 'Create a welcome email for new users'
+  })
+});
+
+const data = await response.json();
+console.log(data.logs);</code></pre>
+          </div>
+          
+          <h3>2. Try Team Collaboration</h3>
+          <div class="endpoint">
+            <span class="method post">POST</span>
+            <span class="url">/team-run</span>
+          </div>
+          
+          <div class="code-header">
+            <span>Team Mode Example</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <div class="code-block">
+            <pre><code>const response = await fetch('/team-run', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    input: 'Plan a product launch campaign'
+  })
+});
+
+// All 4 bots collaborate on your request!</code></pre>
+          </div>
+        </section>
+        
+        <section id="authentication">
+          <h2>Authentication</h2>
+          <p>AITaskFlo uses JWT tokens for secure admin access.</p>
+          
+          <h3>Admin Login</h3>
+          <div class="endpoint">
+            <span class="method post">POST</span>
+            <span class="url">/admin-login</span>
+          </div>
+          
+          <div class="code-block">
+            <pre><code>{
+  "email": "admin@taskflo.com",
+  "password": "your-password"
+}</code></pre>
+          </div>
+          
+          <h4>Response:</h4>
+          <div class="code-block">
+            <pre><code>{
+  "success": true,
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": 1,
+    "email": "admin@taskflo.com",
+    "role": "super-admin"
+  }
+}</code></pre>
+          </div>
+          
+          <h3>Using Tokens</h3>
+          <div class="code-block">
+            <pre><code>// Include token in Authorization header
+headers: {
+  'Authorization': 'Bearer your-jwt-token-here'
+}</code></pre>
+          </div>
+        </section>
+        
+        <section id="email-bot">
+          <h2>AI Bots</h2>
+          
+          <h3>📧 Email Bot <span class="status live">Live</span></h3>
+          <p>Creates professional emails with motivational quotes and learns from previous campaigns.</p>
+          
+          <h4>Features:</h4>
+          <ul>
+            <li>Integrates inspirational quotes from API</li>
+            <li>Remembers previous email styles</li>
+            <li>Suggests improvements based on history</li>
+          </ul>
+          
+          <div class="code-block">
+            <pre><code>{
+  "botName": "emailBot",
+  "input": "Create a follow-up email for demo users"
+}</code></pre>
+          </div>
+        </section>
+        
+        <section id="task-bot">
+          <h3>📋 Task Bot <span class="status live">Live</span></h3>
+          <p>Manages tasks with unique UUIDs and priority tracking.</p>
+          
+          <h4>Features:</h4>
+          <ul>
+            <li>Generates unique task IDs</li>
+            <li>Automatic priority assignment</li>
+            <li>Persistent task storage</li>
+          </ul>
+        </section>
+        
+        <section id="analytics-bot">
+          <h3>📊 Analytics Bot <span class="status live">Live</span></h3>
+          <p>Generates metrics with visual themes and engagement tracking.</p>
+          
+          <h4>Features:</h4>
+          <ul>
+            <li>Random color themes for charts</li>
+            <li>Performance metrics generation</li>
+            <li>Trend analysis</li>
+          </ul>
+        </section>
+        
+        <section id="research-bot">
+          <h3>🔍 Research Bot <span class="status live">Live</span></h3>
+          <p>Conducts live research using news APIs and multiple sources.</p>
+          
+          <h4>Features:</h4>
+          <ul>
+            <li>Live news integration</li>
+            <li>Source citations</li>
+            <li>Cross-referenced research</li>
+          </ul>
+        </section>
+        
+        <section id="team-collaboration">
+          <h3>🧑‍🤝‍🧑 Team Collaboration <span class="status live">Live</span></h3>
+          <p>All bots work together on complex projects with cross-bot communication.</p>
+          
+          <div class="code-block">
+            <pre><code>// Example team response:
+[
+  "🧑‍🤝‍🧑 AI Crew Assembly — Mission: Plan marketing campaign",
+  "[EmailBot] Crafting campaign emails with motivational elements",
+  "[TaskBot] Creating project timeline with task IDs",
+  "[AnalyticsBot] Setting up success metrics and KPIs", 
+  "[ResearchBot] Finding market trends and competitor analysis",
+  "💬 Cross-bot collaboration:",
+  "💡 TaskBot: Analytics show this should be priority #1!",
+  "✅ Mission Complete: Strategy deployed successfully!"
+]</code></pre>
+          </div>
+        </section>
+        
+        <section id="weather-api">
+          <h2>Free APIs</h2>
+          
+          <h3>🌤️ Weather Data <span class="status live">Live</span></h3>
+          <p>Get current weather information for any city worldwide.</p>
+          
+          <div class="endpoint">
+            <span class="method get">GET</span>
+            <span class="url">/api/weather/{city}</span>
+          </div>
+          
+          <div class="code-block">
+            <pre><code>// Example: /api/weather/london
+{
+  "success": true,
+  "data": {
+    "city": "London",
+    "temperature": 18.5,
+    "description": "partly cloudy",
+    "humidity": 65,
+    "windSpeed": 3.2,
+    "icon": "https://openweathermap.org/img/w/02d.png"
+  }
+}</code></pre>
+          </div>
+        </section>
+        
+        <section id="news-api">
+          <h3>📰 News Feed <span class="status live">Live</span></h3>
+          <p>Latest news by category from trusted sources.</p>
+          
+          <div class="endpoint">
+            <span class="method get">GET</span>
+            <span class="url">/api/news/{category}</span>
+          </div>
+          
+          <h4>Available Categories:</h4>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Description</th>
+                  <th>Example</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>technology</td>
+                  <td>Tech news and innovations</td>
+                  <td>/api/news/technology</td>
+                </tr>
+                <tr>
+                  <td>business</td>
+                  <td>Business and finance</td>
+                  <td>/api/news/business</td>
+                </tr>
+                <tr>
+                  <td>science</td>
+                  <td>Scientific discoveries</td>
+                  <td>/api/news/science</td>
+                </tr>
+                <tr>
+                  <td>general</td>
+                  <td>General news (default)</td>
+                  <td>/api/news/general</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+        
+        <section id="currency-api">
+          <h3>💱 Currency Exchange <span class="status live">Live</span></h3>
+          <p>Real-time currency conversion rates.</p>
+          
+          <div class="endpoint">
+            <span class="method get">GET</span>
+            <span class="url">/api/exchange/{from}/{to}/{amount}</span>
+          </div>
+          
+          <div class="code-block">
+            <pre><code>// Example: /api/exchange/usd/eur/100
+{
+  "success": true,
+  "data": {
+    "from": "USD",
+    "to": "EUR", 
+    "rate": 0.85,
+    "amount": 100,
+    "convertedAmount": 85.00,
+    "date": "2024-01-15"
+  }
+}</code></pre>
+          </div>
+        </section>
+        
+        <section id="utility-apis">
+          <h3>🛠️ Utility APIs <span class="status live">Live</span></h3>
+          <p>Various utility endpoints for common tasks.</p>
+          
+          <div class="feature-grid">
+            <div class="feature-card">
+              <h4>📱 QR Code Generator</h4>
+              <p>POST /api/qr-code</p>
+              <div class="code-block">
+                <pre><code>{
+  "text": "https://aitaskflo.com",
+  "size": "300x300"
+}</code></pre>
+              </div>
+            </div>
+            
+            <div class="feature-card">
+              <h4>🎲 UUID Generator</h4>
+              <p>GET /api/uuid/{count}</p>
+              <div class="code-block">
+                <pre><code>// /api/uuid/3
+{
+  "success": true,
+  "data": [
+    "550e8400-e29b-41d4-a716-446655440000",
+    "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+    "6ba7b811-9dad-11d1-80b4-00c04fd430c8"
+  ]
+}</code></pre>
+              </div>
+            </div>
+            
+            <div class="feature-card">
+              <h4>🎨 Random Colors</h4>
+              <p>GET /api/color/{count}</p>
+              <div class="code-block">
+                <pre><code>{
+  "success": true,
+  "data": {
+    "hex": "#ff5733",
+    "rgb": {"r": 255, "g": 87, "b": 51},
+    "name": "Color-1704067200-0"
+  }
+}</code></pre>
+              </div>
+            </div>
+            
+            <div class="feature-card">
+              <h4>😂 Random Jokes</h4>
+              <p>GET /api/joke</p>
+              <div class="code-block">
+                <pre><code>{
+  "setup": "Why don't scientists trust atoms?",
+  "punchline": "Because they make up everything!",
+  "type": "general"
+}</code></pre>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <section id="analytics">
+          <h2>Analytics Dashboard</h2>
+          <p>Monitor your AITaskFlo usage with real-time analytics.</p>
+          
+          <div class="endpoint">
+            <span class="method get">GET</span>
+            <span class="url">/analytics/dashboard</span>
+            <span style="color: #dc3545; font-size: 0.8rem; margin-left: 8px;">Requires Auth</span>
+          </div>
+          
+          <div class="code-block">
+            <pre><code>{
+  "totalInteractions": 1247,
+  "totalTasks": 89,
+  "completedTasks": 67,
+  "activeUsers": 23,
+  "botUsage": {
+    "emailBot": {
+      "totalInteractions": 312,
+      "lastUsed": "2024-01-15T10:30:00Z"
+    },
+    "taskBot": {
+      "totalInteractions": 298,
+      "lastUsed": "2024-01-15T11:15:00Z"
+    }
+  },
+  "apiUsage": {
+    "weather": [
+      {
+        "endpoint": "/weather/london",
+        "timestamp": "2024-01-15T09:45:00Z",
+        "success": true
+      }
+    ]
+  }
+}</code></pre>
+          </div>
+        </section>
+        
+        <section id="rate-limits">
+          <h2>Rate Limits</h2>
+          <p>AITaskFlo implements intelligent rate limiting to ensure fair usage.</p>
+          
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Endpoint Type</th>
+                  <th>Limit</th>
+                  <th>Window</th>
+                  <th>Headers</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>General</td>
+                  <td>100 requests</td>
+                  <td>15 minutes</td>
+                  <td>X-RateLimit-Limit</td>
+                </tr>
+                <tr>
+                  <td>API Endpoints</td>
+                  <td>20 requests</td>
+                  <td>1 minute</td>
+                  <td>X-RateLimit-Remaining</td>
+                </tr>
+                <tr>
+                  <td>Bot Interactions</td>
+                  <td>20 requests</td>
+                  <td>1 minute</td>
+                  <td>X-RateLimit-Reset</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+        
+        <section id="errors">
+          <h2>Error Handling</h2>
+          <p>AITaskFlo uses standard HTTP status codes and provides detailed error messages.</p>
+          
+          <h3>Common Error Responses:</h3>
+          
+          <h4>400 - Bad Request</h4>
+          <div class="code-block">
+            <pre><code>{
+  "success": false,
+  "errors": [
+    {
+      "field": "botName",
+      "message": "Bot name is required"
+    }
+  ]
+}</code></pre>
+          </div>
+          
+          <h4>401 - Unauthorized</h4>
+          <div class="code-block">
+            <pre><code>{
+  "error": "Access token required"
+}</code></pre>
+          </div>
+          
+          <h4>429 - Rate Limit Exceeded</h4>
+          <div class="code-block">
+            <pre><code>{
+  "error": "API rate limit exceeded"
+}</code></pre>
+          </div>
+          
+          <h4>500 - Server Error</h4>
+          <div class="code-block">
+            <pre><code>{
+  "success": false,
+  "error": "Internal server error"
+}</code></pre>
+          </div>
+        </section>
+        
+        <section id="security">
+          <h2>Security</h2>
+          <p>AITaskFlo implements enterprise-grade security measures.</p>
+          
+          <div class="feature-grid">
+            <div class="feature-card">
+              <h4>🔒 JWT Authentication</h4>
+              <p>Secure token-based authentication with configurable expiration.</p>
+            </div>
+            <div class="feature-card">
+              <h4>🛡️ Helmet.js Protection</h4>
+              <p>Security headers including CSRF, XSS, and clickjacking protection.
