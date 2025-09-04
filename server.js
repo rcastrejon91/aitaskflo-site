@@ -10,7 +10,7 @@ app.use(cors());
 app.use(express.json());
 
 // Serve static files
-app.use(express.static('.'));
+app.use(express.static('public'));
 
 // --- SAFETY NET: Ensure core files exist ---
 if (!fs.existsSync("admins.json")) {
