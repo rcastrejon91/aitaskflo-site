@@ -1,0 +1,19 @@
+{
+  "history": [
+    {
+      "input": "Create a test task",
+      "output": [
+        "[TaskBot] Task: \"Create a test task\"",
+        "[TaskBot] ✅ Task queued!"
+      ],
+      "timestamp": "2025-09-15T06:19:58.331Z",
+      "userId": "anonymous"
+    }
+  ],
+  "stats": {
+    "totalInteractions": 1,
+    "lastUsed": "2025-09-15T06:19:58.331Z"
+  },
+  "preferences": {},
+  "apiData": {}
+}

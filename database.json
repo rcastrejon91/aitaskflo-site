@@ -1,0 +1,51 @@
+{
+  "users": [],
+  "analytics": [],
+  "logs": [
+    {
+      "id": 1757917198331,
+      "timestamp": "2025-09-15T06:19:58.331Z",
+      "action": "bot_interaction",
+      "details": {
+        "botName": "taskBot",
+        "input": "Create a test task"
+      },
+      "userId": "anonymous",
+      "ip": null
+    }
+  ],
+  "settings": {},
+  "subscribers": [],
+  "tasks": [],
+  "billing": [],
+  "api_usage": {
+    "uuid": [
+      {
+        "endpoint": "/uuid/undefined",
+        "timestamp": "2025-09-15T06:19:49.681Z",
+        "success": false
+      }
+    ],
+    "password": [
+      {
+        "endpoint": "/password/12",
+        "timestamp": "2025-09-15T06:19:49.690Z",
+        "success": true
+      }
+    ],
+    "jokes": [
+      {
+        "endpoint": "/joke/undefined",
+        "timestamp": "2025-09-15T06:20:54.398Z",
+        "success": false
+      }
+    ],
+    "qr-code": [
+      {
+        "endpoint": "/qr-code",
+        "timestamp": "2025-09-15T06:20:54.407Z",
+        "success": true
+      }
+    ]
+  }
+}
