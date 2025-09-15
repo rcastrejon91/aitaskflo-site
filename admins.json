@@ -1,0 +1,10 @@
+[
+  {
+    "id": 1,
+    "email": "admin@taskflo.com",
+    "password": "$2b$10$xz7P8MsDTmI/PGX.wElHkufdZs1bECske3ywh6PVkkF9AF4RCNi/W",
+    "active": true,
+    "role": "super-admin",
+    "createdAt": "2025-09-15T06:18:39.199Z"
+  }
+]

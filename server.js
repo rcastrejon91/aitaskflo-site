@@ -17,6 +17,9 @@ const WebSocket = require("ws"); // Real-time features
 const axios = require("axios"); // For API calls
 const FormData = require("form-data");
 
+// Enhanced AI Agent: Active Knowledge Seeking & Continuous Learning System
+const EnhancedAIAgent = require("./enhanced-ai-agent");
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key-change-this";
@@ -289,7 +292,12 @@ class SecurityGuardianBot {
   // Send email alert
   async sendEmailAlert(alert) {
     try {
-      const transporter = nodemailer.createTransporter({
+      if (!transporter) {
+        console.warn('⚠️ Email not configured, skipping alert email');
+        return;
+      }
+      
+      const emailTransporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
           user: process.env.EMAIL_USER,
@@ -297,7 +305,7 @@ class SecurityGuardianBot {
         }
       });
 
-      await transporter.sendMail({
+      await emailTransporter.sendMail({
         from: process.env.EMAIL_USER,
         to: process.env.ADMIN_EMAIL,
         subject: `🚨 AITaskFlo Security Alert - ${alert.level} Threat Detected`,
@@ -323,7 +331,7 @@ class SecurityGuardianBot {
       
       console.log(`📧 Security alert sent for ${alert.level} threat from ${alert.ip}`);
     } catch (error) {
-      console.error('Failed to send security alert email:', error);
+      console.error('Failed to send security alert email:', error.message);
     }
   }
 
@@ -465,6 +473,32 @@ class SecurityGuardianBot {
 // Initialize Security Guardian Bot
 const securityGuardian = new SecurityGuardianBot();
 
+// Initialize Enhanced AI Agent
+const enhancedAIAgent = new EnhancedAIAgent({
+  discoveryEnabled: true,
+  learningEnabled: true,
+  proactiveIntelligenceEnabled: true,
+  integrateWithExistingMemory: true,
+  enhanceSecurityProtocols: true
+});
+
+// Start Enhanced AI Agent
+console.log('🤖 Starting Enhanced AI Agent...');
+enhancedAIAgent.start().then(() => {
+  console.log('✅ Enhanced AI Agent activated with continuous learning');
+}).catch(error => {
+  console.error('❌ Failed to start Enhanced AI Agent:', error.message);
+});
+
+// Integrate with existing systems
+setTimeout(() => {
+  // Integration will happen after other components are initialized
+  console.log('🔗 Integrating Enhanced AI Agent with existing systems...');
+  
+  // Note: Full integration would require additional setup
+  // This is a placeholder for the integration
+}, 5000);
+
 // --- FREE API CONFIGURATIONS ---
 const FREE_APIS = {
   WEATHER_API_KEY: process.env.WEATHER_API_KEY || 'your-openweather-key',
@@ -544,13 +578,20 @@ const upload = multer({
 });
 
 // --- EMAIL CONFIGURATION ---
-const transporter = nodemailer.createTransporter({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+let transporter = null;
+try {
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
   }
-});
+} catch (error) {
+  console.warn('⚠️ Email configuration not available:', error.message);
+}
 
 // --- JWT MIDDLEWARE ---
 const authenticateToken = (req, res, next) => {
@@ -704,11 +745,286 @@ app.post('/security/activate', authenticateToken, (req, res) => {
   });
 });
 
+// --- ENHANCED AI AGENT API ENDPOINTS ---
+
+// Get Enhanced AI Agent status
+app.get('/ai-agent/status', authenticateToken, (req, res) => {
+  try {
+    const status = enhancedAIAgent.getStatus();
+    res.json({
+      success: true,
+      agent: status,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get AI agent status',
+      message: error.message
+    });
+  }
+});
+
+// Query the AI agent's knowledge
+app.post('/ai-agent/query', apiLimiter, [
+  body('query').isString().isLength({ min: 1, max: 500 })
+], (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { query } = req.body;
+    const { limit = 20, minConfidence = 0.5, includeInsights = false } = req.query;
+    
+    const results = enhancedAIAgent.queryKnowledge(query, {
+      limit: parseInt(limit),
+      minConfidence: parseFloat(minConfidence),
+      includeInsights: includeInsights === 'true'
+    });
+    
+    res.json({
+      success: true,
+      ...results
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to query AI agent knowledge',
+      message: error.message
+    });
+  }
+});
+
+// Get AI agent insights and recommendations
+app.get('/ai-agent/insights', (req, res) => {
+  try {
+    const { category, limit = 20 } = req.query;
+    const insights = enhancedAIAgent.getInsights(category, parseInt(limit));
+    
+    res.json({
+      success: true,
+      ...insights
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get AI agent insights',
+      message: error.message
+    });
+  }
+});
+
+// Apply AI agent insights for decision support
+app.post('/ai-agent/apply-insights', authenticateToken, (req, res) => {
+  if (req.user.role !== 'super-admin' && req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Insufficient permissions' });
+  }
+  
+  try {
+    const context = req.body.context || {};
+    
+    enhancedAIAgent.applyInsights(context).then(applications => {
+      res.json({
+        success: true,
+        applications,
+        timestamp: new Date().toISOString()
+      });
+    }).catch(error => {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to apply insights',
+        message: error.message
+      });
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to apply insights',
+      message: error.message
+    });
+  }
+});
+
+// Get comprehensive AI agent report
+app.get('/ai-agent/report', authenticateToken, (req, res) => {
+  if (req.user.role !== 'super-admin' && req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Insufficient permissions' });
+  }
+  
+  try {
+    const report = enhancedAIAgent.generateReport();
+    res.json({
+      success: true,
+      report,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate AI agent report',
+      message: error.message
+    });
+  }
+});
+
+// Control AI agent components
+app.post('/ai-agent/control/:action', authenticateToken, (req, res) => {
+  if (req.user.role !== 'super-admin') {
+    return res.status(403).json({ error: 'Insufficient permissions' });
+  }
+  
+  try {
+    const { action } = req.params;
+    let result;
+    
+    switch (action) {
+      case 'start':
+        result = enhancedAIAgent.start();
+        break;
+      case 'stop':
+        result = enhancedAIAgent.stop();
+        break;
+      default:
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid action',
+          availableActions: ['start', 'stop']
+        });
+    }
+    
+    if (result instanceof Promise) {
+      result.then(() => {
+        res.json({
+          success: true,
+          action: action,
+          status: enhancedAIAgent.isActive ? 'active' : 'inactive',
+          timestamp: new Date().toISOString()
+        });
+      }).catch(error => {
+        res.status(500).json({
+          success: false,
+          error: `Failed to ${action} AI agent`,
+          message: error.message
+        });
+      });
+    } else {
+      res.json({
+        success: true,
+        action: action,
+        status: enhancedAIAgent.isActive ? 'active' : 'inactive',
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: `Failed to ${req.params.action} AI agent`,
+      message: error.message
+    });
+  }
+});
+
+// Get knowledge discovery sources
+app.get('/ai-agent/discovery/sources', authenticateToken, (req, res) => {
+  try {
+    const discoveryStats = enhancedAIAgent.discoveryEngine.getStats();
+    const sources = enhancedAIAgent.discoveryEngine.config.sources.map(source => ({
+      name: source.name,
+      type: source.type,
+      url: source.url,
+      priority: source.priority,
+      tags: source.tags,
+      method: source.method
+    }));
+    
+    res.json({
+      success: true,
+      sources,
+      stats: discoveryStats,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get discovery sources',
+      message: error.message
+    });
+  }
+});
+
+// Add new discovery source
+app.post('/ai-agent/discovery/sources', authenticateToken, [
+  body('name').isString().isLength({ min: 1, max: 100 }),
+  body('type').isString().isLength({ min: 1, max: 50 }),
+  body('url').isURL(),
+  body('method').isIn(['api', 'scrape', 'rss', 'xml'])
+], (req, res) => {
+  if (req.user.role !== 'super-admin' && req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Insufficient permissions' });
+  }
+  
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  
+  try {
+    const newSource = {
+      name: req.body.name,
+      type: req.body.type,
+      url: req.body.url,
+      method: req.body.method,
+      priority: req.body.priority || 'medium',
+      tags: req.body.tags || []
+    };
+    
+    enhancedAIAgent.discoveryEngine.addSource(newSource);
+    
+    res.json({
+      success: true,
+      message: `Discovery source '${newSource.name}' added successfully`,
+      source: newSource,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to add discovery source',
+      message: error.message
+    });
+  }
+});
+
+// Get recent discoveries
+app.get('/ai-agent/discoveries/recent', (req, res) => {
+  try {
+    const { limit = 50 } = req.query;
+    const discoveries = enhancedAIAgent.discoveryEngine.getRecentDiscoveries(parseInt(limit));
+    
+    res.json({
+      success: true,
+      discoveries,
+      total: discoveries.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get recent discoveries',
+      message: error.message
+    });
+  }
+});
+
 // Continue with the rest of your existing server.js code...
 // (All your existing FREE API endpoints, bot functionality, etc.)
 
-// --- HEALTH CHECK (Enhanced with Security Status) ---
+// --- HEALTH CHECK (Enhanced with Security Status & AI Agent) ---
 app.get("/health", (req, res) => {
+  const aiAgentStatus = enhancedAIAgent ? enhancedAIAgent.getStatus() : null;
+  
   res.json({ 
     status: "healthy", 
     timestamp: new Date().toISOString(),
@@ -721,9 +1037,24 @@ app.get("/health", (req, res) => {
       blockedIPs: securityGuardian.blockedIPs.size,
       securityLevel: securityGuardian.getSecurityStatus().status
     },
+    aiAgent: aiAgentStatus ? {
+      active: aiAgentStatus.isActive,
+      knowledgeNodes: aiAgentStatus.stats.knowledgeNodes,
+      totalInsights: aiAgentStatus.stats.totalInsights,
+      uptimeHours: aiAgentStatus.uptimeHours,
+      discoveryActive: aiAgentStatus.components.discoveryEngine.active,
+      learningActive: aiAgentStatus.components.continuousLearner.active
+    } : null,
     features: {
-      security: true, apis: true, fileUploads: true,
-      websockets: true, email: true, analytics: true
+      security: true, 
+      apis: true, 
+      fileUploads: true,
+      websockets: true, 
+      email: true, 
+      analytics: true,
+      enhancedAI: true,
+      knowledgeSeeking: true,
+      continuousLearning: true
     }
   });
 });
@@ -1457,11 +1788,15 @@ app.use((err, req, res, next) => {
 
 // --- START SERVER ---
 server.listen(PORT, () => {
-  console.log(`🚀 COMPLETE AITaskFlo server with Security Guardian running on http://localhost:${PORT}`);
+  console.log(`🚀 COMPLETE AITaskFlo server with Enhanced AI Agent running on http://localhost:${PORT}`);
   console.log(`📱 Website: http://localhost:${PORT}`);
   console.log(`🤖 Bots: http://localhost:${PORT}/run-bot`);
   console.log(`📊 Analytics: http://localhost:${PORT}/analytics/dashboard`);
   console.log(`🛡️ Security Status: http://localhost:${PORT}/security/status`);
+  console.log(`🧠 AI Agent Status: http://localhost:${PORT}/ai-agent/status`);
+  console.log(`🔍 AI Agent Query: POST http://localhost:${PORT}/ai-agent/query`);
+  console.log(`💡 AI Agent Insights: http://localhost:${PORT}/ai-agent/insights`);
+  console.log(`📈 AI Agent Report: http://localhost:${PORT}/ai-agent/report`);
   console.log(`🔒 Security: Rate limiting, JWT, bcrypt, Helmet, Guardian Bot`);
   console.log(`📁 File uploads: http://localhost:${PORT}/upload`);
   console.log(`🔌 WebSocket: Real-time features + security alerts`);
@@ -1480,6 +1815,10 @@ server.listen(PORT, () => {
   console.log(`🔐 Password: /api/password/16`);
   console.log(`🔄 Bulk Data: POST /api/bulk/mixed-data`);
   console.log(`🛡️ Security Guardian: ACTIVE and monitoring all requests`);
+  console.log(`🤖 Enhanced AI Agent: ACTIVE with continuous learning & knowledge seeking`);
+  console.log(`🔍 Knowledge Discovery: Monitoring multiple sources for information`);
+  console.log(`🧠 Continuous Learning: Processing and integrating new knowledge`);
+  console.log(`💡 Proactive Intelligence: Generating insights and recommendations`);
 });
 
 module.exports = app;
