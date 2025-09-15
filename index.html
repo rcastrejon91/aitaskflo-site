@@ -227,6 +227,114 @@ nav{
 .feature h3{margin:0 0 16px;font-size:1.4rem;font-weight:600}
 .feature-card p{color:var(--muted);line-height:1.7}
 
+/* AI Demo Section */
+.ai-demo-section {
+  max-width: 1400px;
+  margin: 120px auto;
+  padding: 60px 24px;
+  background: linear-gradient(135deg, rgba(0,212,255,0.08), rgba(255,152,0,0.03));
+  border-radius: 24px;
+  border: 1px solid var(--line);
+}
+
+.ai-demo-header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.ai-demo-header h2 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0 0 16px;
+  background: linear-gradient(135deg, var(--brand), var(--accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ai-demo-header p {
+  font-size: 1.1rem;
+  color: var(--muted);
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.ai-demo-container {
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  gap: 40px;
+  align-items: start;
+}
+
+.ai-features-sidebar {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 32px;
+}
+
+.ai-features-sidebar h3 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0 0 24px;
+  color: var(--fg);
+}
+
+.ai-capability {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: rgba(0,212,255,0.03);
+  border-radius: 12px;
+  border: 1px solid rgba(0,212,255,0.1);
+  transition: all 0.3s ease;
+}
+
+.ai-capability:hover {
+  background: rgba(0,212,255,0.08);
+  transform: translateX(4px);
+}
+
+.ai-cap-icon {
+  font-size: 1.5rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--brand), var(--gradient-2));
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.ai-capability h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--fg);
+}
+
+.ai-capability p {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+@media (max-width: 1024px) {
+  .ai-demo-container {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  
+  .ai-features-sidebar {
+    order: -1;
+  }
+}
+
 /* Workflow Visualization */
 .workflow{
   max-width:1200px;margin:120px auto;padding:60px 24px;
@@ -400,6 +508,64 @@ footer{
     </div>
   </section>
 
+  <!-- AI Agent Demo Section -->
+  <section class="ai-demo-section">
+    <div class="container">
+      <div class="ai-demo-header">
+        <h2>🤖 Experience Our AI Agent</h2>
+        <p>Interact with our autonomous AI agent featuring emotional intelligence, quantum logic processing, and real-time learning capabilities.</p>
+      </div>
+      <div class="ai-demo-container">
+        <div id="ai-interaction-panel"></div>
+        <div class="ai-features-sidebar">
+          <h3>🧠 AI Capabilities</h3>
+          <div class="ai-capability">
+            <span class="ai-cap-icon">🎭</span>
+            <div>
+              <h4>Emotional Intelligence</h4>
+              <p>Understands and responds to emotional context</p>
+            </div>
+          </div>
+          <div class="ai-capability">
+            <span class="ai-cap-icon">⚡</span>
+            <div>
+              <h4>Quantum Logic</h4>
+              <p>Advanced reasoning with superposition states</p>
+            </div>
+          </div>
+          <div class="ai-capability">
+            <span class="ai-cap-icon">🎯</span>
+            <div>
+              <h4>Autonomous Decisions</h4>
+              <p>Makes intelligent decisions independently</p>
+            </div>
+          </div>
+          <div class="ai-capability">
+            <span class="ai-cap-icon">📚</span>
+            <div>
+              <h4>Real-time Learning</h4>
+              <p>Adapts and improves from every interaction</p>
+            </div>
+          </div>
+          <div class="ai-capability">
+            <span class="ai-cap-icon">🧬</span>
+            <div>
+              <h4>Genetic Optimization</h4>
+              <p>Evolves performance through genetic algorithms</p>
+            </div>
+          </div>
+          <div class="ai-capability">
+            <span class="ai-cap-icon">💭</span>
+            <div>
+              <h4>Dream Processing</h4>
+              <p>Background pattern analysis and prediction</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Workflow Visualization -->
   <section class="workflow">
     <div class="workflow-content">
@@ -505,5 +671,8 @@ footer{
       observer.observe(card);
     });
   </script>
+  
+  <!-- AI Interaction Panel Script -->
+  <script src="ai-agent/ui/ai-interaction-panel.js"></script>
 </body>
 </html>

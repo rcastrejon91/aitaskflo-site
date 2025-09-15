@@ -289,7 +289,7 @@ class SecurityGuardianBot {
   // Send email alert
   async sendEmailAlert(alert) {
     try {
-      const transporter = nodemailer.createTransporter({
+      const transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
           user: process.env.EMAIL_USER,
@@ -544,7 +544,7 @@ const upload = multer({
 });
 
 // --- EMAIL CONFIGURATION ---
-const transporter = nodemailer.createTransporter({
+const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
@@ -1455,11 +1455,342 @@ app.use((err, req, res, next) => {
   });
 });
 
-// --- START SERVER ---
-server.listen(PORT, () => {
-  console.log(`🚀 COMPLETE AITaskFlo server with Security Guardian running on http://localhost:${PORT}`);
+// --- AI AGENT INTEGRATION ---
+const BaseAIAgent = require('./ai-agent/core/base-ai-agent');
+
+// Initialize AI Agent
+let aiAgent = null;
+
+async function initializeAIAgent() {
+  try {
+    console.log('🤖 Initializing AI Agent System...');
+    
+    aiAgent = new BaseAIAgent({
+      id: 'aitaskflo-main-agent',
+      name: 'AITaskFlo-Agent',
+      autonomyLevel: 0.7
+    });
+    
+    await aiAgent.initialize();
+    
+    console.log('✅ AI Agent System initialized successfully');
+    return aiAgent;
+  } catch (error) {
+    console.error('❌ AI Agent initialization failed:', error);
+    return null;
+  }
+}
+
+// AI Agent API Endpoints
+
+// Get AI Agent status
+app.get('/ai-agent/status', (req, res) => {
+  if (!aiAgent) {
+    return res.json({ 
+      success: false, 
+      error: 'AI Agent not initialized',
+      status: 'inactive'
+    });
+  }
+  
+  res.json({
+    success: true,
+    agent: aiAgent.getStatus(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Process interaction through AI Agent
+app.post('/ai-agent/interact', apiLimiter, [
+  body('input').isString().isLength({ min: 1, max: 2000 }),
+  body('context').optional().isObject()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  if (!aiAgent) {
+    return res.status(503).json({ 
+      success: false, 
+      error: 'AI Agent not available' 
+    });
+  }
+
+  try {
+    const { input, context = {} } = req.body;
+    const userId = req.headers['x-user-id'] || 'anonymous';
+    
+    // Add request context
+    const enrichedContext = {
+      ...context,
+      userId,
+      sessionId: context.sessionId || `session_${Date.now()}`,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      timestamp: new Date().toISOString()
+    };
+    
+    const result = await aiAgent.processInteraction(input, enrichedContext);
+    
+    logActivity('ai_agent_interaction', { 
+      input: input.substring(0, 100), 
+      success: result.success,
+      autonomyLevel: result.autonomyLevel 
+    }, userId);
+    
+    res.json({
+      success: true,
+      result,
+      agentId: aiAgent.id,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('AI Agent interaction error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'AI Agent interaction failed',
+      message: error.message 
+    });
+  }
+});
+
+// Execute autonomous task
+app.post('/ai-agent/autonomous-task', authenticateToken, [
+  body('task').isObject(),
+  body('context').optional().isObject()
+], async (req, res) => {
+  if (req.user.role !== 'super-admin') {
+    return res.status(403).json({ error: 'Insufficient permissions for autonomous tasks' });
+  }
+
+  if (!aiAgent) {
+    return res.status(503).json({ 
+      success: false, 
+      error: 'AI Agent not available' 
+    });
+  }
+
+  try {
+    const { task, context = {} } = req.body;
+    
+    const result = await aiAgent.executeAutonomousTask(task, {
+      ...context,
+      requestedBy: req.user.email,
+      timestamp: new Date().toISOString()
+    });
+    
+    logActivity('autonomous_task_execution', { 
+      task: task.type, 
+      success: result.success,
+      requiresConfirmation: result.requiresConfirmation 
+    }, req.user.id);
+    
+    res.json({
+      success: true,
+      result,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Autonomous task error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Autonomous task execution failed',
+      message: error.message 
+    });
+  }
+});
+
+// Get AI Agent insights and recommendations
+app.get('/ai-agent/insights', authenticateToken, async (req, res) => {
+  if (!aiAgent) {
+    return res.status(503).json({ 
+      success: false, 
+      error: 'AI Agent not available' 
+    });
+  }
+
+  try {
+    const insights = {
+      dreamInsights: aiAgent.engines.dream ? aiAgent.engines.dream.patternInsights.slice(-10) : [],
+      learningProgress: aiAgent.engines.learning ? aiAgent.engines.learning.stats : null,
+      geneticOptimization: aiAgent.geneticAlgorithm ? aiAgent.geneticAlgorithm.getBestConfiguration() : null,
+      memoryStats: aiAgent.memoryManager ? aiAgent.memoryManager.getStatus().memoryStats : null,
+      recentDecisions: aiAgent.decisionHistory ? aiAgent.decisionHistory.slice(-5) : []
+    };
+    
+    res.json({
+      success: true,
+      insights,
+      agentStatus: aiAgent.getStatus(),
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('AI insights error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to retrieve AI insights',
+      message: error.message 
+    });
+  }
+});
+
+// Emergency stop for AI Agent
+app.post('/ai-agent/emergency-stop', authenticateToken, [
+  body('reason').optional().isString()
+], (req, res) => {
+  if (req.user.role !== 'super-admin') {
+    return res.status(403).json({ error: 'Insufficient permissions' });
+  }
+
+  if (!aiAgent) {
+    return res.status(404).json({ 
+      success: false, 
+      error: 'AI Agent not available' 
+    });
+  }
+
+  const reason = req.body.reason || 'Manual emergency stop';
+  aiAgent.emergencyStop(reason);
+  
+  logActivity('ai_agent_emergency_stop', { reason }, req.user.id);
+  
+  res.json({
+    success: true,
+    message: 'AI Agent emergency stop activated',
+    reason,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Restart AI Agent
+app.post('/ai-agent/restart', authenticateToken, async (req, res) => {
+  if (req.user.role !== 'super-admin') {
+    return res.status(403).json({ error: 'Insufficient permissions' });
+  }
+
+  try {
+    if (aiAgent) {
+      await aiAgent.restart();
+    } else {
+      aiAgent = await initializeAIAgent();
+    }
+    
+    logActivity('ai_agent_restart', {}, req.user.id);
+    
+    res.json({
+      success: true,
+      message: 'AI Agent restarted successfully',
+      status: aiAgent ? aiAgent.getStatus() : { status: 'failed' },
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('AI Agent restart error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'AI Agent restart failed',
+      message: error.message 
+    });
+  }
+});
+
+// Enhanced bot integration with AI Agent
+app.post("/ai-enhanced-bot", apiLimiter, [
+  body('botName').isString().isLength({ min: 1, max: 50 }),
+  body('input').isString().isLength({ min: 1, max: 1000 }),
+  body('useAIAgent').optional().isBoolean()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { botName, input, useAIAgent = true } = req.body;
+  const userId = req.headers['x-user-id'] || 'anonymous';
+
+  try {
+    let botResult;
+    
+    // First run traditional bot
+    if (bots[botName]) {
+      const memory = getMemory(botName);
+      botResult = await bots[botName](input, memory, userId);
+      saveMemory(botName, input, botResult.responses, userId, botResult.apiData);
+    } else {
+      return res.status(404).json({ 
+        success: false,
+        error: `Bot ${botName} not found`,
+        availableBots: Object.keys(bots)
+      });
+    }
+    
+    // Enhance with AI Agent if available and requested
+    let aiEnhancement = null;
+    if (useAIAgent && aiAgent && aiAgent.status === 'active') {
+      try {
+        const aiContext = {
+          sessionId: `bot_${botName}_${userId}_${Date.now()}`,
+          botName,
+          botResult: botResult.responses,
+          userId
+        };
+        
+        const aiResult = await aiAgent.processInteraction(
+          `Enhance bot response for ${botName}: ${input}`, 
+          aiContext
+        );
+        
+        aiEnhancement = {
+          suggestions: aiResult.response.suggestions || [],
+          confidence: aiResult.confidence,
+          emotionalInsight: aiResult.emotionalState,
+          autonomousActions: aiResult.response.autonomousActions || []
+        };
+      } catch (aiError) {
+        console.error('AI Agent enhancement error:', aiError);
+        // Continue without AI enhancement
+      }
+    }
+    
+    logActivity('ai_enhanced_bot_interaction', { 
+      botName, 
+      input: input.substring(0, 50),
+      aiEnhanced: !!aiEnhancement 
+    }, userId);
+    
+    res.json({ 
+      success: true,
+      botResponse: {
+        logs: botResult.responses,
+        apiEnhanced: Object.keys(botResult.apiData).length > 0
+      },
+      aiEnhancement,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('AI-enhanced bot error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'AI-enhanced bot interaction failed',
+      message: error.message 
+    });
+  }
+});
+
+// --- START SERVER WITH AI AGENT ---
+server.listen(PORT, async () => {
+  console.log(`🚀 COMPLETE AITaskFlo server with AI Agent + Security Guardian running on http://localhost:${PORT}`);
   console.log(`📱 Website: http://localhost:${PORT}`);
-  console.log(`🤖 Bots: http://localhost:${PORT}/run-bot`);
+  console.log(`🤖 Traditional Bots: http://localhost:${PORT}/run-bot`);
+  console.log(`🧠 AI-Enhanced Bots: http://localhost:${PORT}/ai-enhanced-bot`);
+  console.log(`🤖 AI Agent Interaction: http://localhost:${PORT}/ai-agent/interact`);
+  console.log(`📊 AI Agent Status: http://localhost:${PORT}/ai-agent/status`);
+  console.log(`💡 AI Insights: http://localhost:${PORT}/ai-agent/insights`);
   console.log(`📊 Analytics: http://localhost:${PORT}/analytics/dashboard`);
   console.log(`🛡️ Security Status: http://localhost:${PORT}/security/status`);
   console.log(`🔒 Security: Rate limiting, JWT, bcrypt, Helmet, Guardian Bot`);
@@ -1480,6 +1811,28 @@ server.listen(PORT, () => {
   console.log(`🔐 Password: /api/password/16`);
   console.log(`🔄 Bulk Data: POST /api/bulk/mixed-data`);
   console.log(`🛡️ Security Guardian: ACTIVE and monitoring all requests`);
+  
+  // Initialize AI Agent System
+  console.log('');
+  console.log('🧠 Initializing AI Agent System...');
+  aiAgent = await initializeAIAgent();
+  
+  if (aiAgent) {
+    console.log('🎯 AI Agent Features:');
+    console.log('   • Autonomous decision making');
+    console.log('   • Multi-engine processing (emotion, logic, dream, decision, learning)');
+    console.log('   • Real-time learning and adaptation');
+    console.log('   • Genetic algorithm optimization');
+    console.log('   • Advanced memory management');
+    console.log('   • Security Guardian integration');
+    console.log('   • Predictive user assistance');
+    console.log('   • Creative problem solving');
+    console.log('');
+    console.log('🤖 AI Agent Status:', aiAgent.getStatus().status);
+    console.log(`🎯 Autonomy Level: ${(aiAgent.autonomyLevel * 100).toFixed(1)}%`);
+  } else {
+    console.log('❌ AI Agent failed to initialize - running in traditional mode only');
+  }
 });
 
 module.exports = app;
