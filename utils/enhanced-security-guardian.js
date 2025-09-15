@@ -1,3 +1,4 @@
+const fs = require('fs');
 const logger = require('./logger');
 const securityConfig = require('../config/security-config');
 const EncryptionUtils = require('./encryption');
@@ -573,7 +574,487 @@ class EnhancedSecurityGuardianBot {
   }
 
   // Inherit remaining methods from base SecurityGuardianBot
-  // ... (Include all the other methods from the original class)
+  // Continue with your existing server.js code for APIs, bots, etc.
+  // Just ensure they all use the enhanced security features
+
+  /**
+   * Handle high threats (inherited and enhanced)
+   */
+  handleHighThreat(context, risk, res) {
+    this.blockedIPs.add(context.ip);
+    this.stats.threatsBlocked++;
+    
+    const threat = {
+      level: 'HIGH',
+      ip: context.ip,
+      timestamp: new Date(context.timestamp).toISOString(),
+      threats: risk.threats,
+      patterns: risk.patterns,
+      score: risk.score,
+      action: 'BLOCKED'
+    };
+
+    this.logThreat(context.ip, 'HIGH_THREAT_BLOCKED', 'High threat detected and blocked', context, threat);
+    this.sendSecurityAlert('HIGH', context, threat);
+
+    return res.status(403).json({
+      error: 'High security threat detected',
+      message: 'Access denied by Enhanced Security Guardian',
+      incident_id: `SEC-HIGH-${Date.now()}`,
+      threat_level: 'HIGH',
+      contact: 'security@aitaskflo.com',
+      guardian: this.name
+    });
+  }
+
+  /**
+   * Handle medium threats
+   */
+  handleMediumThreat(context, risk) {
+    this.logThreat(context.ip, 'MEDIUM_THREAT_MONITORED', 'Medium threat detected - monitoring', context, risk);
+    
+    // Add to watch list
+    this.suspiciousActivities.push({
+      ip: context.ip,
+      threat: risk,
+      timestamp: new Date(context.timestamp),
+      action: 'MONITORED'
+    });
+
+    // Send alert for multiple medium threats
+    const recentMediumThreats = this.suspiciousActivities.filter(
+      activity => new Date() - activity.timestamp < 60000 // Last minute
+    );
+    
+    if (recentMediumThreats.length >= 3) {
+      this.sendSecurityAlert('MEDIUM', context, risk);
+    }
+  }
+
+  /**
+   * Handle low risk requests
+   */
+  handleLowRisk(context) {
+    // Just log for analytics
+    this.logActivity(context, 'LOW_RISK');
+  }
+
+  /**
+   * Log security activities
+   */
+  logActivity(context, status) {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      ip: context.ip,
+      endpoint: context.endpoint,
+      method: context.method,
+      status: status,
+      guardian: this.name,
+      userAgent: context.userAgent
+    };
+    
+    this.saveSecurityLog(logEntry);
+  }
+
+  /**
+   * Log threats
+   */
+  logThreat(ip, type, description, context = {}, additionalData = {}) {
+    const threatLog = {
+      timestamp: new Date().toISOString(),
+      ip: ip,
+      type: type,
+      description: description,
+      context: {
+        endpoint: context.endpoint,
+        method: context.method,
+        userAgent: context.userAgent
+      },
+      threat_data: additionalData,
+      action_taken: this.blockedIPs.has(ip) ? 'BLOCKED' : 'MONITORED',
+      guardian: this.name
+    };
+    
+    this.saveSecurityLog(threatLog);
+    console.log(`🚨 ${this.name}: ${type} from ${ip} - ${description}`);
+  }
+
+  /**
+   * Save to security log
+   */
+  saveSecurityLog(logEntry) {
+    try {
+      const securityLogPath = './security-logs.json';
+      let logs = [];
+      
+      if (fs.existsSync(securityLogPath)) {
+        const data = fs.readFileSync(securityLogPath, 'utf8');
+        logs = data ? JSON.parse(data) : [];
+      }
+      
+      logs.push(logEntry);
+      
+      // Keep only last 1000 entries
+      if (logs.length > 1000) {
+        logs = logs.slice(-1000);
+      }
+      
+      fs.writeFileSync(securityLogPath, JSON.stringify(logs, null, 2));
+    } catch (error) {
+      console.error('Failed to save security log:', error);
+    }
+  }
+
+  /**
+   * Send security alerts
+   */
+  sendSecurityAlert(level, context, alertData) {
+    const alert = {
+      level: level,
+      ip: context.ip,
+      timestamp: new Date(context.timestamp).toISOString(),
+      endpoint: context.endpoint,
+      method: context.method,
+      userAgent: context.userAgent,
+      alertData: alertData,
+      action: this.blockedIPs.has(context.ip) ? 'BLOCKED' : 'MONITORED'
+    };
+
+    this.lastAlert = alert;
+
+    // If email is configured, send alert
+    if (process.env.EMAIL_USER && process.env.ADMIN_EMAIL) {
+      this.sendEmailAlert(alert);
+    }
+
+    // Broadcast via WebSocket if available
+    if (this.broadcastAlert) {
+      this.broadcastAlert(alert);
+    }
+  }
+
+  /**
+   * Send email alert
+   */
+  async sendEmailAlert(alert) {
+    // Implementation for email alerts
+    console.log(`📧 Security alert email would be sent: ${alert.level} threat from ${alert.ip}`);
+  }
+
+  /**
+   * Calculate behavioral deviations
+   */
+  calculateBehavioralDeviations(context, userProfile) {
+    const deviations = {
+      userAgentChange: 0,
+      accessPatternChange: 0,
+      requestFrequencyChange: 0
+    };
+
+    // User agent deviation
+    if (!userProfile.userAgents.has(context.userAgent)) {
+      deviations.userAgentChange = 0.8;
+    }
+
+    // Access pattern deviation
+    const recentPatterns = userProfile.accessPatterns.slice(-10);
+    const newPattern = `${context.method}:${context.endpoint}`;
+    const patternExists = recentPatterns.some(p => `${p.method}:${p.endpoint}` === newPattern);
+    
+    if (!patternExists) {
+      deviations.accessPatternChange = 0.7;
+    }
+
+    // Request frequency deviation
+    const currentHour = new Date(context.timestamp).getHours();
+    const hourlyPatterns = userProfile.accessPatterns.filter(p => 
+      new Date(p.timestamp).getHours() === currentHour
+    );
+    
+    if (hourlyPatterns.length === 0) {
+      deviations.requestFrequencyChange = 0.6;
+    }
+
+    return deviations;
+  }
+
+  /**
+   * Get recent requests for an IP
+   */
+  getRecentRequests(ip, timeWindow = 60000) {
+    const requests = this.requestCounts.get(ip) || [];
+    const cutoff = Date.now() - timeWindow;
+    return requests.filter(time => time > cutoff);
+  }
+
+  /**
+   * Calculate confidence score
+   */
+  calculateConfidence(patterns, threats) {
+    let confidence = 0.5; // Base confidence
+    
+    // Increase confidence with multiple patterns
+    confidence += Math.min(0.3, patterns.length * 0.1);
+    
+    // Increase confidence with threat diversity
+    const threatTypes = [...new Set(threats.map(t => t.type))];
+    confidence += Math.min(0.2, threatTypes.length * 0.05);
+    
+    return Math.min(1.0, confidence);
+  }
+
+  /**
+   * Get geolocation (placeholder)
+   */
+  getGeoLocation(ip) {
+    // This would integrate with a geolocation service
+    return { country: 'unknown', city: 'unknown' };
+  }
+
+  /**
+   * Update learning models
+   */
+  updateLearningModels(context, risk) {
+    if (!this.isLearning) return;
+
+    // Update baseline patterns
+    const hour = new Date(context.timestamp).getHours();
+    const pattern = `${context.method}:${context.endpoint}`;
+    
+    if (!this.baselinePatterns.requestFrequency.has(hour)) {
+      this.baselinePatterns.requestFrequency.set(hour, []);
+    }
+    this.baselinePatterns.requestFrequency.get(hour).push(context.timestamp);
+
+    // Update user agent patterns
+    if (!this.baselinePatterns.userAgentPatterns.has(context.userAgent)) {
+      this.baselinePatterns.userAgentPatterns.set(context.userAgent, 0);
+    }
+    this.baselinePatterns.userAgentPatterns.set(
+      context.userAgent,
+      this.baselinePatterns.userAgentPatterns.get(context.userAgent) + 1
+    );
+
+    // Update endpoint access patterns
+    if (!this.baselinePatterns.endpointAccess.has(pattern)) {
+      this.baselinePatterns.endpointAccess.set(pattern, 0);
+    }
+    this.baselinePatterns.endpointAccess.set(
+      pattern,
+      this.baselinePatterns.endpointAccess.get(pattern) + 1
+    );
+  }
+
+  /**
+   * Generate security recommendation
+   */
+  generateSecurityRecommendation(level, score) {
+    switch (level) {
+      case 'CRITICAL':
+        return 'IMMEDIATE ACTION REQUIRED: Block IP and investigate';
+      case 'HIGH':
+        return 'HIGH PRIORITY: Review and potentially block';
+      case 'MEDIUM':
+        return 'MONITOR: Watch for escalation patterns';
+      case 'LOW':
+        return 'LOG: Continue normal monitoring';
+      default:
+        return 'CONTINUE: No action required';
+    }
+  }
+
+  /**
+   * Trigger incident response
+   */
+  triggerIncidentResponse(incident) {
+    console.log(`🚨 INCIDENT RESPONSE TRIGGERED: ${incident.level}`);
+    
+    // This would integrate with incident management systems
+    // For now, just log the incident
+    logger.incident('Security incident triggered', incident);
+  }
+
+  /**
+   * Calculate average analysis time
+   */
+  calculateAverageAnalysisTime() {
+    // Placeholder - would track actual analysis times
+    return 15; // milliseconds
+  }
+
+  /**
+   * Calculate false positive rate
+   */
+  calculateFalsePositiveRate() {
+    if (this.stats.threatsBlocked === 0) return 0;
+    return this.stats.falsePositives / this.stats.threatsBlocked;
+  }
+
+  /**
+   * Generate advanced recommendations
+   */
+  generateAdvancedRecommendations() {
+    return [
+      'Regular security training for development team',
+      'Implement additional rate limiting for API endpoints',
+      'Consider implementing CAPTCHA for suspicious activity',
+      'Regular security audits and penetration testing',
+      'Keep security dependencies updated'
+    ];
+  }
+
+  /**
+   * Start continuous monitoring
+   */
+  startContinuousMonitoring() {
+    // Check every minute
+    setInterval(() => {
+      this.performSecurityScan();
+    }, 60000);
+
+    // Daily cleanup
+    setInterval(() => {
+      this.performDailyCleanup();
+    }, 24 * 60 * 60 * 1000);
+  }
+
+  /**
+   * Perform security scan
+   */
+  performSecurityScan() {
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+    // Check for patterns in recent threats
+    const recentThreats = Array.from(this.threats.entries())
+      .filter(([ip, threat]) => threat.timestamp > oneHourAgo);
+
+    if (recentThreats.length > 10) {
+      console.log(`🔍 ${this.name}: ${recentThreats.length} threats detected in last hour`);
+    }
+
+    // Auto-unblock IPs after configured time
+    this.reviewBlockedIPs();
+  }
+
+  /**
+   * Review and potentially unblock IPs
+   */
+  reviewBlockedIPs() {
+    const now = new Date();
+    const unblockTime = new Date(now.getTime() - this.config.blockDuration.extended);
+
+    this.blockedIPs.forEach(ip => {
+      const threat = this.threats.get(ip);
+      if (threat && threat.timestamp < unblockTime) {
+        // Consider unblocking after time period for lower threat scores
+        if (threat.score < 75) {
+          this.blockedIPs.delete(ip);
+          this.logActivity({ ip, endpoint: 'AUTO_UNBLOCK', method: 'SYSTEM' }, 'UNBLOCKED');
+          console.log(`🔓 ${this.name}: Auto-unblocked IP ${ip} after time period`);
+        }
+      }
+    });
+  }
+
+  /**
+   * Daily cleanup
+   */
+  performDailyCleanup() {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    // Clean old threats
+    this.threats.forEach((threat, ip) => {
+      if (threat.timestamp < sevenDaysAgo) {
+        this.threats.delete(ip);
+      }
+    });
+
+    // Clean old suspicious activities
+    this.suspiciousActivities = this.suspiciousActivities.filter(
+      activity => activity.timestamp > sevenDaysAgo
+    );
+
+    // Clean old request counts
+    this.requestCounts.clear();
+
+    // Clean old user profiles
+    this.userProfiles.forEach((profile, ip) => {
+      if (profile.lastActivity < sevenDaysAgo.getTime()) {
+        this.userProfiles.delete(ip);
+      }
+    });
+
+    console.log(`🧹 ${this.name}: Daily cleanup completed`);
+  }
+
+  /**
+   * Get security status (enhanced)
+   */
+  getSecurityStatus() {
+    return {
+      isActive: this.isActive,
+      threatsDetected: this.threats.size,
+      blockedIPs: this.blockedIPs.size,
+      suspiciousActivities: this.suspiciousActivities.length,
+      lastAlert: this.lastAlert,
+      uptime: process.uptime(),
+      memoryUsage: process.memoryUsage(),
+      status: this.threats.size > 50 ? 'HIGH_ALERT' : 
+              this.threats.size > 10 ? 'ELEVATED' : 'NORMAL'
+    };
+  }
+
+  /**
+   * Get threat report
+   */
+  getThreatReport() {
+    const now = new Date();
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    const recentThreats = Array.from(this.threats.entries())
+      .filter(([ip, threat]) => threat.timestamp > oneDayAgo)
+      .map(([ip, threat]) => ({ ip, ...threat }));
+
+    return {
+      period: '24_hours',
+      totalThreats: recentThreats.length,
+      blockedIPs: Array.from(this.blockedIPs),
+      topThreats: recentThreats.sort((a, b) => b.score - a.score).slice(0, 10),
+      threatsByType: this.groupThreatsByPattern(recentThreats),
+      recommendation: this.getSecurityRecommendation(recentThreats)
+    };
+  }
+
+  /**
+   * Group threats by pattern
+   */
+  groupThreatsByPattern(threats) {
+    const groups = {};
+    threats.forEach(threat => {
+      if (threat.patterns) {
+        threat.patterns.forEach(pattern => {
+          groups[pattern] = (groups[pattern] || 0) + 1;
+        });
+      }
+    });
+    return groups;
+  }
+
+  /**
+   * Get security recommendation
+   */
+  getSecurityRecommendation(threats) {
+    if (threats.length > 100) {
+      return "HIGH ALERT: Consider implementing additional DDoS protection";
+    } else if (threats.length > 50) {
+      return "ELEVATED: Monitor for coordinated attacks";
+    } else if (threats.length > 10) {
+      return "NORMAL: Regular security monitoring in effect";
+    }
+    return "LOW: System security is optimal";
+  }
 }
 
 module.exports = EnhancedSecurityGuardianBot;
