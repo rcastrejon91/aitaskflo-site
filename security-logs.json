@@ -1,0 +1,98 @@
+[
+  {
+    "timestamp": "2025-09-15T06:19:34.303Z",
+    "ip": "::1",
+    "endpoint": "/health",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-09-15T06:19:41.619Z",
+    "ip": "::1",
+    "endpoint": "/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-09-15T06:19:49.670Z",
+    "ip": "::1",
+    "endpoint": "/api/uuid",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-09-15T06:19:49.689Z",
+    "ip": "::1",
+    "endpoint": "/api/password/12",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-09-15T06:19:58.324Z",
+    "ip": "::1",
+    "endpoint": "/run-bot",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-09-15T06:20:15.083Z",
+    "ip": "::1",
+    "endpoint": "/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-09-15T06:20:38.132Z",
+    "ip": "::1",
+    "endpoint": "/pricing.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-09-15T06:20:54.383Z",
+    "ip": "::1",
+    "endpoint": "/waitlist.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-09-15T06:20:54.394Z",
+    "ip": "::1",
+    "endpoint": "/api/joke",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-09-15T06:20:54.407Z",
+    "ip": "::1",
+    "endpoint": "/api/qr-code",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-09-15T06:23:03.533Z",
+    "ip": "::1",
+    "endpoint": "/health",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-09-15T06:23:03.545Z",
+    "ip": "::1",
+    "endpoint": "/api/password/8",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  }
+]
