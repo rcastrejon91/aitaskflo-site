@@ -1,0 +1,289 @@
+name: Security Scan and Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  security-scan:
+    name: Security Vulnerability Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run npm audit
+      run: npm audit --audit-level=moderate
+      continue-on-error: true
+
+    - name: Run security tests
+      run: npm run test:security
+      continue-on-error: true
+
+    - name: Install Snyk CLI
+      run: npm install -g snyk
+
+    - name: Run Snyk vulnerability scan
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      run: snyk test --severity-threshold=high
+      continue-on-error: true
+
+    - name: Run Snyk code analysis
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      run: snyk code test
+      continue-on-error: true
+
+  sast-analysis:
+    name: Static Application Security Testing
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run ESLint security rules
+      run: npm run lint
+
+    - name: Run security-focused linting
+      run: npx eslint . --ext .js --config .eslintrc.security.js
+      continue-on-error: true
+
+  dependency-check:
+    name: Dependency Security Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run OWASP Dependency Check
+      uses: dependency-check/Dependency-Check_Action@main
+      with:
+        project: 'AITaskFlo'
+        path: '.'
+        format: 'ALL'
+        args: >
+          --enableRetired
+          --enableExperimental
+          --failOnCVSS 7
+
+    - name: Upload dependency check results
+      uses: actions/upload-artifact@v4
+      with:
+        name: dependency-check-report
+        path: reports/
+
+  secrets-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Run TruffleHog OSS
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+        extra_args: --debug --only-verified
+
+  security-test:
+    name: Security Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run security-specific tests
+      run: npm run test:security
+
+    - name: Generate test coverage
+      run: npm test -- --coverage --testPathPattern=security
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: security-tests
+
+  docker-security:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.message, '[docker]') || github.event_name == 'schedule'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build Docker image
+      run: |
+        cat > Dockerfile << EOF
+        FROM node:18-alpine
+        WORKDIR /app
+        COPY package*.json ./
+        RUN npm ci --only=production
+        COPY . .
+        EXPOSE 3001
+        USER node
+        CMD ["npm", "start"]
+        EOF
+        docker build -t aitaskflo-security:latest .
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'aitaskflo-security:latest'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  configuration-security:
+    name: Configuration Security Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check for exposed secrets in config
+      run: |
+        # Check for hardcoded secrets or credentials
+        if grep -r "password\|secret\|key" --include="*.js" --include="*.json" --exclude-dir=node_modules --exclude-dir=tests . | grep -v "PLACEHOLDER\|example\|test"; then
+          echo "⚠️ Potential hardcoded secrets found!"
+          exit 1
+        fi
+
+    - name: Validate security configuration
+      run: |
+        # Check if security config file exists and has required settings
+        if [ ! -f "config/security-config.js" ]; then
+          echo "❌ Security configuration file missing!"
+          exit 1
+        fi
+        
+        # Check for required security middleware
+        if ! grep -q "helmet\|rateLimit\|inputValidation" server.js; then
+          echo "❌ Required security middleware not found!"
+          exit 1
+        fi
+        
+        echo "✅ Security configuration validation passed"
+
+    - name: Check file permissions
+      run: |
+        # Ensure sensitive files have appropriate permissions
+        find . -name "*.key" -o -name "*.pem" -o -name "*.crt" | xargs -I {} chmod 600 {} 2>/dev/null || true
+        
+        # Check for world-writable files
+        if find . -type f -perm -o+w -not -path "./node_modules/*" -not -path "./.git/*" | head -1 | read; then
+          echo "⚠️ World-writable files found!"
+          find . -type f -perm -o+w -not -path "./node_modules/*" -not -path "./.git/*"
+          exit 1
+        fi
+
+  security-report:
+    name: Generate Security Report
+    runs-on: ubuntu-latest
+    needs: [security-scan, sast-analysis, dependency-check, secrets-scan, security-test]
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Generate security summary
+      run: |
+        echo "# Security Scan Summary" > security-report.md
+        echo "" >> security-report.md
+        echo "## Scan Results" >> security-report.md
+        echo "- Security Scan: ${{ needs.security-scan.result }}" >> security-report.md
+        echo "- SAST Analysis: ${{ needs.sast-analysis.result }}" >> security-report.md
+        echo "- Dependency Check: ${{ needs.dependency-check.result }}" >> security-report.md
+        echo "- Secrets Scan: ${{ needs.secrets-scan.result }}" >> security-report.md
+        echo "- Security Tests: ${{ needs.security-test.result }}" >> security-report.md
+        echo "" >> security-report.md
+        echo "## Recommendations" >> security-report.md
+        echo "- Keep dependencies updated" >> security-report.md
+        echo "- Review and fix any HIGH severity vulnerabilities" >> security-report.md
+        echo "- Ensure all security tests pass" >> security-report.md
+        echo "- Regular security training for developers" >> security-report.md
+
+    - name: Upload security report
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-report
+        path: security-report.md
+
+    - name: Comment PR with security status
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('security-report.md', 'utf8');
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## 🛡️ Security Scan Results\n\n${report}`
+          });
+
+  notify-security-team:
+    name: Notify Security Team
+    runs-on: ubuntu-latest
+    needs: [security-scan, sast-analysis, dependency-check, secrets-scan]
+    if: failure() && github.event_name == 'schedule'
+    
+    steps:
+    - name: Send security alert
+      run: |
+        echo "🚨 Security scan failed on scheduled run"
+        echo "Repository: ${{ github.repository }}"
+        echo "Workflow: ${{ github.workflow }}"
+        echo "Run ID: ${{ github.run_id }}"
+        # Add actual notification logic here (Slack, email, etc.)
