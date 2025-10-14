@@ -1,0 +1,36 @@
+{
+  "users": [
+    {
+      "id": "1760445891450",
+      "email": "test@example.com",
+      "password": "$2b$10$qSnHaH/bdSbd3T1KcnDkle6tI.34dbrbccoxnGWvkGbBHcjW/xPJy",
+      "name": "Test User",
+      "role": "user",
+      "createdAt": "2025-10-14T12:44:51.450Z"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "1760445936665",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxNzYwNDQ1ODkxNDUwIiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNzYwNDQ1OTM2LCJleHAiOjE3NjEwNTA3MzZ9.cSufF1JekwqoIP4sDba8RThQBIfsk6msplGXhRMpFWU",
+      "userId": "1760445891450",
+      "createdAt": "2025-10-14T12:45:36.665Z"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "1760446467809",
+      "userId": "1760445891450",
+      "title": "Test Task",
+      "description": "Testing the API",
+      "type": "general",
+      "priority": "high",
+      "status": "pending",
+      "agentId": null,
+      "createdAt": "2025-10-14T12:54:27.809Z",
+      "updatedAt": "2025-10-14T12:54:27.809Z",
+      "completedAt": null
+    }
+  ],
+  "agents": []
+}

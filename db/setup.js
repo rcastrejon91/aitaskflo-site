@@ -1,63 +1,112 @@
-const Database = require('better-sqlite3');
-const bcrypt = require('bcrypt');
+const fs = require('fs');
 const path = require('path');
 
-// Create database in db folder
-const dbPath = path.join(__dirname, 'users.db');
-const db = new Database(dbPath);
+const DB_PATH = path.join(__dirname, 'database.json');
 
-// Create users table
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    last_login DATETIME,
-    is_active INTEGER DEFAULT 1
-  )
-`);
-
-console.log('✅ Database initialized at:', dbPath);
-
-// Helper functions
-const createUser = (username, email, password) => {
-  const hashedPassword = bcrypt.hashSync(password, 10);
-  const stmt = db.prepare('INSERT INTO users (username, email, password) VALUES (?, ?, ?)');
-  return stmt.run(username, email, hashedPassword);
+// Initialize database structure
+const initDB = () => {
+  if (!fs.existsSync(DB_PATH)) {
+    const initialData = {
+      users: [],
+      sessions: [],
+      tasks: [],
+      agents: []
+    };
+    fs.writeFileSync(DB_PATH, JSON.stringify(initialData, null, 2));
+    console.log('✅ Database initialized');
+  }
 };
 
-const findUserByEmail = (email) => {
-  const stmt = db.prepare('SELECT * FROM users WHERE email = ?');
-  return stmt.get(email);
+// Read database
+const readDB = () => {
+  try {
+    const data = fs.readFileSync(DB_PATH, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error reading database:', error);
+    return { users: [], sessions: [], tasks: [], agents: [] };
+  }
 };
 
-const findUserById = (id) => {
-  const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
-  return stmt.get(id);
+// Write database
+const writeDB = (data) => {
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+    return true;
+  } catch (error) {
+    console.error('Error writing database:', error);
+    return false;
+  }
 };
 
-const verifyPassword = (password, hashedPassword) => {
-  return bcrypt.compareSync(password, hashedPassword);
+// User operations
+const users = {
+  create: (userData) => {
+    const db = readDB();
+    const user = {
+      id: Date.now().toString(),
+      ...userData,
+      createdAt: new Date().toISOString()
+    };
+    db.users.push(user);
+    writeDB(db);
+    return user;
+  },
+  
+  findByEmail: (email) => {
+    const db = readDB();
+    return db.users.find(u => u.email === email);
+  },
+  
+  findById: (id) => {
+    const db = readDB();
+    return db.users.find(u => u.id === id);
+  },
+  
+  update: (id, updates) => {
+    const db = readDB();
+    const index = db.users.findIndex(u => u.id === id);
+    if (index !== -1) {
+      db.users[index] = { ...db.users[index], ...updates };
+      writeDB(db);
+      return db.users[index];
+    }
+    return null;
+  }
 };
 
-const updateLastLogin = (userId) => {
-  const stmt = db.prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?');
-  return stmt.run(userId);
+// Session operations
+const sessions = {
+  create: (sessionData) => {
+    const db = readDB();
+    const session = {
+      id: Date.now().toString(),
+      ...sessionData,
+      createdAt: new Date().toISOString()
+    };
+    db.sessions.push(session);
+    writeDB(db);
+    return session;
+  },
+  
+  findByToken: (token) => {
+    const db = readDB();
+    return db.sessions.find(s => s.token === token);
+  },
+  
+  delete: (token) => {
+    const db = readDB();
+    db.sessions = db.sessions.filter(s => s.token !== token);
+    writeDB(db);
+  }
 };
 
-const getAllUsers = () => {
-  const stmt = db.prepare('SELECT id, username, email, created_at, last_login FROM users WHERE is_active = 1');
-  return stmt.all();
-};
+// Initialize on load
+initDB();
 
-module.exports = { 
-  db, 
-  createUser, 
-  findUserByEmail, 
-  findUserById,
-  verifyPassword,
-  updateLastLogin,
-  getAllUsers
+module.exports = {
+  users,
+  sessions,
+  readDB,
+  writeDB
 };

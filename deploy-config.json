@@ -1,0 +1,9 @@
+{
+  "app_name": "aitaskflo",
+  "port": 3000,
+  "domain": "your-domain.com",
+  "ssl": true,
+  "auto_restart": true,
+  "max_memory": "512M",
+  "instances": 1
+}
