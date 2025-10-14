@@ -1,0 +1,14 @@
+
+// DEBUG: List all registered routes
+console.log('\n🔍 Registered routes:');
+app._router.stack.forEach(function(r){
+  if (r.route && r.route.path){
+    console.log('  ', r.route.path)
+  } else if (r.name === 'router') {
+    r.handle.stack.forEach(function(rr){
+      if (rr.route) {
+        console.log('  ', r.regexp, rr.route.path);
+      }
+    });
+  }
+});

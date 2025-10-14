@@ -1,0 +1,164 @@
+{
+  "tasks": [],
+  "logs": [],
+  "api_usage": {
+    "jokes": [
+      {
+        "endpoint": "/joke/random",
+        "timestamp": "2025-10-13T21:56:13.520Z",
+        "success": true
+      },
+      {
+        "endpoint": "/joke/random",
+        "timestamp": "2025-10-13T21:57:06.149Z",
+        "success": true
+      },
+      {
+        "endpoint": "/joke/random",
+        "timestamp": "2025-10-13T22:41:01.217Z",
+        "success": true
+      },
+      {
+        "endpoint": "/joke/random",
+        "timestamp": "2025-10-13T22:42:00.054Z",
+        "success": true
+      }
+    ],
+    "weather": [
+      {
+        "endpoint": "/weather/miami",
+        "timestamp": "2025-10-13T21:56:14.067Z",
+        "success": false
+      },
+      {
+        "endpoint": "/weather/london",
+        "timestamp": "2025-10-13T22:41:00.244Z",
+        "success": false
+      },
+      {
+        "endpoint": "/weather/london",
+        "timestamp": "2025-10-13T22:41:58.807Z",
+        "success": false
+      }
+    ],
+    "quotes": [
+      {
+        "endpoint": "/quote/motivational",
+        "timestamp": "2025-10-13T21:56:39.594Z",
+        "success": false
+      },
+      {
+        "endpoint": "/quote/motivational",
+        "timestamp": "2025-10-13T22:41:04.783Z",
+        "success": false
+      },
+      {
+        "endpoint": "/quote/motivational",
+        "timestamp": "2025-10-13T22:42:00.549Z",
+        "success": false
+      }
+    ],
+    "animals": [
+      {
+        "endpoint": "/random/cat",
+        "timestamp": "2025-10-13T21:56:40.076Z",
+        "success": true
+      }
+    ],
+    "colors": [
+      {
+        "endpoint": "/color/3",
+        "timestamp": "2025-10-13T21:56:40.910Z",
+        "success": false
+      },
+      {
+        "endpoint": "/color/5",
+        "timestamp": "2025-10-13T22:41:04.443Z",
+        "success": false
+      },
+      {
+        "endpoint": "/color/3",
+        "timestamp": "2025-10-13T22:42:02.243Z",
+        "success": false
+      }
+    ],
+    "uuid": [
+      {
+        "endpoint": "/uuid/5",
+        "timestamp": "2025-10-13T21:56:48.365Z",
+        "success": true
+      },
+      {
+        "endpoint": "/uuid/5",
+        "timestamp": "2025-10-13T21:57:05.731Z",
+        "success": true
+      },
+      {
+        "endpoint": "/uuid/3",
+        "timestamp": "2025-10-13T22:41:03.424Z",
+        "success": true
+      },
+      {
+        "endpoint": "/uuid/5",
+        "timestamp": "2025-10-13T22:42:01.205Z",
+        "success": false
+      }
+    ],
+    "password": [
+      {
+        "endpoint": "/password/16",
+        "timestamp": "2025-10-13T21:56:48.400Z",
+        "success": true
+      },
+      {
+        "endpoint": "/password/16",
+        "timestamp": "2025-10-13T21:57:05.766Z",
+        "success": true
+      },
+      {
+        "endpoint": "/password/16",
+        "timestamp": "2025-10-13T22:42:02.269Z",
+        "success": true
+      }
+    ],
+    "news": [
+      {
+        "endpoint": "/news/technology",
+        "timestamp": "2025-10-13T21:56:49.083Z",
+        "success": false
+      },
+      {
+        "endpoint": "/news/technology",
+        "timestamp": "2025-10-13T22:41:00.728Z",
+        "success": false
+      },
+      {
+        "endpoint": "/news/technology",
+        "timestamp": "2025-10-13T22:41:59.507Z",
+        "success": false
+      }
+    ],
+    "exchange": [
+      {
+        "endpoint": "/exchange/usd/eur",
+        "timestamp": "2025-10-13T21:56:49.801Z",
+        "success": true
+      }
+    ],
+    "qr-code": [
+      {
+        "endpoint": "/qr-code",
+        "timestamp": "2025-10-13T21:57:06.205Z",
+        "success": true
+      }
+    ],
+    "url-shortener": [
+      {
+        "endpoint": "/shorten-url",
+        "timestamp": "2025-10-13T21:57:06.918Z",
+        "success": true
+      }
+    ]
+  },
+  "subscribers": []
+}

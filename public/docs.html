@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation - AITaskFlo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --dark: #0f172a;
+            --light: #f8fafc;
+            --gray: #64748b;
+            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--light);
+            color: var(--dark);
+            line-height: 1.8;
+        }
+
+        .navbar {
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .nav-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--dark);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .btn-primary {
+            background: var(--gradient-1);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            text-decoration: none;
+        }
+
+        .docs-container {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            max-width: 1400px;
+            margin: 0 auto;
+            gap: 3rem;
+            padding: 2rem;
+        }
+
+        .sidebar {
+            position: sticky;
+            top: 100px;
+            height: fit-content;
+        }
+
+        .sidebar h3 {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            color: var(--gray);
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+
+        .sidebar ul {
+            list-style: none;
+            margin-bottom: 2rem;
+        }
+
+        .sidebar li {
+            margin-bottom: 0.5rem;
+        }
+
+        .sidebar a {
+            color: var(--dark);
+            text-decoration: none;
+            display: block;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar a:hover, .sidebar a.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .content {
+            background: white;
+            padding: 3rem;
+            border-radius: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 900px;
+        }
+
+        .content h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: var(--dark);
+        }
+
+        .content h2 {
+            font-size: 1.8rem;
+            margin: 2rem 0 1rem;
+            color: var(--dark);
+        }
+
+        .content h3 {
+            font-size: 1.3rem;
+            margin: 1.5rem 0 0.75rem;
+            color: var(--dark);
+        }
+
+        .content p {
+            margin-bottom: 1rem;
+            color: var(--gray);
+        }
+
+        .content code {
+            background: var(--light);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'Monaco', monospace;
+            color: var(--primary);
+        }
+
+        .content pre {
+            background: #0f172a;
+            color: #10b981;
+            padding: 1.5rem;
+            border-radius: 12px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'Monaco', monospace;
+        }
+
+        .content ul, .content ol {
+            margin-left: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .content li {
+            margin-bottom: 0.5rem;
+            color: var(--gray);
+        }
+
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            margin: 1.5rem 0;
+            border-left: 4px solid;
+        }
+
+        .alert-info {
+            background: #dbeafe;
+            border-color: #3b82f6;
+            color: #1e40af;
+        }
+
+        @media (max-width: 968px) {
+            .docs-container {
+                grid-template-columns: 1fr;
+            }
+            .sidebar {
+                position: relative;
+                top: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="logo">
+                <span>🤖</span>
+                <span>AITaskFlo</span>
+            </a>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/factory.html">Studio</a>
+                <a href="/pricing.html">Pricing</a>
+                <a href="/docs.html">Docs</a>
+                <a href="/dashboard.html" class="btn-primary">Dashboard</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="docs-container">
+        <aside class="sidebar">
+            <h3>Getting Started</h3>
+            <ul>
+                <li><a href="#introduction" class="active">Introduction</a></li>
+                <li><a href="#quick-start">Quick Start</a></li>
+                <li><a href="#authentication">Authentication</a></li>
+            </ul>
+
+            <h3>AI Bots</h3>
+            <ul>
+                <li><a href="#email-bot">Email Bot</a></li>
+                <li><a href="#task-bot">Task Bot</a></li>
+                <li><a href="#analytics-bot">Analytics Bot</a></li>
+                <li><a href="#research-bot">Research Bot</a></li>
+            </ul>
+
+            <h3>API Reference</h3>
+            <ul>
+                <li><a href="#rest-api">REST API</a></li>
+                <li><a href="#websocket">WebSocket</a></li>
+                <li><a href="#integrations">Integrations</a></li>
+            </ul>
+        </aside>
+
+        <main class="content">
+            <h1 id="introduction">📚 AITaskFlo Documentation</h1>
+            <p>Welcome to AITaskFlo! This documentation will help you get started with our AI-powered automation platform.</p>
+
+            <div class="alert alert-info">
+                <strong>💡 New to AITaskFlo?</strong> Start with our Quick Start Guide below!
+            </div>
+
+            <h2 id="quick-start">🚀 Quick Start</h2>
+            <p>Get started with AITaskFlo in 3 simple steps:</p>
+
+            <h3>1. Create an Account</h3>
+            <p>Sign up for a free account. No credit card required!</p>
+            <pre>curl -X POST http://localhost:3001/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"yourname","email":"you@email.com","password":"YourPass123!"}'</pre>
+
+            <h3>2. Access the Bot Studio</h3>
+            <p>Navigate to the Bot Studio and select your first AI bot.</p>
+
+            <h3>3. Run Your First Task</h3>
+            <p>Send a task to your bot:</p>
+            <pre>curl -X POST http://localhost:3001/run-bot \
+  -H "Content-Type: application/json" \
+  -d '{"task":"Draft a professional email","bot":"email"}'</pre>
+
+            <h2 id="authentication">🔐 Authentication</h2>
+            <p>AITaskFlo uses JWT (JSON Web Tokens) for secure authentication.</p>
+
+            <h3>Login</h3>
+            <pre>curl -X POST http://localhost:3001/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@email.com","password":"YourPass123!"}'</pre>
+
+            <h3>Use Token</h3>
+            <pre>curl -X GET http://localhost:3001/auth/me \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"</pre>
+
+            <h2 id="email-bot">📧 Email Bot</h2>
+            <p>The Email Bot helps you draft professional emails with AI assistance.</p>
+            <pre>POST /run-bot
+{
+  "bot": "email",
+  "task": "Draft a meeting invitation for next Monday"
+}</pre>
+
+            <h2 id="rest-api">🌐 REST API</h2>
+            <p>AITaskFlo provides a comprehensive REST API for all operations.</p>
+
+            <h3>Base URL</h3>
+            <code>http://localhost:3001</code>
+
+            <h3>Endpoints</h3>
+            <ul>
+                <li><code>POST /auth/register</code> - Create account</li>
+                <li><code>POST /auth/login</code> - Login</li>
+                <li><code>GET /auth/me</code> - Get user info</li>
+                <li><code>POST /run-bot</code> - Run single bot</li>
+                <li><code>POST /team-run</code> - Run bot team</li>
+                <li><code>GET /health</code> - Health check</li>
+            </ul>
+
+            <h2>🎯 Next Steps</h2>
+            <p>Now that you understand the basics, explore:</p>
+            <ul>
+                <li>Advanced bot configurations</li>
+                <li>Team collaboration features</li>
+                <li>Custom workflow creation</li>
+                <li>API integrations</li>
+            </ul>
+        </main>
+    </div>
+
+    <script>
+        document.querySelectorAll('.sidebar a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

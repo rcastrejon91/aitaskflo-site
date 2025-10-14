@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Studio - AITaskFlo</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0f;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        /* Top Navigation */
+        .top-nav {
+            background: rgba(15, 15, 25, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .nav-content {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-decoration: none;
+        }
+
+        .nav-links a {
+            color: #a0a0b0;
+            text-decoration: none;
+            margin-left: 2rem;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: #6366f1;
+        }
+
+        /* Main Studio Layout */
+        .studio-container {
+            display: grid;
+            grid-template-columns: 300px 1fr 350px;
+            gap: 1.5rem;
+            max-width: 1600px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+            height: calc(100vh - 120px);
+        }
+
+        /* Left Sidebar - Bot Selection */
+        .bot-panel {
+            background: rgba(15, 15, 25, 0.8);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 16px;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .bot-panel h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .bot-card {
+            background: rgba(99, 102, 241, 0.1);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .bot-card:hover {
+            border-color: #6366f1;
+            background: rgba(99, 102, 241, 0.2);
+            transform: translateX(5px);
+        }
+
+        .bot-card.active {
+            border-color: #6366f1;
+            background: rgba(99, 102, 241, 0.25);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+        }
+
+        .bot-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .bot-name {
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 0.25rem;
+        }
+
+        .bot-desc {
+            font-size: 0.85rem;
+            color: #a0a0b0;
+        }
+
+        /* Center - Workspace */
+        .workspace {
+            background: rgba(15, 15, 25, 0.8);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .workspace-header {
+            background: rgba(99, 102, 241, 0.1);
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .workspace-header h1 {
+            font-size: 1.5rem;
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+
+        .workspace-header p {
+            color: #a0a0b0;
+            font-size: 0.9rem;
+        }
+
+        .input-area {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .input-area label {
+            display: block;
+            color: #a0a0b0;
+            font-size: 0.9rem;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+
+        #taskInput {
+            width: 100%;
+            min-height: 120px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(99, 102, 241, 0.3);
+            border-radius: 12px;
+            padding: 1rem;
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            resize: vertical;
+            transition: all 0.3s;
+        }
+
+        #taskInput:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 1rem;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(139, 92, 246, 0.2);
+            color: #8b5cf6;
+            border: 2px solid #8b5cf6;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(139, 92, 246, 0.3);
+        }
+
+        /* Output Terminal */
+        .output-terminal {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            line-height: 1.8;
+        }
+
+        .terminal-line {
+            margin-bottom: 0.5rem;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .terminal-prompt {
+            color: #10b981;
+        }
+
+        .terminal-output {
+            color: #e0e0e0;
+        }
+
+        .terminal-error {
+            color: #ef4444;
+        }
+
+        .terminal-success {
+            color: #10b981;
+        }
+
+        /* Right Sidebar - Status */
+        .status-panel {
+            background: rgba(15, 15, 25, 0.8);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 16px;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .status-panel h3 {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            color: #fff;
+        }
+
+        .status-item {
+            background: rgba(99, 102, 241, 0.1);
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+
+        .status-label {
+            font-size: 0.85rem;
+            color: #a0a0b0;
+            margin-bottom: 0.25rem;
+        }
+
+        .status-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #10b981;
+        }
+
+        .api-list {
+            margin-top: 1.5rem;
+        }
+
+        .api-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .api-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+        }
+
+        @media (max-width: 1200px) {
+            .studio-container {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+        <div class="nav-content">
+            <a href="/" class="logo">🤖 AITaskFlo Studio</a>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/pricing.html">Pricing</a>
+                <a href="/docs.html">Docs</a>
+                <a href="/dashboard.html">Dashboard</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Studio Layout -->
+    <div class="studio-container">
+        <!-- Left: Bot Selection -->
+        <div class="bot-panel">
+            <h2>🤖 AI Bots</h2>
+            
+            <div class="bot-card active" data-bot="email">
+                <div class="bot-icon">📧</div>
+                <div class="bot-name">Email Bot</div>
+                <div class="bot-desc">Professional email drafting</div>
+            </div>
+
+            <div class="bot-card" data-bot="task">
+                <div class="bot-icon">📋</div>
+                <div class="bot-name">Task Bot</div>
+                <div class="bot-desc">Smart task management</div>
+            </div>
+
+            <div class="bot-card" data-bot="analytics">
+                <div class="bot-icon">📊</div>
+                <div class="bot-name">Analytics Bot</div>
+                <div class="bot-desc">Data insights & reports</div>
+            </div>
+
+            <div class="bot-card" data-bot="research">
+                <div class="bot-icon">🔍</div>
+                <div class="bot-name">Research Bot</div>
+                <div class="bot-desc">Web research & citations</div>
+            </div>
+        </div>
+
+        <!-- Center: Workspace -->
+        <div class="workspace">
+            <div class="workspace-header">
+                <h1 id="activeBotName">📧 Email Bot</h1>
+                <p id="activeBotDesc">Craft professional emails with AI assistance</p>
+            </div>
+
+            <div class="input-area">
+                <label for="taskInput">💬 What would you like to automate?</label>
+                <textarea id="taskInput" placeholder="Example: Draft a professional email declining a meeting request politely..."></textarea>
+                
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="runBot()">
+                        <span>🚀</span>
+                        <span>Run Bot</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="runTeam()">
+                        <span>👥</span>
+                        <span>Run Team</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="output-terminal" id="output">
+                <div class="terminal-line terminal-prompt">$ AITaskFlo Studio Ready</div>
+                <div class="terminal-line terminal-output">✅ All bots initialized and ready</div>
+                <div class="terminal-line terminal-output">🔌 Connected to 15+ APIs</div>
+                <div class="terminal-line terminal-success">💡 Enter your task above to get started!</div>
+            </div>
+        </div>
+
+        <!-- Right: Status Panel -->
+        <div class="status-panel">
+            <h3>📊 System Status</h3>
+            
+            <div class="status-item">
+                <div class="status-label">Active Bots</div>
+                <div class="status-value">4 / 4</div>
+            </div>
+
+            <div class="status-item">
+                <div class="status-label">Tasks Processed</div>
+                <div class="status-value" id="taskCount">0</div>
+            </div>
+
+            <div class="status-item">
+                <div class="status-label">Uptime</div>
+                <div class="status-value">99.9%</div>
+            </div>
+
+            <div class="api-list">
+                <h3>🔌 Connected APIs</h3>
+                <div class="api-item">
+                    <div class="api-status"></div>
+                    <span>Weather API</span>
+                </div>
+                <div class="api-item">
+                    <div class="api-status"></div>
+                    <span>News API</span>
+                </div>
+                <div class="api-item">
+                    <div class="api-status"></div>
+                    <span>Currency API</span>
+                </div>
+                <div class="api-item">
+                    <div class="api-status"></div>
+                    <span>QR Code API</span>
+                </div>
+                <div class="api-item">
+                    <div class="api-status"></div>
+                    <span>Quote API</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedBot = 'email';
+        let taskCount = 0;
+
+        // Bot selection
+        document.querySelectorAll('.bot-card').forEach(card => {
+            card.addEventListener('click', function() {
+                document.querySelectorAll('.bot-card').forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+                selectedBot = this.dataset.bot;
+                
+                const botInfo = {
+                    email: { name: '📧 Email Bot', desc: 'Craft professional emails with AI assistance' },
+                    task: { name: '📋 Task Bot', desc: 'Manage and prioritize tasks intelligently' },
+                    analytics: { name: '📊 Analytics Bot', desc: 'Generate insights from your data' },
+                    research: { name: '🔍 Research Bot', desc: 'Conduct research with citations' }
+                };
+                
+                document.getElementById('activeBotName').textContent = botInfo[selectedBot].name;
+                document.getElementById('activeBotDesc').textContent = botInfo[selectedBot].desc;
+            });
+        });
+
+        // Run single bot
+        async function runBot() {
+            const task = document.getElementById('taskInput').value;
+            if (!task.trim()) {
+                addOutput('⚠️ Please enter a task', 'error');
+                return;
+            }
+
+            addOutput(`$ Running ${selectedBot} bot...`, 'prompt');
+            addOutput(`📝 Task: ${task}`, 'output');
+
+            try {
+                const response = await fetch('/run-bot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bot: selectedBot, task: task })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    addOutput('✅ ' + data.result, 'success');
+                    taskCount++;
+                    document.getElementById('taskCount').textContent = taskCount;
+                } else {
+                    addOutput('❌ Error: ' + data.error, 'error');
+                }
+            } catch (error) {
+                addOutput('❌ Connection error: ' + error.message, 'error');
+            }
+        }
+
+        // Run full team
+        async function runTeam() {
+            const task = document.getElementById('taskInput').value;
+            if (!task.trim()) {
+                addOutput('⚠️ Please enter a task', 'error');
+                return;
+            }
+
+            addOutput('$ Running full bot team...', 'prompt');
+            addOutput(`📝 Task: ${task}`, 'output');
+
+            try {
+                const response = await fetch('/team-run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task: task })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    data.results.forEach(result => {
+                        addOutput(`\n🤖 ${result.bot}:`, 'output');
+                        addOutput(result.result, 'success');
+                    });
+                    taskCount += data.results.length;
+                    document.getElementById('taskCount').textContent = taskCount;
+                } else {
+                    addOutput('❌ Error: ' + data.error, 'error');
+                }
+            } catch (error) {
+                addOutput('❌ Connection error: ' + error.message, 'error');
+            }
+        }
+
+        // Add output to terminal
+        function addOutput(text, type = 'output') {
+            const output = document.getElementById('output');
+            const line = document.createElement('div');
+            line.className = `terminal-line terminal-${type}`;
+            line.textContent = text;
+            output.appendChild(line);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        // Enter key to run
+        document.getElementById('taskInput').addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                runBot();
+            }
+        });
+    </script>
+</body>
+</html>

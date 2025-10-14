@@ -1,0 +1,1274 @@
+[
+  {
+    "timestamp": "2025-10-13T21:56:12.977Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/joke",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T21:56:13.560Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/weather/miami",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T21:56:14.100Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/security/status",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T21:56:39.202Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/quote/motivational",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T21:56:39.629Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/random/cat",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T21:56:40.109Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/color/3",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T21:56:40.971Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/uuid/5",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T21:56:48.397Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/password/16",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T21:56:48.434Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/news/technology",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T21:56:49.124Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/exchange/usd/eur/100",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T21:57:00.901Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/uuid/5",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T21:57:05.763Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/password/16",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T21:57:05.801Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/joke",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T21:57:06.204Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/qr-code",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T21:57:06.234Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/shorten-url",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T21:58:00.464Z",
+    "ip": "::1",
+    "endpoint": "/run-bot",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:00:56.505Z",
+    "ip": "::1",
+    "endpoint": "/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:00:58.485Z",
+    "ip": "::1",
+    "endpoint": "/favicon.ico",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:06:33.947Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:07:14.217Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/login",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:08:12.232Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/health",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:08:12.301Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:08:27.820Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:08:27.837Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/login",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:08:27.855Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:08:32.853Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:08:33.089Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:09:21.997Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:09:22.041Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/login",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:09:22.058Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:10:38.765Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:10:38.795Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/login",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:10:38.819Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:12:57.566Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:12:57.598Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/login",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:15:10.236Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:15:10.280Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/login",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:15:10.305Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:16:10.802Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:16:39.703Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:17:23.580Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/login",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:17:30.266Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:17:30.332Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/login",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:17:30.403Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:18:13.022Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:18:13.048Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/me",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:18:39.202Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:18:39.291Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/me",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:18:39.361Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/me",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:18:39.469Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/login",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:18:39.560Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/me",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:19:11.289Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:19:11.497Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/login",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:19:11.678Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/me",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:19:11.735Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:19:11.782Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/login",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:20:35.096Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:20:35.263Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/me",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:22:33.381Z",
+    "ip": "::1",
+    "endpoint": "/login.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:22:44.065Z",
+    "ip": "::1",
+    "endpoint": "/favicon.ico",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:27:08.550Z",
+    "ip": "::1",
+    "endpoint": "/login.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:27:10.047Z",
+    "ip": "::1",
+    "endpoint": "/favicon.ico",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:27:21.529Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:27:21.687Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/login",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:27:21.818Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/me",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:27:56.668Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:27:56.869Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/me",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:28:12.259Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:28:12.476Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/me",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:28:12.524Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/login",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:28:12.723Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/me",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:28:12.760Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:28:44.970Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:28:58.532Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/login",
+    "method": "POST",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:29:05.508Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/me",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:29:09.115Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:32:09.532Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:32:09.567Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/login.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:32:09.587Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/register.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:32:09.612Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/dashboard.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:32:09.631Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:32:14.165Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:33:38.947Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:33:39.073Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/index.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:33:39.111Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/login.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:33:39.130Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/register.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:33:39.150Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/dashboard.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:33:48.458Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:33:48.493Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/login.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:33:48.526Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/register.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:33:48.555Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/dashboard.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:33:48.588Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:39:32.044Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:39:32.074Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/login.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:39:32.091Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/register.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:39:32.114Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/dashboard.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:39:32.135Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:39:32.162Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/health",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:39:42.617Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:39:42.637Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/login.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:39:42.652Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/register.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:39:42.673Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/dashboard.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:39:42.687Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:40:04.575Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:40:04.589Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/login.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:40:04.608Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/register.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:40:04.622Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/dashboard.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:40:04.642Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:40:04.656Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/health",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:40:04.685Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:40:04.700Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/login.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:40:04.714Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/register.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:40:04.731Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/dashboard.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:40:04.745Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:40:59.626Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/weather/london",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:00.278Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/news/technology",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:00.756Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/joke",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:01.234Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/uuid/3",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:03.448Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/color/5",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:04.464Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/quote/motivational",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:07.682Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:07.702Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/login.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:07.716Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/register.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:07.737Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/dashboard.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:07.751Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:07.767Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/health",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:07.802Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:07.819Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/login.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:07.849Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/register.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:07.884Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/dashboard.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:07.931Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:57.591Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/weather/london",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:58.865Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/news/technology",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:41:59.615Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/joke",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:42:00.090Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/quote/motivational",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:42:00.613Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/uuid/5",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:42:01.236Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/color/3",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:42:02.267Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/api/password/16",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:42:05.682Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:42:05.731Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/health",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:42:30.007Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:42:30.034Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/login.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:42:30.054Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/register.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:42:30.077Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/dashboard.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:42:30.100Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:42:30.121Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/health",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:42:30.156Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:42:30.175Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/login.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:42:30.189Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/register.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:42:30.205Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/dashboard.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:42:30.220Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/auth/users",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:55:10.583Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:55:10.626Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/factory.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:55:10.657Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/pricing.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:55:10.678Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/docs.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:55:10.707Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/dashboard.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:56:51.137Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:59:20.618Z",
+    "ip": "::ffff:127.0.0.1",
+    "endpoint": "/factory.html",
+    "method": "HEAD",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  },
+  {
+    "timestamp": "2025-10-13T22:59:39.916Z",
+    "ip": "::1",
+    "endpoint": "/factory.html",
+    "method": "GET",
+    "status": "SAFE",
+    "guardian": "SecurityGuardian"
+  }
+]
