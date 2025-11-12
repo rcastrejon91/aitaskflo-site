@@ -288,7 +288,10 @@ class SecurityGuardianBot {
 
   // Send email alert
   async sendEmailAlert(alert) {
+<<<<<<< HEAD
     return; // Email alerts disabled - nodemailer issue
+=======
+>>>>>>> 7abc438 (deploy: 2025-11-11)
     try {
       const transporter = nodemailer.createTransporter({
         service: 'gmail',
@@ -545,6 +548,7 @@ const upload = multer({
 });
 
 // --- EMAIL CONFIGURATION ---
+<<<<<<< HEAD
 // const transporter = nodemailer.createTransporter({
 //   service: 'gmail',
 //   auth: {
@@ -552,6 +556,15 @@ const upload = multer({
 //     pass: process.env.EMAIL_PASS
 //   }
 // });
+=======
+const transporter = nodemailer.createTransporter({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
+>>>>>>> 7abc438 (deploy: 2025-11-11)
 
 // --- JWT MIDDLEWARE ---
 const authenticateToken = (req, res, next) => {
@@ -571,7 +584,10 @@ const authenticateToken = (req, res, next) => {
 
 // --- SERVE STATIC FILES ---
 app.use(express.static('.', {
+<<<<<<< HEAD
 app.use((req, res, next) => { res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate"); next(); });
+=======
+>>>>>>> 7abc438 (deploy: 2025-11-11)
   extensions: ['html', 'htm'],
   index: 'index.html',
   setHeaders: (res, path) => {
@@ -1425,6 +1441,7 @@ app.get('/terms', (req, res) => res.sendFile(path.join(__dirname, 'docs/terms.ht
 app.use('/uploads', express.static('uploads'));
 
 // --- 404 HANDLER ---
+<<<<<<< HEAD
 
 // AUTH ROUTES
 // ==========================================
@@ -1438,6 +1455,8 @@ app.use((req, res, next) => {
   next();
 });
 
+=======
+>>>>>>> 7abc438 (deploy: 2025-11-11)
 app.use((req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/run-bot') || 
       req.path.startsWith('/team-run') || req.path.startsWith('/admin-login') ||
@@ -1497,6 +1516,7 @@ server.listen(PORT, () => {
   console.log(`🛡️ Security Guardian: ACTIVE and monitoring all requests`);
 });
 
+<<<<<<< HEAD
 
 // ==========================================
 // ==========================================
@@ -1525,3 +1545,52 @@ app._router.stack.forEach(function(r){
 // Serve static files from public directory
 app.use(express.static('public'));
 app.use((req, res, next) => { res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate"); next(); });
+=======
+module.exports = app;
+
+// 🏥 MEDICAL BOT
+const medicalBot = async (input, memory, userId) => {
+  try {
+    const response = await axios.post('http://localhost:8000/predict', {
+      text: input,
+      return_probabilities: true
+    }, { headers: { 'X-API-Key': 'demo' } });
+    
+    const { prediction, confidence } = response.data;
+    
+    return { 
+      responses: [
+        `[MedicalBot] 🏥 Analyzing: "${input}"`,
+        `[MedicalBot] 🎯 Specialty: ${prediction}`,
+        `[MedicalBot] 📈 Confidence: ${(confidence * 100).toFixed(1)}%`,
+        `[MedicalBot] ✅ Complete!`
+      ], 
+      apiData: { prediction, confidence }
+    };
+  } catch (error) {
+    return {
+      responses: [`[MedicalBot] ⚠️ Service unavailable`],
+      apiData: {}
+    };
+  }
+};
+
+bots.medicalBot = medicalBot;
+
+app.post("/medical-predict", apiLimiter, [
+  body('text').isString().isLength({ min: 1, max: 1000 })
+], async (req, res) => {
+  try {
+    const response = await axios.post('http://localhost:8000/predict', {
+      text: req.body.text,
+      return_probabilities: true
+    }, { headers: { 'X-API-Key': 'demo' }, timeout: 10000 });
+
+    res.json({ success: true, ...response.data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Service unavailable' });
+  }
+});
+
+console.log('🏥 Medical Bot ready!');
+>>>>>>> 7abc438 (deploy: 2025-11-11)

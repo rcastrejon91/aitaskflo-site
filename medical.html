@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Medical AI | AITaskFlo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui; background: linear-gradient(135deg, #667eea, #764ba2); min-height: 100vh; }
+        .hero { text-align: center; padding: 100px 20px; color: white; }
+        .hero h1 { font-size: 48px; margin-bottom: 20px; }
+        .demo { max-width: 800px; margin: 50px auto; background: white; padding: 40px; border-radius: 20px; }
+        textarea { width: 100%; padding: 15px; border: 2px solid #e2e8f0; border-radius: 12px; min-height: 120px; font-size: 16px; }
+        button { width: 100%; padding: 16px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; margin-top: 15px; }
+        .result { margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 12px; display: none; }
+        .result.active { display: block; }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1>🏥 Medical AI Assistant</h1>
+        <p>AI-powered symptom analysis</p>
+    </div>
+    
+    <div class="demo">
+        <textarea id="symptoms" placeholder="Describe your symptoms..."></textarea>
+        <button onclick="analyze()">🔍 Analyze Symptoms</button>
+        <div class="result" id="result"></div>
+    </div>
+    
+    <script>
+        async function analyze() {
+            const text = document.getElementById('symptoms').value;
+            if (!text) return alert('Enter symptoms');
+            
+            const result = document.getElementById('result');
+            result.innerHTML = '🔄 Analyzing...';
+            result.classList.add('active');
+            
+            try {
+                const res = await fetch('/medical-predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    result.innerHTML = `
+                        <h3>📋 Results</h3>
+                        <p><strong>Specialty:</strong> ${data.prediction}</p>
+                        <p><strong>Confidence:</strong> ${(data.confidence * 100).toFixed(1)}%</p>
+                        <p style="margin-top: 15px; color: #856404;">⚠️ Consult a healthcare professional</p>
+                    `;
+                } else {
+                    result.innerHTML = '⚠️ Analysis failed';
+                }
+            } catch (e) {
+                result.innerHTML = '⚠️ Connection error';
+            }
+        }
+    </script>
+</body>
+</html>
