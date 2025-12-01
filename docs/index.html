@@ -1,553 +1,264 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AITaskFlo - Intelligent Task Automation</title>
-    <meta name="description" content="Build, deploy, and manage AI-powered automation bots without coding. Transform your workflow with AITaskFlo.">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.6;
-            color: #333;
-        }
-
-        .navbar {
-            background: white;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .navbar h1 {
-            color: #667eea;
-            font-size: 24px;
-            font-weight: 700;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 30px;
-            align-items: center;
-        }
-
-        .nav-links a {
-            color: #333;
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.3s ease;
-        }
-
-        .nav-links a:hover {
-            color: #667eea;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 10px 25px;
-            border-radius: 25px;
-            border: none;
-            cursor: pointer;
-            font-weight: 600;
-            transition: transform 0.3s ease;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        /* Hero Section */
-        .hero {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 100px 30px;
-            text-align: center;
-        }
-
-        .hero h2 {
-            font-size: 48px;
-            margin-bottom: 20px;
-            font-weight: 700;
-        }
-
-        .hero p {
-            font-size: 20px;
-            margin-bottom: 40px;
-            opacity: 0.9;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        .cta-buttons {
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .btn-large {
-            padding: 15px 40px;
-            font-size: 18px;
-            border-radius: 30px;
-            border: none;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-
-        .btn-white {
-            background: white;
-            color: #667eea;
-        }
-
-        .btn-white:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        }
-
-        .btn-outline {
-            background: transparent;
-            color: white;
-            border: 2px solid white;
-        }
-
-        .btn-outline:hover {
-            background: white;
-            color: #667eea;
-        }
-
-        /* Features Section */
-        .features {
-            padding: 80px 30px;
-            background: #f8f9fa;
-        }
-
-        .features h2 {
-            text-align: center;
-            font-size: 36px;
-            margin-bottom: 60px;
-            color: #333;
-        }
-
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 40px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .feature-card {
-            background: white;
-            padding: 40px;
-            border-radius: 15px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease;
-        }
-
-        .feature-card:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
-        }
-
-        .feature-icon {
-            font-size: 48px;
-            margin-bottom: 20px;
-        }
-
-        .feature-card h3 {
-            font-size: 24px;
-            margin-bottom: 15px;
-            color: #667eea;
-        }
-
-        .feature-card p {
-            color: #666;
-            line-height: 1.8;
-        }
-
-        /* Use Cases Section */
-        .use-cases {
-            padding: 80px 30px;
-            background: white;
-        }
-
-        .use-cases h2 {
-            text-align: center;
-            font-size: 36px;
-            margin-bottom: 60px;
-            color: #333;
-        }
-
-        .use-cases-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 30px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .use-case {
-            padding: 30px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 15px;
-            text-align: center;
-            transition: transform 0.3s ease;
-        }
-
-        .use-case:hover {
-            transform: scale(1.05);
-        }
-
-        .use-case h3 {
-            font-size: 20px;
-            margin-bottom: 10px;
-        }
-
-        /* Pricing Section */
-        .pricing {
-            padding: 80px 30px;
-            background: #f8f9fa;
-        }
-
-        .pricing h2 {
-            text-align: center;
-            font-size: 36px;
-            margin-bottom: 60px;
-            color: #333;
-        }
-
-        .pricing-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .pricing-card {
-            background: white;
-            padding: 40px;
-            border-radius: 15px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-            text-align: center;
-            transition: transform 0.3s ease;
-        }
-
-        .pricing-card:hover {
-            transform: translateY(-10px);
-        }
-
-        .pricing-card.featured {
-            border: 3px solid #667eea;
-            transform: scale(1.05);
-        }
-
-        .pricing-card h3 {
-            font-size: 28px;
-            margin-bottom: 15px;
-            color: #667eea;
-        }
-
-        .price {
-            font-size: 48px;
-            font-weight: 700;
-            color: #333;
-            margin-bottom: 10px;
-        }
-
-        .price span {
-            font-size: 20px;
-            color: #666;
-        }
-
-        .pricing-features {
-            list-style: none;
-            margin: 30px 0;
-            text-align: left;
-        }
-
-        .pricing-features li {
-            padding: 10px 0;
-            border-bottom: 1px solid #eee;
-        }
-
-        .pricing-features li:before {
-            content: "✓ ";
-            color: #667eea;
-            font-weight: bold;
-            margin-right: 10px;
-        }
-
-        /* Footer */
-        .footer {
-            background: #2d3748;
-            color: white;
-            padding: 60px 30px 30px;
-        }
-
-        .footer-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 40px;
-            margin-bottom: 40px;
-        }
-
-        .footer h4 {
-            font-size: 20px;
-            margin-bottom: 20px;
-            color: #667eea;
-        }
-
-        .footer ul {
-            list-style: none;
-        }
-
-        .footer ul li {
-            margin-bottom: 10px;
-        }
-
-        .footer a {
-            color: #cbd5e0;
-            text-decoration: none;
-            transition: color 0.3s ease;
-        }
-
-        .footer a:hover {
-            color: #667eea;
-        }
-
-        .footer-bottom {
-            text-align: center;
-            padding-top: 30px;
-            border-top: 1px solid #4a5568;
-            color: #cbd5e0;
-        }
-
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            .hero h2 {
-                font-size: 32px;
-            }
-
-            .hero p {
-                font-size: 16px;
-            }
-
-            .navbar {
-                flex-direction: column;
-                gap: 15px;
-            }
-
-            .nav-links {
-                flex-direction: column;
-                gap: 10px;
-            }
-
-            .cta-buttons {
-                flex-direction: column;
-            }
-
-            .btn-large {
-                width: 100%;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AITaskFlo - Intelligent Task Automation</title>
+  <meta name="description" content="Build, deploy, and manage AI-powered automation bots without coding. Transform your workflow with AITaskFlo.">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; line-height: 1.6; color: #333; }
+    .navbar { background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+    .navbar h1 { color: #667eea; font-size: 24px; font-weight: 700; }
+    .nav-links { display: flex; gap: 30px; align-items: center; }
+    .nav-links a { color: #333; text-decoration: none; font-weight: 500; transition: color 0.3s ease; }
+    .nav-links a:hover { color: #667eea; }
+    .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 10px 25px; border-radius: 25px; border: none; cursor: pointer; font-weight: 600; transition: transform 0.3s ease; }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4); }
+    /* Hero Section */
+    .hero { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 100px 30px; text-align: center; }
+    .hero h2 { font-size: 48px; margin-bottom: 20px; font-weight: 700; }
+    .hero p { font-size: 20px; margin-bottom: 40px; opacity: 0.9; max-width: 600px; margin-left: auto; margin-right: auto; }
+    .cta-buttons { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+    .btn-large { padding: 15px 40px; font-size: 18px; border-radius: 30px; border: none; cursor: pointer; font-weight: 600; transition: all 0.3s ease; }
+    .btn-white { background: white; color: #667eea; }
+    .btn-white:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+    .btn-outline { background: transparent; color: white; border: 2px solid white; }
+    .btn-outline:hover { background: white; color: #667eea; }
+    /* Features Section */
+    .features { padding: 80px 30px; background: #f8f9fa; }
+    .features h2 { text-align: center; font-size: 36px; margin-bottom: 60px; color: #333; }
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px; max-width: 1200px; margin: 0 auto; }
+    .feature-card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); transition: transform 0.3s ease; }
+    .feature-card:hover { transform: translateY(-10px); box-shadow: 0 15px 40px rgba(0,0,0,0.15); }
+    .feature-icon { font-size: 48px; margin-bottom: 20px; }
+    .feature-card h3 { font-size: 24px; margin-bottom: 15px; color: #667eea; }
+    .feature-card p { color: #666; line-height: 1.8; }
+    /* Use Cases Section */
+    .use-cases { padding: 80px 30px; background: white; }
+    .use-cases h2 { text-align: center; font-size: 36px; margin-bottom: 60px; color: #333; }
+    .use-cases-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; max-width: 1200px; margin: 0 auto; }
+    .use-case { padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 15px; text-align: center; transition: transform 0.3s ease; }
+    .use-case:hover { transform: scale(1.05); }
+    .use-case h3 { font-size: 20px; margin-bottom: 10px; }
+    /* Pricing Section */
+    .pricing { padding: 80px 30px; background: #f8f9fa; }
+    .pricing h2 { text-align: center; font-size: 36px; margin-bottom: 60px; color: #333; }
+    .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; max-width: 1200px; margin: 0 auto; }
+    .pricing-card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); text-align: center; transition: transform 0.3s ease; }
+    .pricing-card:hover { transform: translateY(-10px); }
+    .pricing-card.featured { border: 3px solid #667eea; transform: scale(1.05); }
+    .pricing-card h3 { font-size: 28px; margin-bottom: 15px; color: #667eea; }
+    .price { font-size: 48px; font-weight: 700; color: #333; margin-bottom: 10px; }
+    .price span { font-size: 20px; color: #666; }
+    .pricing-features { list-style: none; margin: 30px 0; text-align: left; }
+    .pricing-features li { padding: 10px 0; border-bottom: 1px solid #eee; }
+    .pricing-features li:before { content: "✓ "; color: #667eea; font-weight: bold; margin-right: 10px; }
+    /* Footer */
+    .footer { background: #2d3748; color: white; padding: 60px 30px 30px; }
+    .footer-content { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 40px; margin-bottom: 40px; }
+    .footer h4 { font-size: 20px; margin-bottom: 20px; color: #667eea; }
+    .footer ul { list-style: none; }
+    .footer ul li { margin-bottom: 10px; }
+    .footer a { color: #cbd5e0; text-decoration: none; transition: color 0.3s ease; }
+    .footer a:hover { color: #667eea; }
+    .footer-bottom { text-align: center; padding-top: 30px; border-top: 1px solid #4a5568; color: #cbd5e0; }
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .hero h2 { font-size: 32px; }
+      .hero p { font-size: 16px; }
+      .navbar { flex-direction: column; gap: 15px; }
+      .nav-links { flex-direction: column; gap: 10px; }
+      .cta-buttons { flex-direction: column; }
+      .btn-large { width: 100%; }
+    }
+  </style>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar">
-        <h1>🤖 AITaskFlo</h1>
-        <div class="nav-links">
-            <a href="#features">Features</a>
-            <a href="#use-cases">Use Cases</a>
-            <a href="#pricing">Pricing</a>
-            <a href="#docs">Docs</a>
-            <a href="funding.html">Investors</a>
-            <button class="btn-primary">Get Started</button>
-        </div>
-    </nav>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <h1>🤖 AITaskFlo</h1>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#use-cases">Use Cases</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#docs">Docs</a>
+      <a href="funding.html">Investors</a>
+      <button class="btn-primary">Get Started</button>
+    </div>
+  </nav>
 
-    <!-- Hero Section -->
-    <section class="hero">
-        <h2>Build AI Bots That Work For You</h2>
-        <p>No-code platform to create, deploy, and manage intelligent automation bots. Transform your workflow in minutes, not months.</p>
-        <div class="cta-buttons">
-            <button class="btn-large btn-white">Start Building Free</button>
-            <button class="btn-large btn-outline">Watch Demo</button>
-        </div>
-    </section>
+  <!-- Hero Section with Integrated Chatbot -->
+  <section class="hero">
+    <h2>Build AI Bots That Work For You</h2>
+    <p>No-code platform to create, deploy, and manage intelligent automation bots. Transform your workflow in minutes, not months.</p>
+    <div class="cta-buttons">
+      <button class="btn-large btn-white">Start Building Free</button>
+      <button class="btn-large btn-outline">Watch Demo</button>
+    </div>
 
-    <!-- Features Section -->
-    <section class="features" id="features">
-        <h2>Powerful Features, Simple Interface</h2>
-        <div class="features-grid">
-            <div class="feature-card">
-                <div class="feature-icon">🎯</div>
-                <h3>Drag & Drop Builder</h3>
-                <p>Create complex automation workflows with our intuitive visual builder. No coding required.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🔗</div>
-                <h3>1000+ Integrations</h3>
-                <p>Connect with your favorite tools: Slack, Gmail, Salesforce, Shopify, and more.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🧠</div>
-                <h3>AI-Powered Logic</h3>
-                <p>Advanced machine learning algorithms that learn and improve from your data.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">⚡</div>
-                <h3>Real-Time Execution</h3>
-                <p>Lightning-fast bot responses with 99.9% uptime guarantee.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">📊</div>
-                <h3>Analytics Dashboard</h3>
-                <p>Track performance, monitor tasks, and optimize your bots with detailed insights.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🔒</div>
-                <h3>Enterprise Security</h3>
-                <p>Bank-level encryption, SOC 2 compliant, and GDPR ready.</p>
-            </div>
-        </div>
-    </section>
+    <!-- LIVE AITASKFLO CHATBOT EMBEDDED HERE -->
+    <div style="max-width:900px;margin:60px auto 80px; text-align:center;">
+      <h3 style="font-size:2.5rem;color:white;margin-bottom:30px;">Try the AI Console Live</h3>
+      <div style="height:720px;border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);border:4px solid white;">
+        <iframe src="https://aitaskflo.vercel.app" style="width:100%;height:100%;border:none;" title="AITaskFlo AI Console"></iframe>
+      </div>
+    </div>
+  </section>
 
-    <!-- Use Cases Section -->
-    <section class="use-cases" id="use-cases">
-        <h2>Automate Everything</h2>
-        <div class="use-cases-grid">
-            <div class="use-case">
-                <h3>📧 Email Management</h3>
-                <p>Auto-sort, respond, and schedule</p>
-            </div>
-            <div class="use-case">
-                <h3>💬 Customer Support</h3>
-                <p>24/7 intelligent chatbots</p>
-            </div>
-            <div class="use-case">
-                <h3>📱 Social Media</h3>
-                <p>Schedule and analyze posts</p>
-            </div>
-            <div class="use-case">
-                <h3>💰 Sales Pipeline</h3>
-                <p>Lead qualification & follow-ups</p>
-            </div>
-            <div class="use-case">
-                <h3>📊 Data Entry</h3>
-                <p>Extract and organize data</p>
-            </div>
-            <div class="use-case">
-                <h3>🔔 Notifications</h3>
-                <p>Smart alerts and reminders</p>
-            </div>
-        </div>
-    </section>
+  <!-- Features Section -->
+  <section class="features" id="features">
+    <h2>Powerful Features, Simple Interface</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🎯</div>
+        <h3>Drag & Drop Builder</h3>
+        <p>Create complex automation workflows with our intuitive visual builder. No coding required.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔗</div>
+        <h3>1000+ Integrations</h3>
+        <p>Connect with your favorite tools: Slack, Gmail, Salesforce, Shopify, and more.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🧠</div>
+        <h3>AI-Powered Logic</h3>
+        <p>Advanced machine learning algorithms that learn and improve from your data.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Real-Time Execution</h3>
+        <p>Lightning-fast bot responses with 99.9% uptime guarantee.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>Analytics Dashboard</h3>
+        <p>Track performance, monitor tasks, and optimize your bots with detailed insights.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <h3>Enterprise Security</h3>
+        <p>Bank-level encryption, SOC 2 compliant, and GDPR ready.</p>
+      </div>
+    </div>
+  </section>
 
-    <!-- Pricing Section -->
-    <section class="pricing" id="pricing">
-        <h2>Simple, Transparent Pricing</h2>
-        <div class="pricing-grid">
-            <div class="pricing-card">
-                <h3>Starter</h3>
-                <div class="price">$0<span>/month</span></div>
-                <ul class="pricing-features">
-                    <li>5 Active Bots</li>
-                    <li>1,000 Tasks/month</li>
-                    <li>Basic Integrations</li>
-                    <li>Community Support</li>
-                    <li>7-Day History</li>
-                </ul>
-                <button class="btn-primary">Start Free</button>
-            </div>
-            <div class="pricing-card featured">
-                <h3>Professional</h3>
-                <div class="price">$49<span>/month</span></div>
-                <ul class="pricing-features">
-                    <li>Unlimited Bots</li>
-                    <li>50,000 Tasks/month</li>
-                    <li>All Integrations</li>
-                    <li>Priority Support</li>
-                    <li>90-Day History</li>
-                    <li>Advanced Analytics</li>
-                    <li>Custom Workflows</li>
-                </ul>
-                <button class="btn-primary">Start Trial</button>
-            </div>
-            <div class="pricing-card">
-                <h3>Enterprise</h3>
-                <div class="price">Custom</div>
-                <ul class="pricing-features">
-                    <li>Unlimited Everything</li>
-                    <li>Dedicated Support</li>
-                    <li>Custom Integrations</li>
-                    <li>SLA Guarantee</li>
-                    <li>Unlimited History</li>
-                    <li>White-Label Option</li>
-                    <li>On-Premise Deployment</li>
-                </ul>
-                <button class="btn-primary">Contact Sales</button>
-            </div>
-        </div>
-    </section>
+  <!-- Use Cases Section -->
+  <section class="use-cases" id="use-cases">
+    <h2>Automate Everything</h2>
+    <div class="use-cases-grid">
+      <div class="use-case">
+        <h3>📧 Email Management</h3>
+        <p>Auto-sort, respond, and schedule</p>
+      </div>
+      <div class="use-case">
+        <h3>💬 Customer Support</h3>
+        <p>24/7 intelligent chatbots</p>
+      </div>
+      <div class="use-case">
+        <h3>📱 Social Media</h3>
+        <p>Schedule and analyze posts</p>
+      </div>
+      <div class="use-case">
+        <h3>💰 Sales Pipeline</h3>
+        <p>Lead qualification & follow-ups</p>
+      </div>
+      <div class="use-case">
+        <h3>📊 Data Entry</h3>
+        <p>Extract and organize data</p>
+      </div>
+      <div class="use-case">
+        <h3>🔔 Notifications</h3>
+        <p>Smart alerts and reminders</p>
+      </div>
+    </div>
+  </section>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="footer-content">
-            <div>
-                <h4>AITaskFlo</h4>
-                <p>Intelligent task automation for modern teams.</p>
-            </div>
-            <div>
-                <h4>Product</h4>
-                <ul>
-                    <li><a href="#features">Features</a></li>
-                    <li><a href="#pricing">Pricing</a></li>
-                    <li><a href="#integrations">Integrations</a></li>
-                    <li><a href="#changelog">Changelog</a></li>
-                </ul>
-            </div>
-            <div>
-                <h4>Resources</h4>
-                <ul>
-                    <li><a href="#docs">Documentation</a></li>
-                    <li><a href="#api">API Reference</a></li>
-                    <li><a href="#tutorials">Tutorials</a></li>
-                    <li><a href="#blog">Blog</a></li>
-                </ul>
-            </div>
-            <div>
-                <h4>Company</h4>
-                <ul>
-                    <li><a href="#about">About Us</a></li>
-                    <li><a href="#careers">Careers</a></li>
-                    <li><a href="#contact">Contact</a></li>
-                    <li><a href="#privacy">Privacy Policy</a></li>
-                </ul>
-            </div>
-        </div>
-        <div class="footer-bottom">
-            <p>&copy; 2025 AITaskFlo. All rights reserved.</p>
-        </div>
-    </footer>
+  <!-- Pricing Section -->
+  <section class="pricing" id="pricing">
+    <h2>Simple, Transparent Pricing</h2>
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <h3>Starter</h3>
+        <div class="price">$0<span>/month</span></div>
+        <ul class="pricing-features">
+          <li>5 Active Bots</li>
+          <li>1,000 Tasks/month</li>
+          <li>Basic Integrations</li>
+          <li>Community Support</li>
+          <li>7-Day History</li>
+        </ul>
+        <button class="btn-primary">Start Free</button>
+      </div>
+      <div class="pricing-card featured">
+        <h3>Professional</h3>
+        <div class="price">$49<span>/month</span></div>
+        <ul class="pricing-features">
+          <li>Unlimited Bots</li>
+          <li>50,000 Tasks/month</li>
+          <li>All Integrations</li>
+          <li>Priority Support</li>
+          <li>90-Day History</li>
+          <li>Advanced Analytics</li>
+          <li>Custom Workflows</li>
+        </ul>
+        <button class="btn-primary">Start Trial</button>
+      </div>
+      <div class="pricing-card">
+        <h3>Enterprise</h3>
+        <div class="price">Custom</div>
+        <ul class="pricing-features">
+          <li>Unlimited Everything</li>
+          <li>Dedicated Support</li>
+          <li>Custom Integrations</li>
+          <li>SLA Guarantee</li>
+          <li>Unlimited History</li>
+          <li>White-Label Option</li>
+          <li>On-Premise Deployment</li>
+        </ul>
+        <button class="btn-primary">Contact Sales</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-content">
+      <div>
+        <h4>AITaskFlo</h4>
+        <p>Intelligent task automation for modern teams.</p>
+      </div>
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#pricing">Pricing</a></li>
+          <li><a href="#integrations">Integrations</a></li>
+          <li><a href="#changelog">Changelog</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="#docs">Documentation</a></li>
+          <li><a href="#api">API Reference</a></li>
+          <li><a href="#tutorials">Tutorials</a></li>
+          <li><a href="#blog">Blog</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Company</h4>
+        <ul>
+          <li><a href="#about">About Us</a></li>
+          <li><a href="#careers">Careers</a></li>
+          <li><a href="#contact">Contact</a></li>
+          <li><a href="#privacy">Privacy Policy</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2025 AITaskFlo. All rights reserved.</p>
+    </div>
+  </footer>
 </body>
 </html>
