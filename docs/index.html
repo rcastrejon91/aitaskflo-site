@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AITaskFlo - Intelligent Task Automation</title>
   <meta name="description" content="Build, deploy, and manage AI-powered automation bots without coding. Transform your workflow with AITaskFlo.">
+  
+  <!-- Security header for the iframe -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; frame-src https://v0-new-project-puehr8hs3ai.vercel.app; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';">
+  
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; line-height: 1.6; color: #333; }
@@ -15,7 +19,7 @@
     .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 10px 25px; border-radius: 25px; border: none; cursor: pointer; font-weight: 600; }
     .hero { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 100px 30px; text-align: center; }
     .hero h2 { font-size: 48px; margin-bottom: 20px; font-weight: 700; }
-    .hero p { font-size: 20px; margin-bottom: 40px; opacity: 0.9; max-width: 600px; margin-left: 0 auto; }
+    .hero p { font-size: 20px; margin-bottom: 40px; opacity: 0.9; max-width: 600px; margin-left: auto; margin-right: auto; }
     .cta-buttons { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
     .btn-large { padding: 15px 40px; font-size: 18px; border-radius: 30px; border: none; cursor: pointer; font-weight: 600; }
     .btn-white { background: white; color: #667eea; }
@@ -27,6 +31,206 @@
     .pricing-card.featured { border: 3px solid #667eea; transform: scale(1.05); }
     .footer { background: #2d3748; color: white; padding: 60px 30px 30px; }
     .footer-content { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 40px; }
+    
+    /* Chatbot section styling */
+    .chatbot-section {
+      padding: 100px 20px;
+      background: #f8f9fa;
+      text-align: center;
+    }
+    
+    .chatbot-section h2 {
+      font-size: 2.8rem;
+      color: #333;
+      margin-bottom: 40px;
+    }
+    
+    .chatbot-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      height: 700px;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      border: 4px solid #667eea;
+      background: white;
+    }
+    
+    .chatbot-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .chatbot-title {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    
+    .chatbot-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+    
+    .chatbot-controls {
+      display: flex;
+      gap: 15px;
+    }
+    
+    .control-button {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    
+    .control-button:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+    
+    .chatbot-frame {
+      width: 100%;
+      height: calc(100% - 80px);
+      border: none;
+    }
+    
+    .example-prompts {
+      margin-top: 30px;
+      max-width: 1000px;
+      margin: 30px auto 0;
+      text-align: left;
+      padding: 20px;
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+    }
+    
+    .example-prompts h3 {
+      margin-bottom: 15px;
+      color: #333;
+      font-size: 1.5rem;
+    }
+    
+    .prompts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 15px;
+    }
+    
+    .prompt-item {
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      border-left: 4px solid #667eea;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    
+    .prompt-item:hover {
+      background: #edf2f7;
+    }
+    
+    /* Use case styling */
+    .use-case {
+      background: white;
+      padding: 25px;
+      border-radius: 15px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+      transition: transform 0.3s ease;
+    }
+    
+    .use-case:hover {
+      transform: translateY(-5px);
+    }
+    
+    .use-case h3 {
+      margin-bottom: 15px;
+      color: #667eea;
+    }
+    
+    /* Section headers */
+    section h2 {
+      text-align: center;
+      font-size: 36px;
+      margin-bottom: 50px;
+      color: #333;
+    }
+    
+    /* Footer styling */
+    .footer h4 {
+      margin-bottom: 20px;
+      font-size: 18px;
+    }
+    
+    .footer ul {
+      list-style: none;
+    }
+    
+    .footer a {
+      color: #cbd5e0;
+      text-decoration: none;
+      display: block;
+      margin-bottom: 10px;
+    }
+    
+    .footer a:hover {
+      color: white;
+    }
+    
+    .footer-bottom {
+      margin-top: 40px;
+      text-align: center;
+      padding-top: 20px;
+      border-top: 1px solid #4a5568;
+    }
+    
+    /* Mobile responsiveness */
+    @media (max-width: 768px) {
+      .navbar {
+        flex-direction: column;
+        padding: 15px;
+      }
+      
+      .nav-links {
+        margin-top: 15px;
+        width: 100%;
+        justify-content: space-around;
+      }
+      
+      .hero h2 {
+        font-size: 32px;
+      }
+      
+      .hero p {
+        font-size: 18px;
+      }
+      
+      .cta-buttons {
+        flex-direction: column;
+        gap: 15px;
+      }
+      
+      .chatbot-container {
+        height: 600px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -61,11 +265,54 @@
     </div>
   </section>
 
-  <!-- LIVE CHATBOT — PLACED HERE ON PURPOSE -->
-  <section style="padding:100px 20px;background:#f8f9fa;text-align:center;">
-    <h2 style="font-size:2.8rem;color:#333;margin-bottom:40px;">Try the AI Live Right Now</h2>
-    <div style="max-width:1000px;margin:0 auto;height:700px;border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.2);border:4px solid #667eea;">
-      <iframe src="https://v0-new-project-puehr8hs3ai.vercel.app" style="width:100%;height:100%;border:none;" title="AITaskFlo Live AI"></iframe>
+  <!-- ENHANCED SECURE CHATBOT SECTION -->
+  <section class="chatbot-section" id="live-demo">
+    <h2>Try the AI Live Right Now</h2>
+    
+    <div class="chatbot-container" id="chatbot-container">
+      <div class="chatbot-header">
+        <div class="chatbot-title">
+          <div class="chatbot-avatar">🤖</div>
+          <h3>AITaskFlo Assistant</h3>
+        </div>
+        <div class="chatbot-controls">
+          <button class="control-button" id="refresh-chat" title="Refresh Chat">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path><path d="M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          </button>
+          <button class="control-button" id="expand-chat" title="Expand Chat">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"></path><path d="M9 21H3v-6"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>
+          </button>
+        </div>
+      </div>
+      
+      <iframe 
+        id="chatbot-frame"
+        src="https://v0-new-project-puehr8hs3ai.vercel.app" 
+        class="chatbot-frame"
+        title="AITaskFlo Live AI"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade"
+        importance="high">
+      </iframe>
+    </div>
+    
+    <div class="example-prompts">
+      <h3>Try these examples:</h3>
+      <div class="prompts-grid">
+        <div class="prompt-item" data-prompt="Draft a follow-up email to a client who hasn't responded in two weeks">
+          <strong>Email Management:</strong> "Draft a follow-up email to a client who hasn't responded in two weeks"
+        </div>
+        <div class="prompt-item" data-prompt="Create a workflow to notify me when new leads come in from our website">
+          <strong>Task Automation:</strong> "Create a workflow to notify me when new leads come in from our website"
+        </div>
+        <div class="prompt-item" data-prompt="Summarize last month's sales performance and identify trends">
+          <strong>Data Analysis:</strong> "Summarize last month's sales performance and identify trends"
+        </div>
+        <div class="prompt-item" data-prompt="Set up a weekly team meeting every Monday at 10 AM">
+          <strong>Meeting Scheduling:</strong> "Set up a weekly team meeting every Monday at 10 AM"
+        </div>
+      </div>
     </div>
   </section>
 
@@ -77,7 +324,7 @@
       <div class="use-case"><h3>📱 Social Media</h3><p>Schedule and analyze posts</p></div>
       <div class="use-case"><h3>💰 Sales Pipeline</h3><p>Lead qualification & follow-ups</p></div>
       <div class="use-case"><h3>📊 Data Entry</h3><p>Extract and organize data</p></div>
-      <div class="use-case"><h3>🔔 Notifications</h3><p></div>
+      <div class="use-case"><h3>🔔 Notifications</h3><p>Real-time alerts and reminders</p></div>
     </div>
   </section>
 
@@ -136,5 +383,82 @@
     </div>
     <div class="footer-bottom"><p>© 2025 AITaskFlo. All rights reserved.</p></div>
   </footer>
+
+  <!-- Integration JavaScript -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Get references to elements
+      const chatbotFrame = document.getElementById('chatbot-frame');
+      const refreshButton = document.getElementById('refresh-chat');
+      const expandButton = document.getElementById('expand-chat');
+      const promptItems = document.querySelectorAll('.prompt-item');
+      
+      // Function to refresh the chat
+      refreshButton.addEventListener('click', function() {
+        chatbotFrame.src = chatbotFrame.src;
+      });
+      
+      // Function to expand the chat
+      expandButton.addEventListener('click', function() {
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else {
+          document.getElementById('chatbot-container').requestFullscreen().catch(err => {
+            console.error(`Error attempting to enable fullscreen: ${err.message}`);
+          });
+        }
+      });
+      
+      // Set up communication with the iframe
+      window.addEventListener('message', function(event) {
+        // Verify the origin for security
+        if (event.origin !== 'https://v0-new-project-puehr8hs3ai.vercel.app') return;
+        
+        console.log('Received message from chatbot:', event.data);
+        
+        // Handle different message types from the chatbot
+        if (event.data.type === 'chat_ready') {
+          console.log('Chat is ready to use');
+        } else if (event.data.type === 'chat_response') {
+          console.log('Bot responded:', event.data.message);
+        }
+      });
+      
+      // Function to send a message to the iframe
+      function sendMessageToChat(message) {
+        chatbotFrame.contentWindow.postMessage({
+          type: 'user_message',
+          message: message
+        }, 'https://v0-new-project-puehr8hs3ai.vercel.app');
+      }
+      
+      // Set up example prompt clicks
+      promptItems.forEach(item => {
+        item.addEventListener('click', function() {
+          const promptText = this.getAttribute('data-prompt');
+          if (promptText) {
+            sendMessageToChat(promptText);
+            
+            // Scroll to the chat
+            document.getElementById('live-demo').scrollIntoView({ behavior: 'smooth' });
+            
+            // Visual feedback that the prompt was selected
+            this.style.backgroundColor = '#e6e8ff';
+            setTimeout(() => {
+              this.style.backgroundColor = '#f8f9fa';
+            }, 500);
+          }
+        });
+      });
+      
+      // Send a message to the iframe when it's loaded
+      chatbotFrame.addEventListener('load', function() {
+        // Give the iframe a moment to initialize
+        setTimeout(() => {
+          sendMessageToChat('__init__'); // Special message to initialize the chat
+        }, 1000);
+      });
+    });
+  </script>
 </body>
 </html>
