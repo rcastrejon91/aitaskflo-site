@@ -1,235 +1,252 @@
-const express = require('express');
-const path = require('path');
-const cors = require('cors');
-const rateLimit = require('express-rate-limit');
-const { body, validationResult } = require('express-validator');
-const axios = require('axios');
-const helmet = require('helmet');
-const fs = require('fs');
-require('dotenv').config();
+const express = require(‘express’);
+const path = require(‘path’);
+const cors = require(‘cors’);
+const rateLimit = require(‘express-rate-limit’);
+const { body, validationResult } = require(‘express-validator’);
+const axios = require(‘axios’);
+const helmet = require(‘helmet’);
+require(‘dotenv’).config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(helmet());
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
-app.use('/uploads', express.static('uploads'));
+// ─── Middleware ───────────────────────────────────────────────────────────────
+app.use(helmet({
+contentSecurityPolicy: {
+directives: {
+defaultSrc: [”‘self’”],
+scriptSrc: [”‘self’”, “‘unsafe-inline’”, “https://cdn.jsdelivr.net”],
+styleSrc: [”‘self’”, “‘unsafe-inline’”, “https://fonts.googleapis.com”],
+fontSrc: [”‘self’”, “https://fonts.gstatic.com”],
+imgSrc: [”‘self’”, “data:”, “https:”],
+connectSrc: [”‘self’”, process.env.FASTAPI_URL || “http://localhost:8000”]
+}
+}
+}));
 
-// Rate limiting
+app.use(cors({
+origin: process.env.ALLOWED_ORIGINS?.split(’,’) || ‘*’,
+methods: [‘GET’, ‘POST’, ‘PUT’, ‘DELETE’, ‘OPTIONS’],
+allowedHeaders: [‘Content-Type’, ‘Authorization’, ‘X-User-ID’]
+}));
+
+app.use(express.json({ limit: ‘10mb’ }));
+app.use(express.urlencoded({ extended: true, limit: ‘10mb’ }));
+app.use(express.static(path.join(__dirname, ‘public’)));
+
+// ─── Rate Limiting ────────────────────────────────────────────────────────────
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100
+windowMs: 15 * 60 * 1000, // 15 minutes
+max: 100,
+standardHeaders: true,
+legacyHeaders: false,
+message: { success: false, error: ‘Too many requests, please try again later.’ }
 });
 
-// Ensure logs directory exists
-const logsDir = path.join(__dirname, 'logs');
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
-}
+const strictLimiter = rateLimit({
+windowMs: 60 * 1000, // 1 minute
+max: 10,
+message: { success: false, error: ‘Rate limit exceeded.’ }
+});
 
-// Activity logging
-const logActivity = (action, details, userId = 'anonymous') => {
-  const logEntry = {
-    timestamp: new Date().toISOString(),
-    action,
-    userId,
-    details
-  };
-  
-  const logFile = path.join(logsDir, 'activity.log');
-  fs.appendFileSync(logFile, JSON.stringify(logEntry) + '\n');
-};
-
-// Bot memory
+// ─── In-Memory Bot State (Vercel-safe) ───────────────────────────────────────
 const botMemory = new Map();
 
-// Bot definitions
-const bots = {};
-
-// Medical Bot - connects to FastAPI on port 8000
-bots.medicalBot = async (input, memory, userId) => {
-  try {
-    const response = await axios.post('http://localhost:8000/predict', {
-      text: input,
-      return_probabilities: true
-    }, {
-      headers: { 'X-API-Key': 'demo' },
-      timeout: 10000
-    });
-    
-    const { prediction, confidence, probabilities } = response.data;
-    
-    const responses = [
-      `[MedicalBot] 🏥 Analyzing: "${input}"`,
-      `[MedicalBot] 🎯 Specialty: ${prediction}`,
-      `[MedicalBot] 📈 Confidence: ${(confidence * 100).toFixed(1)}%`,
-      `[MedicalBot] ⚠️ Consult a healthcare professional`
-    ];
-    
-    return { 
-      responses, 
-      apiData: { prediction, confidence, probabilities }
-    };
-  } catch (error) {
-    return {
-      responses: [
-        `[MedicalBot] ⚠️ Service unavailable`,
-        `[MedicalBot] Error: ${error.message}`,
-        `[MedicalBot] Make sure FastAPI is running on port 8000`
-      ],
-      apiData: { error: error.message }
-    };
-  }
+// ─── Activity Logger (Vercel-safe: console only) ─────────────────────────────
+const logActivity = (action, details, userId = ‘anonymous’) => {
+console.log(JSON.stringify({
+timestamp: new Date().toISOString(),
+action,
+userId,
+details
+}));
 };
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-    port: PORT
+// ─── Bot Definitions ──────────────────────────────────────────────────────────
+const FASTAPI_URL = process.env.FASTAPI_URL || ‘http://localhost:8000’;
+
+const bots = {
+medicalBot: async (input, memory, userId) => {
+try {
+const response = await axios.post(`${FASTAPI_URL}/predict`, {
+text: input,
+return_probabilities: true
+}, {
+headers: { ‘X-API-Key’: process.env.FASTAPI_KEY || ‘demo’ },
+timeout: 10000
+});
+
+```
+  const { prediction, confidence, probabilities } = response.data;
+
+  return {
+    responses: [
+      `🏥 Analyzing: "${input}"`,
+      `🎯 Specialty: ${prediction}`,
+      `📈 Confidence: ${(confidence * 100).toFixed(1)}%`,
+      `⚠️ Always consult a licensed healthcare professional.`
+    ],
+    apiData: { prediction, confidence, probabilities }
+  };
+} catch (error) {
+  console.error('MedicalBot error:', error.message);
+  return {
+    responses: [
+      `⚠️ Medical AI service is currently unavailable.`,
+      `Please try again shortly.`
+    ],
+    apiData: { error: error.message }
+  };
+}
+```
+
+}
+};
+
+// ─── Health Check ─────────────────────────────────────────────────────────────
+app.get(’/health’, (req, res) => {
+res.status(200).json({
+status: ‘ok’,
+timestamp: new Date().toISOString(),
+uptime: process.uptime(),
+environment: process.env.NODE_ENV || ‘development’,
+version: process.env.npm_package_version || ‘1.0.0’
+});
+});
+
+// ─── Page Routes ──────────────────────────────────────────────────────────────
+const pages = [’’, ‘login’, ‘register’, ‘dashboard’, ‘medical’];
+
+pages.forEach(page => {
+const route = page ? `/${page}` : ‘/’;
+const file = page ? `${page}.html` : ‘index.html’;
+app.get(route, (req, res) => {
+res.sendFile(path.join(__dirname, ‘public’, file));
+});
+});
+
+// ─── Medical Prediction ───────────────────────────────────────────────────────
+app.post(’/api/medical/predict’,
+strictLimiter,
+body(‘text’).isString().trim().isLength({ min: 1, max: 1000 }).escape(),
+async (req, res) => {
+const errors = validationResult(req);
+if (!errors.isEmpty()) {
+return res.status(400).json({ success: false, errors: errors.array() });
+}
+
+```
+const { text } = req.body;
+const userId = req.headers['x-user-id'] || 'anonymous';
+
+try {
+  const response = await axios.post(`${FASTAPI_URL}/predict`, {
+    text,
+    return_probabilities: true
+  }, {
+    headers: { 'X-API-Key': process.env.FASTAPI_KEY || 'demo' },
+    timeout: 10000
   });
-});
 
-// API routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/tasks', require('./src/routes/tasks'));
+  logActivity('medical_prediction', {
+    preview: text.substring(0, 100),
+    prediction: response.data.prediction
+  }, userId);
 
-// Routes
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
+  res.json({
+    success: true,
+    ...response.data,
+    timestamp: new Date().toISOString()
+  });
+} catch (error) {
+  console.error('Medical prediction error:', error.message);
+  res.status(503).json({
+    success: false,
+    error: 'Medical AI service unavailable',
+    message: 'Please try again later.'
+  });
+}
+```
 
-app.get('/login', (req, res) => {
-  res.sendFile(path.join(__dirname, 'login.html'));
-});
+}
+);
 
-app.get('/register', (req, res) => {
-  res.sendFile(path.join(__dirname, 'register.html'));
-});
+// ─── Bot Runner ───────────────────────────────────────────────────────────────
+app.post(’/api/bot/run’,
+apiLimiter,
+body(‘botName’).isString().trim().isIn(Object.keys(bots)),
+body(‘input’).isString().trim().isLength({ min: 1, max: 1000 }).escape(),
+async (req, res) => {
+const errors = validationResult(req);
+if (!errors.isEmpty()) {
+return res.status(400).json({ success: false, errors: errors.array() });
+}
 
-app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dashboard.html'));
-});
+```
+const { botName, input } = req.body;
+const userId = req.headers['x-user-id'] || 'anonymous';
 
-app.get('/medical', (req, res) => {
-  res.sendFile(path.join(__dirname, 'medical.html'));
-});
+try {
+  const memory = botMemory.get(userId) || [];
+  const result = await bots[botName](input, memory, userId);
 
-// Medical prediction endpoint - proxies to FastAPI
-app.post('/medical-predict', apiLimiter, [
-  body('text').isString().isLength({ min: 1, max: 1000 })
-], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
+  // Keep last 10 interactions per user
+  botMemory.set(userId, [...memory, { input, output: result.responses }].slice(-10));
 
-  const { text } = req.body;
-  const userId = req.headers['x-user-id'] || 'anonymous';
+  logActivity('bot_execution', {
+    botName,
+    preview: input.substring(0, 50)
+  }, userId);
 
-  try {
-    // Call FastAPI on port 8000
-    const response = await axios.post('http://localhost:8000/predict', {
-      text: text,
-      return_probabilities: true
-    }, {
-      headers: { 'X-API-Key': 'demo' },
-      timeout: 10000
-    });
+  res.json({
+    success: true,
+    botName,
+    responses: result.responses,
+    apiData: result.apiData,
+    timestamp: new Date().toISOString()
+  });
+} catch (error) {
+  console.error('Bot execution error:', error.message);
+  res.status(500).json({
+    success: false,
+    error: 'Bot execution failed',
+    message: error.message
+  });
+}
+```
 
-    logActivity('medical_prediction', { 
-      text: text.substring(0, 100),
-      prediction: response.data.prediction 
-    }, userId);
+}
+);
 
-    res.json({
-      success: true,
-      ...response.data,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Medical prediction error:', error.message);
-    res.status(500).json({
-      success: false,
-      error: 'Medical AI service unavailable',
-      message: 'Please ensure FastAPI server is running on port 8000'
-    });
-  }
-});
-
-// Run bot endpoint
-app.post('/run-bot', apiLimiter, [
-  body('botName').isString(),
-  body('input').isString().isLength({ min: 1, max: 1000 })
-], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
-  const { botName, input } = req.body;
-  const userId = req.headers['x-user-id'] || 'anonymous';
-
-  if (!bots[botName]) {
-    return res.status(404).json({ error: 'Bot not found' });
-  }
-
-  try {
-    let memory = botMemory.get(userId) || [];
-    const result = await bots[botName](input, memory, userId);
-    
-    memory.push({ input, output: result.responses });
-    botMemory.set(userId, memory.slice(-10));
-
-    logActivity('bot_execution', { botName, input: input.substring(0, 50) }, userId);
-
-    res.json({
-      success: true,
-      responses: result.responses,
-      apiData: result.apiData,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Bot execution error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Bot execution failed',
-      message: error.message
-    });
-  }
-});
-
-// 404 handler
+// ─── 404 Handler ─────────────────────────────────────────────────────────────
 app.use((req, res) => {
-  res.status(404).json({ error: 'Not found', path: req.path });
+res.status(404).json({
+success: false,
+error: ‘Not found’,
+path: req.path,
+timestamp: new Date().toISOString()
+});
 });
 
-// Error handler
+// ─── Global Error Handler (Express 5 compatible) ─────────────────────────────
 app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
-  res.status(500).json({ error: 'Something went wrong!', message: err.message });
+console.error(‘Unhandled error:’, err.stack);
+res.status(err.status || 500).json({
+success: false,
+error: process.env.NODE_ENV === ‘production’ ? ‘Something went wrong.’ : err.message,
+timestamp: new Date().toISOString()
+});
 });
 
-// Start server
+// ─── Export for Vercel ────────────────────────────────────────────────────────
+module.exports = app;
+
+// ─── Local Dev Server ─────────────────────────────────────────────────────────
+if (require.main === module) {
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`✅ AITaskFlo server running on http://localhost:${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🏥 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔐 Auth API: http://localhost:${PORT}/api/auth`);
-  console.log(`📋 Tasks API: http://localhost:${PORT}/api/tasks`);
-  console.log(`🌐 Medical Page: http://localhost:${PORT}/medical`);
-  console.log(`🔗 FastAPI Backend: http://localhost:8000 (if available)`);
+console.log(`✅ AITaskFlo running on http://localhost:${PORT}`);
+console.log(`🏥 Health: http://localhost:${PORT}/health`);
+console.log(`🤖 Bot API: http://localhost:${PORT}/api/bot/run`);
+console.log(`🔬 Medical API: http://localhost:${PORT}/api/medical/predict`);
 });
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully...');
-  process.exit(0);
-});
+}
