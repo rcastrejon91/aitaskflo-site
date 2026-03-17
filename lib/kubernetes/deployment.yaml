@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nextjs-app
+spec:
+  replicas: 2  # Number of copies of your app to run
+  selector:
+    matchLabels:
+      app: nextjs-app
+  template:
+    metadata:
+      labels:
+        app: nextjs-app
+    spec:
+      containers:
+      - name: nextjs
+        image: your-docker-image:tag  # Your Next.js app's Docker image
+        ports:
+        - containerPort: 3000  # Port your Next.js app runs on
+        env:
+        - name: NODE_ENV
+          value: "production"
+        # Add any other environment variables your app needs
