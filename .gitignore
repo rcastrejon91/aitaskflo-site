@@ -27,6 +27,9 @@ yarn-error.log*
 # local env files
 .env*.local
 
+# Lyra AI data store (local only — use a DB in production)
+/data/
+
 # vercel
 .vercel
 
@@ -34,3 +37,4 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+.claude/
