@@ -89,7 +89,7 @@ export default function LyraChat() {
         const updated = [...prev];
         updated[updated.length - 1] = {
           role: "assistant",
-          content: `Sorry, I ran into an issue: ${msg}. Please check that your API key is set in .env.local.`,
+          content: `Sorry, I ran into an issue. Please try again.`,
         };
         return updated;
       });

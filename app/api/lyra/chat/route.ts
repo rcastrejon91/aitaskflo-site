@@ -3,8 +3,6 @@ import { NextRequest } from "next/server";
 import { getActiveAgent, getAgent, incrementConversationCount } from "@/lib/lyra/agents";
 import { upsertUser, upsertCrmContact, searchCrmContacts, buildMemoryContext } from "@/lib/lyra/db";
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 // HF model endpoints
 const IMAGE_MODELS: Record<string, string> = {
   "flux-schnell":
@@ -345,6 +343,67 @@ function toolCalculate(expression: string): string {
   }
 }
 
+// ── Groq fallback (text-only, no tools) ──────────────────────────────────────
+async function streamGroqFallback(
+  systemPrompt: string,
+  messages: Array<{ role: string; content: string }>,
+  encoder: TextEncoder,
+  controller: ReadableStreamDefaultController
+): Promise<void> {
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!groqKey) {
+    controller.enqueue(encoder.encode("⚠️ AI service unavailable — no API keys configured."));
+    return;
+  }
+
+  const groqMessages = [
+    { role: "system", content: systemPrompt },
+    ...messages.map((m) => ({ role: m.role, content: typeof m.content === "string" ? m.content : JSON.stringify(m.content) })),
+  ];
+
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${groqKey}`,
+    },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      messages: groqMessages,
+      stream: true,
+      max_tokens: 4096,
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => res.status.toString());
+    controller.enqueue(encoder.encode(`⚠️ Groq error: ${errText}`));
+    return;
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) return;
+  const dec = new TextDecoder();
+  let buf = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
+      try {
+        const json = JSON.parse(line.slice(6));
+        const delta = json.choices?.[0]?.delta?.content;
+        if (delta) controller.enqueue(encoder.encode(delta));
+      } catch { /* skip malformed SSE line */ }
+    }
+  }
+}
+
 // ── Tool dispatcher ───────────────────────────────────────────────────────────
 
 async function executeTool(
@@ -498,6 +557,15 @@ export async function POST(req: NextRequest) {
     const readable = new ReadableStream({
       async start(controller) {
         try {
+          const anthropicKey = process.env.ANTHROPIC_API_KEY;
+
+          // No Anthropic key — fall back to Groq immediately
+          if (!anthropicKey) {
+            await streamGroqFallback(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller);
+            return;
+          }
+
+          const client = new Anthropic({ apiKey: anthropicKey });
           let loopMessages = [...messages];
           let iterations = 0;
           const MAX_ITERATIONS = 5;
@@ -573,7 +641,16 @@ export async function POST(req: NextRequest) {
             ];
           }
         } catch (err) {
-          controller.error(err);
+          // Auth failure → fall back to Groq silently
+          if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+            try {
+              await streamGroqFallback(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller);
+            } catch {
+              controller.enqueue(encoder.encode("⚠️ AI service unavailable. Please try again."));
+            }
+          } else {
+            controller.error(err);
+          }
         } finally {
           controller.close();
         }
@@ -592,13 +669,10 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    if (error instanceof Anthropic.AuthenticationError) {
-      return new Response("Invalid API key — check ANTHROPIC_API_KEY in .env.local", { status: 401 });
-    }
-    if (error instanceof Anthropic.RateLimitError) {
-      return new Response("Rate limited, please try again", { status: 429 });
-    }
     console.error("Lyra chat error:", error);
-    return new Response("Internal server error", { status: 500 });
+    if (error instanceof Anthropic.RateLimitError) {
+      return new Response("Rate limited — please try again in a moment.", { status: 429 });
+    }
+    return new Response("Something went wrong. Please try again.", { status: 500 });
   }
 }
