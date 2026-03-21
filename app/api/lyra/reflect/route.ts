@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { auth } from "@/auth";
 import { saveConversation, upsertFact, upsertUser } from "@/lib/lyra/db";
 import { getAgent, saveAgent } from "@/lib/lyra/agents";
 import { shouldEvolve } from "@/lib/lyra/reflections";
@@ -11,7 +12,10 @@ const EVOLUTION_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 export async function POST(req: NextRequest) {
   try {
-    const { conversationId, agentId, transcript, userId } = await req.json();
+    const { conversationId, agentId, transcript } = await req.json();
+
+    const session = await auth();
+    const userId = (session?.user as { id?: string } | undefined)?.id;
 
     if (!conversationId || !agentId || !Array.isArray(transcript)) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });

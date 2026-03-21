@@ -12,6 +12,7 @@ export interface Memory {
   accessCount: number;
   agentId: string;
   sourceConversationId?: string;
+  userId?: string;
 }
 
 export interface Reflection {

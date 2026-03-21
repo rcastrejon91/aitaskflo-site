@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest } from "next/server";
 import { getActiveAgent, getAgent, incrementConversationCount } from "@/lib/lyra/agents";
-import { upsertUser, upsertCrmContact, searchCrmContacts, buildMemoryContext } from "@/lib/lyra/db";
+import { upsertUser, upsertCrmContact, searchCrmContacts, buildMemoryContext, createTask, listTasks } from "@/lib/lyra/db";
+import { auth } from "@/auth";
 
 
 // Real tool definitions
@@ -147,6 +148,30 @@ const LYRA_TOOLS: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: "create_task",
+    description: "Create a task or reminder for the user. Use when the user asks to remember something, add a task, set a reminder, or create a to-do.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        title: { type: "string", description: "Task title" },
+        notes: { type: "string", description: "Additional notes or details" },
+        due_date: { type: "string", description: "Due date in YYYY-MM-DD format (optional)" },
+      },
+      required: ["title"],
+    },
+  },
+  {
+    name: "list_tasks",
+    description: "List the user's tasks and reminders. Use when the user asks to see their tasks, to-do list, or reminders.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        include_completed: { type: "boolean", description: "Include completed tasks. Default false." },
+      },
+      required: [],
+    },
+  },
 ];
 
 function pollinationsUrl(prompt: string): string {
@@ -214,6 +239,30 @@ async function toolGetWeather(location: string): Promise<string> {
 }
 
 async function toolSearchWeb(query: string): Promise<string> {
+  // Try Brave Search first if key is configured
+  const braveKey = process.env.BRAVE_SEARCH_API_KEY;
+  if (braveKey) {
+    try {
+      const res = await fetch(
+        `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=5&text_decorations=false`,
+        {
+          headers: { "Accept": "application/json", "X-Subscription-Token": braveKey },
+          signal: AbortSignal.timeout(10_000),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const results = data.web?.results?.slice(0, 5) ?? [];
+        if (results.length > 0) {
+          return results.map((r: { title: string; description: string; url: string }) =>
+            `**${r.title}**\n${r.description}\n${r.url}`
+          ).join("\n\n");
+        }
+      }
+    } catch { /* fall through to DuckDuckGo */ }
+  }
+
+  // DuckDuckGo fallback
   try {
     const res = await fetch(
       `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`,
@@ -224,11 +273,7 @@ async function toolSearchWeb(query: string): Promise<string> {
     if (data.AbstractText) parts.push(data.AbstractText);
     if (data.Answer) parts.push(`Answer: ${data.Answer}`);
     if (data.RelatedTopics?.length) {
-      const topics = data.RelatedTopics
-        .slice(0, 6)
-        .map((t: { Text?: string }) => t.Text)
-        .filter(Boolean)
-        .join("\n• ");
+      const topics = data.RelatedTopics.slice(0, 6).map((t: { Text?: string }) => t.Text).filter(Boolean).join("\n• ");
       if (topics) parts.push(`Related:\n• ${topics}`);
     }
     return parts.length ? parts.join("\n\n") : `No instant results for "${query}". Try being more specific.`;
@@ -416,7 +461,8 @@ async function executeTool(
   name: string,
   input: Record<string, string>,
   encoder: TextEncoder,
-  controller: ReadableStreamDefaultController
+  controller: ReadableStreamDefaultController,
+  userId?: string
 ): Promise<string> {
   if (name === "image_gen") {
     const url = pollinationsUrl(input.prompt ?? "");
@@ -490,6 +536,21 @@ async function executeTool(
     return await toolGetNews(input.topic);
   }
 
+  if (name === "create_task") {
+    if (!userId) return "Task creation requires login.";
+    const task = createTask(userId, input.title ?? "Untitled", input.notes, input.due_date);
+    const card = JSON.stringify({ tool: "task", action: "created", title: task.title, due: task.due_date ?? "no due date" });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return `Task created: "${task.title}"`;
+  }
+
+  if (name === "list_tasks") {
+    if (!userId) return "Task list requires login.";
+    const tasks = listTasks(userId, input.include_completed === "true");
+    if (tasks.length === 0) return "No tasks found.";
+    return tasks.map(t => `• ${t.title}${t.due_date ? ` (due ${t.due_date})` : ""}${t.notes ? ` — ${t.notes}` : ""}`).join("\n");
+  }
+
   const card = JSON.stringify({ tool: name, ...input });
   controller.enqueue(encoder.encode(`\n${card}`));
   return `${name} recorded.`;
@@ -497,7 +558,10 @@ async function executeTool(
 
 export async function POST(req: NextRequest) {
   try {
-    const { message, history, conversationId, agentId, images, userId } = await req.json();
+    const { message, history, conversationId, agentId, images } = await req.json();
+
+    const session = await auth();
+    const userId = (session?.user as { id?: string } | undefined)?.id;
 
     if (!message || typeof message !== "string") {
       return new Response("Invalid message", { status: 400 });
@@ -667,7 +731,7 @@ export async function POST(req: NextRequest) {
               } catch {
                 input = {};
               }
-              const result = await executeTool(toolUse.name, input, encoder, controller);
+              const result = await executeTool(toolUse.name, input, encoder, controller, userId);
               toolResults.push({
                 type: "tool_result",
                 tool_use_id: toolUse.id,

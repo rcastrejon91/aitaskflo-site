@@ -13,10 +13,15 @@ export default function Home() {
             AITaskFlo
           </div>
           <div className="flex gap-3">
+            <Link href="/login">
+              <Button variant="outline">
+                Sign in
+              </Button>
+            </Link>
             <Link href="/lyra">
               <Button variant="outline">
                 <GitBranch className="mr-2 h-4 w-4" />
-                Lyra Dashboard
+                Open Lyra
               </Button>
             </Link>
           </div>

@@ -1,20 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllMemories, storeMemory, getRelevantMemories } from "@/lib/lyra/memories";
 import type { MemoryType, MemoryImportance } from "@/lib/types/lyra";
+import { auth } from "@/auth";
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await auth();
+    const userId = (session?.user as { id?: string } | undefined)?.id;
+
     const { searchParams } = new URL(req.url);
     const type = searchParams.get("type") as MemoryType | null;
     const query = searchParams.get("query");
     const limit = parseInt(searchParams.get("limit") ?? "20");
 
     if (query) {
-      const memories = await getRelevantMemories(query, limit, type ?? undefined);
+      const memories = await getRelevantMemories(query, limit, type ?? undefined, userId);
       return NextResponse.json({ memories });
     }
 
-    let memories = getAllMemories();
+    let memories = getAllMemories(userId);
     if (type) memories = memories.filter((m) => m.type === type);
     memories = memories
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -29,6 +33,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth();
+    const userId = (session?.user as { id?: string } | undefined)?.id;
+
     const body = await req.json();
     const { content, type, tags, importance, agentId, sourceConversationId } = body;
 
@@ -43,6 +50,7 @@ export async function POST(req: NextRequest) {
       importance: (importance as MemoryImportance) ?? "medium",
       agentId,
       sourceConversationId,
+      userId,
     });
 
     return NextResponse.json({ memory });

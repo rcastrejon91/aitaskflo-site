@@ -97,14 +97,6 @@ export default function LyraChat() {
   const [loading, setLoading] = useState(false);
   const [conversationId] = useState(generateId);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
-  const [userId] = useState(() => {
-    if (typeof window === "undefined") return generateId();
-    const stored = localStorage.getItem("lyra_user_id");
-    if (stored) return stored;
-    const id = generateId();
-    localStorage.setItem("lyra_user_id", id);
-    return id;
-  });
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -155,7 +147,6 @@ export default function LyraChat() {
           message: text || "Please analyze the attached file(s).",
           history,
           conversationId,
-          userId,
           images: filesToSend.map((f) => ({ data: f.base64, mimeType: f.mimeType })),
         }),
       });
@@ -187,7 +178,6 @@ export default function LyraChat() {
             conversationId,
             agentId: "lyra-v1",
             transcript: messages.map((m) => ({ role: m.role, content: m.content })),
-            userId,
           }),
         }).catch(() => {});
       }

@@ -12,8 +12,10 @@ const IMPORTANCE_WEIGHT: Record<MemoryImportance, number> = {
   low: 0.25,
 };
 
-export function getAllMemories(): Memory[] {
-  return readStore<Memory[]>(MEMORIES_FILE, []);
+export function getAllMemories(userId?: string): Memory[] {
+  const memories = readStore<Memory[]>(MEMORIES_FILE, []);
+  if (!userId) return memories;
+  return memories.filter((m) => !m.userId || m.userId === userId);
 }
 
 export async function storeMemory(
@@ -80,9 +82,10 @@ const STOP_WORDS = new Set([
 export async function getRelevantMemories(
   query: string,
   limit = 5,
-  type?: MemoryType
+  type?: MemoryType,
+  userId?: string
 ): Promise<Memory[]> {
-  const memories = getAllMemories();
+  const memories = getAllMemories(userId);
   const queryTokens = tokenize(query);
 
   let candidates = type ? memories.filter((m) => m.type === type) : memories;

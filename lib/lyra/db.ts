@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs";
+import { randomUUID } from "crypto";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -109,6 +110,27 @@ function initSchema(db: BetterSqlite3Db) {
     CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id, timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_facts_user ON facts(user_id);
     CREATE INDEX IF NOT EXISTS idx_crm_name ON crm_contacts(name);
+
+    CREATE TABLE IF NOT EXISTS auth_users (
+      id         TEXT PRIMARY KEY,
+      email      TEXT UNIQUE NOT NULL,
+      name       TEXT,
+      password_hash TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_auth_users_email ON auth_users(email);
+
+    CREATE TABLE IF NOT EXISTS tasks (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    TEXT NOT NULL,
+      title      TEXT NOT NULL,
+      notes      TEXT,
+      due_date   TEXT,
+      completed  INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_tasks_user ON tasks(user_id, completed);
   `);
 }
 
@@ -249,6 +271,85 @@ export function deleteCrmContact(nameOrId: string): boolean {
   } catch {
     return false;
   }
+}
+
+// ── Auth Users ────────────────────────────────────────────────────────────────
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string | null;
+  password_hash: string | null;
+  created_at: string;
+}
+
+export function getAuthUserByEmail(email: string): AuthUser | null {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    return db.prepare("SELECT * FROM auth_users WHERE LOWER(email) = LOWER(?)").get(email) as AuthUser | null;
+  } catch { return null; }
+}
+
+export function getAuthUserById(id: string): AuthUser | null {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    return db.prepare("SELECT * FROM auth_users WHERE id = ?").get(id) as AuthUser | null;
+  } catch { return null; }
+}
+
+export function createAuthUser(email: string, name: string | null, passwordHash: string | null): AuthUser {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  db.prepare("INSERT INTO auth_users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)").run(id, email, name, passwordHash, now);
+  return db.prepare("SELECT * FROM auth_users WHERE id = ?").get(id) as AuthUser;
+}
+
+// ── Tasks ─────────────────────────────────────────────────────────────────────
+
+export interface DbTask {
+  id: number;
+  user_id: string;
+  title: string;
+  notes: string | null;
+  due_date: string | null;
+  completed: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export function createTask(userId: string, title: string, notes?: string, dueDate?: string): DbTask {
+  const db = getDb();
+  const now = new Date().toISOString();
+  if (!db) return { id: 0, user_id: userId, title, notes: notes ?? null, due_date: dueDate ?? null, completed: 0, created_at: now, updated_at: now };
+  try {
+    const result = db.prepare("INSERT INTO tasks (user_id, title, notes, due_date, completed, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?)").run(userId, title, notes ?? null, dueDate ?? null, now, now);
+    return db.prepare("SELECT * FROM tasks WHERE id = ?").get(result.lastInsertRowid) as DbTask;
+  } catch (err) {
+    console.error("[Lyra DB] createTask error:", err instanceof Error ? err.message : err);
+    return { id: 0, user_id: userId, title, notes: notes ?? null, due_date: dueDate ?? null, completed: 0, created_at: now, updated_at: now };
+  }
+}
+
+export function listTasks(userId: string, includeCompleted = false): DbTask[] {
+  const db = getDb();
+  if (!db) return [];
+  try {
+    if (includeCompleted) return db.prepare("SELECT * FROM tasks WHERE user_id = ? ORDER BY created_at DESC").all(userId) as DbTask[];
+    return db.prepare("SELECT * FROM tasks WHERE user_id = ? AND completed = 0 ORDER BY created_at DESC").all(userId) as DbTask[];
+  } catch { return []; }
+}
+
+export function completeTask(userId: string, taskId: number): boolean {
+  const db = getDb();
+  if (!db) return false;
+  try {
+    const r = db.prepare("UPDATE tasks SET completed = 1, updated_at = ? WHERE id = ? AND user_id = ?").run(new Date().toISOString(), taskId, userId);
+    return r.changes > 0;
+  } catch { return false; }
 }
 
 // ── Memory context builder ────────────────────────────────────────────────────

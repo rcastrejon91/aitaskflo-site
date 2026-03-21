@@ -4,8 +4,9 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Send, Loader2, Brain, Lightbulb, GitBranch,
-  Zap, ArrowLeft, CheckCircle, AlertCircle, X, PanelLeftClose, PanelLeftOpen,
+  Zap, ArrowLeft, CheckCircle, AlertCircle, X, PanelLeftClose, PanelLeftOpen, LogOut,
 } from "lucide-react";
+import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { LineageGraph } from "./LineageGraph";
 import { MemoryPanel } from "./MemoryPanel";
@@ -39,21 +40,13 @@ function generateId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-export function Dashboard({ initial }: { initial: DashboardData }) {
+export function Dashboard({ initial, userId }: { initial: DashboardData; userId: string }) {
   const [data, setData] = useState<DashboardData>(initial);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [rightPanel, setRightPanel] = useState<RightPanel>("memory");
   const [conversationId] = useState(() => generateId());
-  const [userId] = useState(() => {
-    if (typeof window === "undefined") return generateId();
-    const stored = localStorage.getItem("lyra_user_id");
-    if (stored) return stored;
-    const id = generateId();
-    localStorage.setItem("lyra_user_id", id);
-    return id;
-  });
   const [evolving, setEvolving] = useState(false);
   const [evolutionReady, setEvolutionReady] = useState(false);
   const [leftOpen, setLeftOpen] = useState(true);
@@ -257,6 +250,14 @@ export function Dashboard({ initial }: { initial: DashboardData }) {
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             online
           </span>
+
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="p-1.5 text-white/30 hover:text-white/60 transition-colors"
+            title="Sign out"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
 
           {messages.length >= 2 && (
             <button
