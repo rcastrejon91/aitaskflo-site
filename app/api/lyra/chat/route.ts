@@ -172,6 +172,40 @@ const LYRA_TOOLS: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: "godot_builder",
+    description: `Build and ship the 13th Witch Godot 4.4 game. You ARE the developer.
+Use this tool to write GDScript (.gd), scene files (.tscn), project config, resources, and assets.
+When asked to build any game feature — level, enemy, NPC, mechanic, UI — use this tool directly.
+Do not describe what to build. Build it. Write the files. Commit. Ship.
+Actions: write_file, read_file, list_files, delete_file, run_command, git_commit, git_push`,
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        action: {
+          type: "string",
+          description: "write_file | read_file | list_files | delete_file | run_command | git_commit | git_push",
+        },
+        path: {
+          type: "string",
+          description: "File path relative to game root, e.g. 'scripts/Enemy.gd' or 'scenes/DarkForest.tscn'",
+        },
+        content: {
+          type: "string",
+          description: "Full file content for write_file (GDScript, .tscn, .tres, etc.)",
+        },
+        command: {
+          type: "string",
+          description: "Shell command to run inside the game directory (e.g. 'godot --headless --export-release ...')",
+        },
+        message: {
+          type: "string",
+          description: "Git commit message for git_commit action",
+        },
+      },
+      required: ["action"],
+    },
+  },
 ];
 
 function pollinationsUrl(prompt: string): string {
@@ -381,6 +415,114 @@ async function toolGetNews(topic?: string): Promise<string> {
   }
 }
 
+// ── Godot builder ─────────────────────────────────────────────────────────────
+
+async function toolGodotBuilder(
+  action: string,
+  path?: string,
+  content?: string,
+  command?: string,
+  message?: string
+): Promise<string> {
+  const { exec } = await import("child_process");
+  const { promisify } = await import("util");
+  const execAsync = promisify(exec);
+  const fsp = await import("fs/promises");
+  const nodePath = await import("path");
+
+  const GAME_DIR =
+    process.env.GAME_DIR ??
+    nodePath.default.join(process.cwd(), "game", "13th-witch");
+
+  // Prevent path traversal
+  const safePath = (rel: string): string => {
+    const resolved = nodePath.default.resolve(GAME_DIR, rel);
+    if (!resolved.startsWith(GAME_DIR)) throw new Error("Path traversal blocked");
+    return resolved;
+  };
+
+  switch (action) {
+    case "write_file": {
+      if (!path || content === undefined) return "write_file requires path and content.";
+      const full = safePath(path);
+      await fsp.default.mkdir(nodePath.default.dirname(full), { recursive: true });
+      await fsp.default.writeFile(full, content, "utf-8");
+      return `✓ Wrote ${path} (${content.length} chars)`;
+    }
+
+    case "read_file": {
+      if (!path) return "read_file requires path.";
+      try {
+        const text = await fsp.default.readFile(safePath(path), "utf-8");
+        return text.slice(0, 8000);
+      } catch {
+        return `File not found: ${path}`;
+      }
+    }
+
+    case "list_files": {
+      try {
+        await fsp.default.mkdir(GAME_DIR, { recursive: true });
+        const cwd = path ? safePath(path) : GAME_DIR;
+        const { stdout } = await execAsync("find . -type f | sort | head -80", {
+          cwd,
+          timeout: 10_000,
+        });
+        return stdout.trim() || "Directory is empty.";
+      } catch (e) {
+        return `list_files error: ${e instanceof Error ? e.message : String(e)}`;
+      }
+    }
+
+    case "delete_file": {
+      if (!path) return "delete_file requires path.";
+      await fsp.default.unlink(safePath(path));
+      return `✓ Deleted ${path}`;
+    }
+
+    case "run_command": {
+      if (!command) return "run_command requires command.";
+      await fsp.default.mkdir(GAME_DIR, { recursive: true });
+      try {
+        const { stdout, stderr } = await execAsync(command, {
+          cwd: GAME_DIR,
+          timeout: 60_000,
+        });
+        return ((stdout + "\n" + stderr).trim()).slice(0, 4000) || "Command completed (no output)";
+      } catch (e: unknown) {
+        const err = e as { stdout?: string; stderr?: string; message?: string };
+        return ((err.stdout ?? "") + (err.stderr ?? "") + (err.message ?? "")).slice(0, 4000);
+      }
+    }
+
+    case "git_commit": {
+      const msg = (message ?? "chore: Lyra auto-commit").replace(/"/g, '\\"');
+      await fsp.default.mkdir(GAME_DIR, { recursive: true });
+      try {
+        await execAsync("git add -A", { cwd: GAME_DIR });
+        const { stdout } = await execAsync(`git commit -m "${msg}"`, { cwd: GAME_DIR });
+        return stdout.trim() || "Committed.";
+      } catch (e: unknown) {
+        const err = e as { stdout?: string; stderr?: string };
+        return ((err.stdout ?? "") + (err.stderr ?? "")).trim() || "Nothing to commit.";
+      }
+    }
+
+    case "git_push": {
+      try {
+        const { stdout, stderr } = await execAsync("git push", { cwd: GAME_DIR, timeout: 30_000 });
+        return (stdout + stderr).trim() || "Pushed.";
+      } catch (e: unknown) {
+        const err = e as { stdout?: string; stderr?: string; message?: string };
+        return ((err.stdout ?? "") + (err.stderr ?? "") + (err.message ?? "")).slice(0, 2000);
+      }
+    }
+
+    default:
+      return `Unknown action "${action}". Valid: write_file, read_file, list_files, delete_file, run_command, git_commit, git_push`;
+  }
+}
+
 // ── Groq fallback (text-only, no tools) ──────────────────────────────────────
 async function streamGroqFallback(
   systemPrompt: string,
@@ -549,6 +691,25 @@ async function executeTool(
     const tasks = listTasks(userId, input.include_completed === "true");
     if (tasks.length === 0) return "No tasks found.";
     return tasks.map(t => `• ${t.title}${t.due_date ? ` (due ${t.due_date})` : ""}${t.notes ? ` — ${t.notes}` : ""}`).join("\n");
+  }
+
+  if (name === "godot_builder") {
+    const result = await toolGodotBuilder(
+      input.action ?? "",
+      input.path,
+      input.content,
+      input.command,
+      input.message
+    );
+    const preview = result.slice(0, 120).replace(/\n/g, " ");
+    const card = JSON.stringify({
+      tool: "godot",
+      action: input.action,
+      path: input.path ?? "",
+      result: preview,
+    });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return result;
   }
 
   const card = JSON.stringify({ tool: name, ...input });

@@ -8,7 +8,7 @@ import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import type { Components } from "react-markdown";
 import {
   Mail, Users, QrCode, Globe, Palette, Calendar,
-  Copy, Check, ExternalLink, ImageIcon,
+  Copy, Check, ExternalLink, ImageIcon, Gamepad2,
 } from "lucide-react";
 
 // ── Tool Card ─────────────────────────────────────────────────────────────────
@@ -25,7 +25,9 @@ const TOOL_CONFIG: Record<string, {
   qr:        { label: "QR Code",         icon: QrCode,   gradient: "from-teal-950/80 to-teal-900/30",    border: "border-teal-500/30",    accent: "text-teal-300" },
   translate: { label: "Translation",     icon: Globe,    gradient: "from-cyan-950/80 to-cyan-900/30",    border: "border-cyan-500/30",    accent: "text-cyan-300" },
   image_gen: { label: "Image Generated", icon: Palette,  gradient: "from-violet-950/80 to-violet-900/30",border: "border-violet-500/30",  accent: "text-violet-300" },
-  calendar:  { label: "Calendar Event",  icon: Calendar, gradient: "from-emerald-950/80 to-emerald-900/30",border:"border-emerald-500/30",accent: "text-emerald-300" },
+  calendar:  { label: "Calendar Event",  icon: Calendar,  gradient: "from-emerald-950/80 to-emerald-900/30", border: "border-emerald-500/30", accent: "text-emerald-300" },
+  godot:     { label: "Game Build",      icon: Gamepad2,  gradient: "from-rose-950/80 to-purple-900/30",      border: "border-rose-500/30",    accent: "text-rose-300" },
+  task:      { label: "Task",            icon: Calendar,  gradient: "from-sky-950/80 to-sky-900/30",           border: "border-sky-500/30",     accent: "text-sky-300" },
 };
 
 function ToolCard({ raw }: { raw: string }) {

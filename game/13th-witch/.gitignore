@@ -1,0 +1,17 @@
+# Godot 4 generated files
+.godot/
+*.import
+
+# Export presets (contains paths and may contain credentials)
+export_presets.cfg
+
+# Mono/C# build artifacts
+.mono/
+data_*/
+mono_crash.*.json
+
+# macOS metadata
+.DS_Store
+
+# Editor metadata
+*.tmp
