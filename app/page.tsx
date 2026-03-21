@@ -19,12 +19,6 @@ export default function Home() {
                 Lyra Dashboard
               </Button>
             </Link>
-            <Link href="/chat">
-              <Button variant="outline">
-                <Bot className="mr-2 h-4 w-4" />
-                Quick Chat
-              </Button>
-            </Link>
           </div>
         </div>
       </nav>
@@ -64,18 +58,12 @@ export default function Home() {
             </span>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex justify-center">
             <Link href="/lyra">
               <Button size="lg" className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600">
                 <GitBranch className="mr-2 h-5 w-5" />
                 Open Lyra Dashboard
                 <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-            <Link href="/chat">
-              <Button size="lg" variant="outline">
-                <Bot className="mr-2 h-5 w-5" />
-                Quick Chat
               </Button>
             </Link>
           </div>
