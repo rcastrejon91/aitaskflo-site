@@ -570,9 +570,28 @@ export async function POST(req: NextRequest) {
     }
     userContent.push({ type: "text", text: message });
 
+    // Sanitize history: strip empty-content messages and ensure alternating roles.
+    // Empty assistant messages (from interrupted streams) cause Anthropic 400 errors.
+    const rawHistory: Array<{ role: string; content: string }> = Array.isArray(history) ? history : [];
+    const cleanHistory = rawHistory
+      .filter((m) => {
+        const text = typeof m.content === "string" ? m.content.trim() : "";
+        return (m.role === "user" || m.role === "assistant") && text.length > 0;
+      })
+      .reduce<Array<{ role: string; content: string }>>((acc, msg) => {
+        // Drop consecutive same-role messages (keep last)
+        if (acc.length > 0 && acc[acc.length - 1].role === msg.role) {
+          acc[acc.length - 1] = msg;
+        } else {
+          acc.push(msg);
+        }
+        return acc;
+      }, []);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const messages: Anthropic.MessageParam[] = [
-      ...(Array.isArray(history) ? history : []),
-      { role: "user", content: userContent.length === 1 ? message : userContent },
+      ...cleanHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })) as Anthropic.MessageParam[],
+      { role: "user" as const, content: (userContent.length === 1 ? message : userContent) as Anthropic.MessageParam["content"] },
     ];
 
     const encoder = new TextEncoder();
@@ -663,18 +682,29 @@ export async function POST(req: NextRequest) {
             ];
           }
         } catch (err) {
-          // Auth failure → fall back to Groq silently
           if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+            // API key invalid / no model access → fall back to Groq
             try {
               await streamGroqFallback(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller);
             } catch {
               controller.enqueue(encoder.encode("⚠️ AI service unavailable. Please try again."));
             }
+          } else if (err instanceof Anthropic.RateLimitError) {
+            controller.enqueue(encoder.encode("⚠️ Rate limited — please wait a moment and try again."));
+          } else if (err instanceof Anthropic.BadRequestError) {
+            // 400: log the actual message so it's visible in server logs
+            const msg = (err as { message?: string }).message ?? "Bad request";
+            console.error("[Lyra] Anthropic 400 BadRequest:", msg, err.error);
+            controller.enqueue(encoder.encode(`⚠️ Request error: ${msg}`));
           } else {
-            controller.error(err);
+            // Unknown error — log it fully (not as [Object]) and stream a message
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error("[Lyra] Unexpected API error:", err);
+            controller.enqueue(encoder.encode(`⚠️ Something went wrong: ${msg}`));
           }
         } finally {
-          controller.close();
+          // Always try to close — close() throws if already errored, swallow that
+          try { controller.close(); } catch { /* already closed */ }
         }
       },
     });
