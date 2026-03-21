@@ -119,7 +119,7 @@ export default function LyraChat() {
         fetch("/api/lyra/reflect", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ conversationId, agentId: "lyra-v1", transcript: messages, userId }),
+          body: JSON.stringify({ conversationId, agentId: "lyra-v1", transcript: messages.map((m) => ({ role: m.role, content: m.content })), userId }),
         }).catch(() => {});
       }
     } catch (err) {

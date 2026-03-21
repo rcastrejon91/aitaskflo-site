@@ -5,8 +5,6 @@ import { getAgent, saveAgent } from "@/lib/lyra/agents";
 import { shouldEvolve } from "@/lib/lyra/reflections";
 import { evolveAgent } from "@/lib/lyra/evolution";
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 export async function POST(req: NextRequest) {
   try {
     const { conversationId, agentId, transcript, userId } = await req.json();
@@ -23,6 +21,7 @@ export async function POST(req: NextRequest) {
       .join("\n\n")
       .slice(0, 8000); // cap to avoid huge tokens
 
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const response = await client.messages.create({
       model: "claude-opus-4-6",
       max_tokens: 1024,

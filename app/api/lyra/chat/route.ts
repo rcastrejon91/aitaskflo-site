@@ -349,9 +349,22 @@ async function streamGroqFallback(
     return;
   }
 
+  // Groq is text-only — flatten any image content blocks to their text parts
+  const flattenContent = (c: unknown): string => {
+    if (typeof c === "string") return c;
+    if (Array.isArray(c)) {
+      return c
+        .filter((b): b is { type: string; text?: string } => typeof b === "object" && b !== null)
+        .map((b) => (b.type === "text" && b.text ? b.text : ""))
+        .join(" ")
+        .trim() || "[image]";
+    }
+    return String(c);
+  };
+
   const groqMessages = [
     { role: "system", content: systemPrompt },
-    ...messages.map((m) => ({ role: m.role, content: typeof m.content === "string" ? m.content : JSON.stringify(m.content) })),
+    ...messages.map((m) => ({ role: m.role, content: flattenContent(m.content) })),
   ];
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {

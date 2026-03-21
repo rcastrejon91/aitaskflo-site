@@ -5,8 +5,6 @@ import type { Agent } from "@/lib/types/lyra";
 
 const MAX_GENERATIONS = 10;
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 export async function evolveAgent(parentAgentId: string): Promise<{
   newAgent: Agent;
   evolutionNotes: string;
@@ -58,10 +56,10 @@ Return ONLY a JSON object — no markdown, no preamble:
   "systemPromptSummary": "one sentence describing the key improvement this generation brings"
 }`;
 
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const response = await client.messages.create({
     model: "claude-opus-4-6",
     max_tokens: 2048,
-    thinking: { type: "adaptive" },
     messages: [{ role: "user", content: evolutionPrompt }],
   });
 

@@ -46,6 +46,14 @@ export function Dashboard({ initial }: { initial: DashboardData }) {
   const [isLoading, setIsLoading] = useState(false);
   const [rightPanel, setRightPanel] = useState<RightPanel>("memory");
   const [conversationId] = useState(() => generateId());
+  const [userId] = useState(() => {
+    if (typeof window === "undefined") return generateId();
+    const stored = localStorage.getItem("lyra_user_id");
+    if (stored) return stored;
+    const id = generateId();
+    localStorage.setItem("lyra_user_id", id);
+    return id;
+  });
   const [evolving, setEvolving] = useState(false);
   const [evolutionReady, setEvolutionReady] = useState(false);
   const [leftOpen, setLeftOpen] = useState(true);
@@ -99,7 +107,7 @@ export function Dashboard({ initial }: { initial: DashboardData }) {
       const response = await fetch("/api/lyra/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history, conversationId, agentId: data.activeAgent.id }),
+        body: JSON.stringify({ message: text, history, conversationId, agentId: data.activeAgent.id, userId }),
       });
       if (!response.ok) throw new Error(await response.text());
       const reader = response.body?.getReader();
@@ -134,7 +142,7 @@ export function Dashboard({ initial }: { initial: DashboardData }) {
       const res = await fetch("/api/lyra/reflect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId, agentId: data.activeAgent.id, transcript: messages }),
+        body: JSON.stringify({ conversationId, agentId: data.activeAgent.id, transcript: messages.map((m) => ({ role: m.role, content: m.content })), userId }),
       });
       const result = await res.json();
       if (result.reflection) {

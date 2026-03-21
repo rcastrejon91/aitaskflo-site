@@ -49,38 +49,74 @@ function ToolCard({ raw }: { raw: string }) {
   }
 }
 
-// Splits a string on __IMG__url__IMG__ and {"tool":...} blocks,
-// returning an array of typed segments.
 type Segment =
   | { kind: "text"; value: string }
   | { kind: "image"; url: string }
   | { kind: "tool"; json: string };
 
+/** Character-level scanner — handles multi-field tool JSON correctly. */
 function parseSegments(raw: string): Segment[] {
   const segments: Segment[] = [];
+  const DELIM = "__IMG__";
+  let i = 0;
+  let textStart = 0;
 
-  // Pattern: __IMG__....__IMG__ OR {"tool":"..."}
-  const pattern = /__IMG__([\s\S]+?)__IMG__|(\{"tool":"[\s\S]+?"\}[^}]*\}|\{"tool":"[^"]+"\})/g;
-
-  let last = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(raw)) !== null) {
-    if (match.index > last) {
-      segments.push({ kind: "text", value: raw.slice(last, match.index) });
+  while (i < raw.length) {
+    // ── __IMG__ image tag ────────────────────────────────────────
+    if (raw.startsWith(DELIM, i)) {
+      if (i > textStart) segments.push({ kind: "text", value: raw.slice(textStart, i) });
+      const contentStart = i + DELIM.length;
+      const closeIdx = raw.indexOf(DELIM, contentStart);
+      if (closeIdx === -1) {
+        // Incomplete tag mid-stream — treat rest as text
+        textStart = i;
+        break;
+      }
+      segments.push({ kind: "image", url: raw.slice(contentStart, closeIdx) });
+      i = closeIdx + DELIM.length;
+      textStart = i;
+      continue;
     }
-    if (match[1] !== undefined) {
-      // __IMG__ tag
-      segments.push({ kind: "image", url: match[1] });
-    } else if (match[2] !== undefined) {
-      // tool JSON card
-      segments.push({ kind: "tool", json: match[2] });
+
+    // ── {"tool":...} JSON card ────────────────────────────────────
+    if (raw.startsWith('{"tool":', i)) {
+      if (i > textStart) segments.push({ kind: "text", value: raw.slice(textStart, i) });
+
+      // Walk forward counting braces to find the matching `}`
+      let depth = 0;
+      let inString = false;
+      let escaped = false;
+      let end = -1;
+
+      for (let j = i; j < raw.length; j++) {
+        const c = raw[j];
+        if (escaped) { escaped = false; continue; }
+        if (c === "\\" && inString) { escaped = true; continue; }
+        if (c === '"') { inString = !inString; continue; }
+        if (!inString) {
+          if (c === "{") depth++;
+          else if (c === "}") { depth--; if (depth === 0) { end = j; break; } }
+        }
+      }
+
+      if (end !== -1) {
+        segments.push({ kind: "tool", json: raw.slice(i, end + 1) });
+        i = end + 1;
+        textStart = i;
+      } else {
+        // Incomplete JSON mid-stream — treat as text
+        textStart = i;
+        break;
+      }
+      continue;
     }
-    last = match.index + match[0].length;
+
+    i++;
   }
 
-  if (last < raw.length) {
-    segments.push({ kind: "text", value: raw.slice(last) });
+  // Flush remaining text
+  if (textStart < raw.length) {
+    segments.push({ kind: "text", value: raw.slice(textStart) });
   }
 
   return segments;
