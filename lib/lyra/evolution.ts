@@ -57,11 +57,21 @@ Return ONLY a JSON object — no markdown, no preamble:
 }`;
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const response = await client.messages.create({
-    model: "claude-opus-4-6",
-    max_tokens: 2048,
-    messages: [{ role: "user", content: evolutionPrompt }],
-  });
+  let response: Awaited<ReturnType<typeof client.messages.create>>;
+  try {
+    response = await client.messages.create({
+      model: "claude-opus-4-6",
+      max_tokens: 2048,
+      messages: [{ role: "user", content: evolutionPrompt }],
+    });
+  } catch (err) {
+    // Log the full nested error so [Object] isn't hiding the real message
+    const detail = err instanceof Error
+      ? { message: err.message, apiError: JSON.stringify((err as { error?: unknown }).error ?? null) }
+      : String(err);
+    console.error("[Lyra Evolution] Anthropic API error:", JSON.stringify(detail));
+    throw err; // re-throw so caller logs it and cooldown stamp holds
+  }
 
   const text = response.content.find((b) => b.type === "text")?.text ?? "{}";
 

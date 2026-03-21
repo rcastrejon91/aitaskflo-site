@@ -6,8 +6,6 @@ import type { Reflection } from "@/lib/types/lyra";
 
 const REFLECTIONS_FILE = "reflections.json";
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 export function getAllReflections(): Reflection[] {
   return readStore<Reflection[]>(REFLECTIONS_FILE, []);
 }
@@ -49,8 +47,9 @@ Score criteria:
 
 Return only the JSON object.`;
 
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const response = await client.messages.create({
-    model: "claude-opus-4-6",
+    model: "claude-sonnet-4-6",
     max_tokens: 1024,
     messages: [{ role: "user", content: prompt }],
   });
