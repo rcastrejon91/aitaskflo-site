@@ -123,6 +123,21 @@ export function Dashboard({ initial }: { initial: DashboardData }) {
           return updated;
         });
       }
+      // Background reflect after 2+ exchanges — keeps memory fresh automatically
+      if (history.length >= 2) {
+        fetch("/api/lyra/reflect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conversationId,
+            agentId: data.activeAgent.id,
+            transcript: [...history, { role: "user" as const, content: text }],
+            userId,
+          }),
+        })
+          .then(() => refreshAll())
+          .catch(() => {});
+      }
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Error";
       setMessages((prev) => {

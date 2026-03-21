@@ -4,6 +4,7 @@ import { saveConversation, upsertFact, upsertUser } from "@/lib/lyra/db";
 import { getAgent, saveAgent } from "@/lib/lyra/agents";
 import { shouldEvolve } from "@/lib/lyra/reflections";
 import { evolveAgent } from "@/lib/lyra/evolution";
+import { storeMemory } from "@/lib/lyra/memories";
 
 export async function POST(req: NextRequest) {
   try {
@@ -74,6 +75,15 @@ For facts: extract things like preferred_language, occupation, location, interes
         for (const fact of parsed.facts) {
           if (fact.key && fact.value) {
             upsertFact(userId, fact.key, fact.value);
+            // Also write to memories.json so the Memory panel shows it
+            storeMemory({
+              content: `${fact.key.replace(/_/g, " ")}: ${fact.value}`,
+              type: "personal",
+              tags: [fact.key],
+              importance: "medium",
+              agentId: agentId ?? "lyra-v1",
+              sourceConversationId: conversationId,
+            }).catch(() => {});
           }
         }
       }
