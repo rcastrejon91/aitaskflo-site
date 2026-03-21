@@ -1,47 +1,73 @@
 "use client";
 
-/** Renders a raw assistant message string, handling:
- *  - __IMG__url__IMG__  → <img> element
- *  - {"tool":"..."}      → styled tool card
- *  - everything else     → plain text
- */
+import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
+import type { Components } from "react-markdown";
+import {
+  Mail, Users, QrCode, Globe, Palette, Calendar,
+  Copy, Check, ExternalLink, ImageIcon,
+} from "lucide-react";
+
+// ── Tool Card ─────────────────────────────────────────────────────────────────
+
+const TOOL_CONFIG: Record<string, {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  gradient: string;
+  border: string;
+  accent: string;
+}> = {
+  email:     { label: "Email Sent",      icon: Mail,     gradient: "from-blue-950/80 to-blue-900/30",    border: "border-blue-500/30",    accent: "text-blue-300" },
+  crm:       { label: "CRM Updated",     icon: Users,    gradient: "from-amber-950/80 to-amber-900/30",  border: "border-amber-500/30",   accent: "text-amber-300" },
+  qr:        { label: "QR Code",         icon: QrCode,   gradient: "from-teal-950/80 to-teal-900/30",    border: "border-teal-500/30",    accent: "text-teal-300" },
+  translate: { label: "Translation",     icon: Globe,    gradient: "from-cyan-950/80 to-cyan-900/30",    border: "border-cyan-500/30",    accent: "text-cyan-300" },
+  image_gen: { label: "Image Generated", icon: Palette,  gradient: "from-violet-950/80 to-violet-900/30",border: "border-violet-500/30",  accent: "text-violet-300" },
+  calendar:  { label: "Calendar Event",  icon: Calendar, gradient: "from-emerald-950/80 to-emerald-900/30",border:"border-emerald-500/30",accent: "text-emerald-300" },
+};
 
 function ToolCard({ raw }: { raw: string }) {
+  const [copied, setCopied] = useState(false);
   try {
-    const obj = JSON.parse(raw);
-    const tool: string = obj.tool;
-
-    const colors: Record<string, string> = {
-      email:     "border-blue-500/30 bg-blue-500/5 text-blue-300",
-      calendar:  "border-emerald-500/30 bg-emerald-500/5 text-emerald-300",
-      crm:       "border-amber-500/30 bg-amber-500/5 text-amber-300",
-      image_gen: "border-violet-500/30 bg-violet-500/5 text-violet-300",
-      qr:        "border-teal-500/30 bg-teal-500/5 text-teal-300",
-      translate: "border-cyan-500/30 bg-cyan-500/5 text-cyan-300",
+    const obj = JSON.parse(raw) as Record<string, string>;
+    const tool = obj.tool;
+    const cfg = TOOL_CONFIG[tool] ?? {
+      label: tool, icon: Globe,
+      gradient: "from-white/5 to-transparent", border: "border-white/15", accent: "text-white/60",
     };
-    const labels: Record<string, string> = {
-      email:     "📧 Email",
-      calendar:  "📅 Calendar",
-      crm:       "🏢 CRM",
-      image_gen: "🎨 Image Generation",
-      qr:        "⬛ QR Code",
-      translate: "🌐 Translation",
-    };
+    const Icon = cfg.icon;
+    const fields = Object.entries(obj).filter(([k]) => k !== "tool");
 
-    const cls = colors[tool] ?? "border-white/10 bg-white/5 text-white/70";
-    const label = labels[tool] ?? tool;
+    function copy() {
+      navigator.clipboard.writeText(fields.map(([k, v]) => `${k}: ${v}`).join("\n")).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    }
 
     return (
-      <div className={`mt-2 rounded-xl border px-3 py-2.5 text-xs ${cls}`}>
-        <div className="font-semibold mb-1">{label}</div>
-        {Object.entries(obj)
-          .filter(([k]) => k !== "tool")
-          .map(([k, v]) => (
-            <div key={k} className="flex gap-2">
-              <span className="opacity-60 capitalize">{k}:</span>
-              <span className="break-all">{String(v)}</span>
-            </div>
-          ))}
+      <div className={`mt-3 rounded-2xl border bg-gradient-to-br ${cfg.gradient} ${cfg.border} overflow-hidden`}>
+        <div className={`flex items-center justify-between px-4 py-2.5 border-b ${cfg.border}`}>
+          <span className={`flex items-center gap-2 text-xs font-semibold tracking-wide ${cfg.accent}`}>
+            <Icon className="w-3.5 h-3.5" />
+            {cfg.label}
+          </span>
+          <button onClick={copy} title="Copy" className="text-white/25 hover:text-white/60 transition-colors">
+            {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+          </button>
+        </div>
+        {fields.length > 0 && (
+          <div className="px-4 py-3 space-y-2">
+            {fields.map(([k, v]) => (
+              <div key={k} className="flex gap-3 text-xs">
+                <span className="text-white/35 capitalize min-w-[56px] flex-shrink-0">{k}</span>
+                <span className="text-white/85 break-all leading-relaxed">{v}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   } catch {
@@ -49,12 +75,59 @@ function ToolCard({ raw }: { raw: string }) {
   }
 }
 
-type Segment =
-  | { kind: "text"; value: string }
-  | { kind: "image"; url: string }
-  | { kind: "tool"; json: string };
+// ── Generated Image ───────────────────────────────────────────────────────────
 
-/** Character-level scanner — handles multi-field tool JSON correctly. */
+function GeneratedImage({ url }: { url: string }) {
+  const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
+
+  return (
+    <div className="mt-3 rounded-2xl overflow-hidden border border-white/10 bg-black/30">
+      {status === "loading" && (
+        <div className="flex items-center justify-center gap-2.5 h-48 text-white/30 text-xs">
+          <ImageIcon className="w-4 h-4 animate-pulse" />
+          <span>Generating image…</span>
+        </div>
+      )}
+      {status === "error" && (
+        <div className="flex flex-col items-center justify-center gap-2 h-36 text-white/30 text-xs">
+          <ImageIcon className="w-5 h-5" />
+          <span>Image failed to load</span>
+          <a href={url} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-1 text-violet-400 hover:text-violet-300 transition-colors">
+            Open directly <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
+      )}
+      <img
+        src={url}
+        alt="Generated by Lyra"
+        onLoad={() => setStatus("loaded")}
+        onError={() => setStatus("error")}
+        className={`w-full object-cover transition-opacity duration-500 ${
+          status === "loaded" ? "opacity-100" : "opacity-0 absolute"
+        }`}
+      />
+      {status === "loaded" && (
+        <div className="px-3 py-2 flex items-center justify-between bg-black/20">
+          <span className="text-[10px] text-white/20">Generated by Lyra · Pollinations.ai</span>
+          <a href={url} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-1 text-[10px] text-white/35 hover:text-white/70 transition-colors">
+            Full size <ExternalLink className="w-2.5 h-2.5" />
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Segment parser ────────────────────────────────────────────────────────────
+
+type Segment =
+  | { kind: "text";  value: string }
+  | { kind: "image"; url: string }
+  | { kind: "tool";  json: string };
+
+/** Character-level scanner — handles multi-field tool JSON and __IMG__ tags. */
 function parseSegments(raw: string): Segment[] {
   const segments: Segment[] = [];
   const DELIM = "__IMG__";
@@ -62,90 +135,149 @@ function parseSegments(raw: string): Segment[] {
   let textStart = 0;
 
   while (i < raw.length) {
-    // ── __IMG__ image tag ────────────────────────────────────────
+    // ── Image tag ──────────────────────────────────────────────────────────
     if (raw.startsWith(DELIM, i)) {
       if (i > textStart) segments.push({ kind: "text", value: raw.slice(textStart, i) });
       const contentStart = i + DELIM.length;
       const closeIdx = raw.indexOf(DELIM, contentStart);
-      if (closeIdx === -1) {
-        // Incomplete tag mid-stream — treat rest as text
-        textStart = i;
-        break;
-      }
+      if (closeIdx === -1) { textStart = i; break; }          // mid-stream
       segments.push({ kind: "image", url: raw.slice(contentStart, closeIdx) });
       i = closeIdx + DELIM.length;
       textStart = i;
       continue;
     }
 
-    // ── {"tool":...} JSON card ────────────────────────────────────
+    // ── Tool JSON card ─────────────────────────────────────────────────────
     if (raw.startsWith('{"tool":', i)) {
       if (i > textStart) segments.push({ kind: "text", value: raw.slice(textStart, i) });
-
-      // Walk forward counting braces to find the matching `}`
-      let depth = 0;
-      let inString = false;
-      let escaped = false;
-      let end = -1;
-
+      let depth = 0, inString = false, escaped = false, end = -1;
       for (let j = i; j < raw.length; j++) {
         const c = raw[j];
-        if (escaped) { escaped = false; continue; }
+        if (escaped)             { escaped = false; continue; }
         if (c === "\\" && inString) { escaped = true; continue; }
-        if (c === '"') { inString = !inString; continue; }
+        if (c === '"')           { inString = !inString; continue; }
         if (!inString) {
           if (c === "{") depth++;
           else if (c === "}") { depth--; if (depth === 0) { end = j; break; } }
         }
       }
-
       if (end !== -1) {
         segments.push({ kind: "tool", json: raw.slice(i, end + 1) });
-        i = end + 1;
-        textStart = i;
-      } else {
-        // Incomplete JSON mid-stream — treat as text
-        textStart = i;
-        break;
-      }
+        i = end + 1; textStart = i;
+      } else { textStart = i; break; }                        // mid-stream
       continue;
     }
 
     i++;
   }
 
-  // Flush remaining text
-  if (textStart < raw.length) {
-    segments.push({ kind: "text", value: raw.slice(textStart) });
-  }
-
+  if (textStart < raw.length) segments.push({ kind: "text", value: raw.slice(textStart) });
   return segments;
 }
+
+// ── Markdown components ───────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mdComponents: Components = {
+  a({ href, children }) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer"
+        className="text-violet-400 hover:text-violet-300 underline underline-offset-2 decoration-violet-500/40 transition-colors inline-flex items-center gap-0.5 break-all">
+        {children}
+        <ExternalLink className="w-2.5 h-2.5 flex-shrink-0 ml-0.5" />
+      </a>
+    );
+  },
+
+  // Suppress default <pre> so SyntaxHighlighter isn't double-wrapped
+  pre({ children }) {
+    return <>{children}</>;
+  },
+
+  code({ className, children }) {
+    const lang = /language-(\w+)/.exec(className ?? "")?.[1];
+    const code = String(children).replace(/\n$/, "");
+    const isBlock = !!lang || code.includes("\n");
+
+    if (isBlock) {
+      return (
+        <SyntaxHighlighter
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          style={oneDark as any}
+          language={lang ?? "text"}
+          PreTag="div"
+          customStyle={{
+            background: "rgba(0,0,0,0.45)",
+            borderRadius: "0.75rem",
+            border: "1px solid rgba(255,255,255,0.07)",
+            fontSize: "0.78rem",
+            margin: "0.75rem 0",
+            padding: "1rem",
+          }}
+        >
+          {code}
+        </SyntaxHighlighter>
+      );
+    }
+
+    return (
+      <code className="px-1.5 py-0.5 rounded-md bg-white/[0.08] text-violet-300 text-[0.82em] font-mono border border-white/[0.06]">
+        {children}
+      </code>
+    );
+  },
+
+  h1({ children }) { return <h1 className="text-lg font-bold mt-5 mb-2 text-white tracking-tight">{children}</h1>; },
+  h2({ children }) { return <h2 className="text-base font-semibold mt-4 mb-1.5 text-white">{children}</h2>; },
+  h3({ children }) { return <h3 className="text-sm font-semibold mt-3 mb-1 text-white/90">{children}</h3>; },
+
+  ul({ children }) { return <ul className="my-2 ml-3 space-y-1 list-disc marker:text-violet-400">{children}</ul>; },
+  ol({ children }) { return <ol className="my-2 ml-3 space-y-1 list-decimal marker:text-violet-400">{children}</ol>; },
+  li({ children }) { return <li className="text-sm text-white/85 leading-relaxed pl-1">{children}</li>; },
+
+  blockquote({ children }) {
+    return (
+      <blockquote className="my-3 pl-3 border-l-2 border-violet-500/50 text-white/55 italic">
+        {children}
+      </blockquote>
+    );
+  },
+
+  p({ children }) { return <p className="text-sm leading-relaxed mb-2 last:mb-0 text-white/90">{children}</p>; },
+  strong({ children }) { return <strong className="font-semibold text-white">{children}</strong>; },
+  em({ children }) { return <em className="text-white/70 italic">{children}</em>; },
+
+  table({ children }) {
+    return (
+      <div className="my-3 overflow-x-auto rounded-xl border border-white/[0.08]">
+        <table className="w-full text-xs border-collapse">{children}</table>
+      </div>
+    );
+  },
+  th({ children }) {
+    return <th className="px-3 py-2 text-left font-semibold text-white/60 bg-white/[0.04] border-b border-white/[0.08]">{children}</th>;
+  },
+  td({ children }) {
+    return <td className="px-3 py-2 text-white/80 border-b border-white/[0.04]">{children}</td>;
+  },
+  hr() { return <hr className="my-4 border-white/[0.07]" />; },
+};
+
+// ── Main renderer ─────────────────────────────────────────────────────────────
 
 export function MessageRenderer({ content }: { content: string }) {
   const segments = parseSegments(content);
 
   return (
-    <div>
+    <div className="space-y-1">
       {segments.map((seg, i) => {
-        if (seg.kind === "image") {
-          return (
-            <img
-              key={i}
-              src={seg.url}
-              alt="Generated by Lyra"
-              className="mt-3 rounded-xl max-w-full border border-white/10"
-            />
-          );
-        }
-        if (seg.kind === "tool") {
-          return <ToolCard key={i} raw={seg.json} />;
-        }
+        if (seg.kind === "image") return <GeneratedImage key={i} url={seg.url} />;
+        if (seg.kind === "tool")  return <ToolCard key={i} raw={seg.json} />;
         if (seg.value.trim()) {
           return (
-            <p key={i} className="whitespace-pre-wrap">
+            <ReactMarkdown key={i} remarkPlugins={[remarkGfm]} components={mdComponents}>
               {seg.value}
-            </p>
+            </ReactMarkdown>
           );
         }
         return null;
