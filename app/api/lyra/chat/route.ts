@@ -3,15 +3,6 @@ import { NextRequest } from "next/server";
 import { getActiveAgent, getAgent, incrementConversationCount } from "@/lib/lyra/agents";
 import { upsertUser, upsertCrmContact, searchCrmContacts, buildMemoryContext } from "@/lib/lyra/db";
 
-// HF model endpoints
-const IMAGE_MODELS: Record<string, string> = {
-  "flux-schnell":
-    "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell",
-  "flux-dev":
-    "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev",
-  sdxl: "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
-  sd3: "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-3-medium-diffusers",
-};
 
 // Real tool definitions
 const LYRA_TOOLS: Anthropic.Tool[] = [
@@ -23,11 +14,6 @@ const LYRA_TOOLS: Anthropic.Tool[] = [
       type: "object" as const,
       properties: {
         prompt: { type: "string", description: "Vivid, detailed description including style, lighting, mood." },
-        model: {
-          type: "string",
-          enum: ["flux-schnell", "flux-dev", "sdxl", "sd3"],
-          description: "flux-schnell = fast (default). flux-dev = highest quality. sdxl = photorealistic. sd3 = text/logos.",
-        },
       },
       required: ["prompt"],
     },
@@ -128,86 +114,8 @@ const LYRA_TOOLS: Anthropic.Tool[] = [
   },
 ];
 
-// Primary: Pollinations.ai — free, no auth, FLUX-powered, always available
-async function generateImagePollinations(prompt: string): Promise<string | null> {
-  try {
-    const encoded = encodeURIComponent(prompt);
-    const url = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&nologo=true&seed=${Math.floor(Math.random() * 999999)}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
-    if (!res.ok) return null;
-    const contentType = res.headers.get("content-type") ?? "";
-    const buffer = Buffer.from(await res.arrayBuffer());
-    // Verify we got image bytes
-    const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8;
-    const isPng = buffer[0] === 0x89 && buffer[1] === 0x50;
-    if (!isJpeg && !isPng && !contentType.startsWith("image/")) return null;
-    const mime = isPng ? "image/png" : "image/jpeg";
-    return `data:${mime};base64,${buffer.toString("base64")}`;
-  } catch {
-    return null;
-  }
-}
-
-// Fallback: Hugging Face Inference API
-async function generateImageHF(
-  prompt: string,
-  model = "flux-schnell",
-  maxWaitMs = 45_000
-): Promise<string | null> {
-  const hfToken = process.env.HF_TOKEN;
-  const url = IMAGE_MODELS[model] ?? IMAGE_MODELS["flux-schnell"];
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (hfToken) headers["Authorization"] = `Bearer ${hfToken}`;
-  const body = JSON.stringify({ inputs: prompt });
-
-  let waited = 0;
-  while (waited < maxWaitMs) {
-    const res = await fetch(url, { method: "POST", headers, body });
-
-    if (res.ok) {
-      const contentType = res.headers.get("content-type") ?? "";
-      const buffer = Buffer.from(await res.arrayBuffer());
-      const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8;
-      const isPng = buffer[0] === 0x89 && buffer[1] === 0x50;
-      if (isJpeg || isPng || contentType.startsWith("image/")) {
-        const mime = isPng ? "image/png" : "image/jpeg";
-        return `data:${mime};base64,${buffer.toString("base64")}`;
-      }
-      try {
-        const json = JSON.parse(buffer.toString());
-        if (json.estimated_time) {
-          const wait = Math.min(json.estimated_time * 1000, 15_000);
-          await new Promise((r) => setTimeout(r, wait));
-          waited += wait;
-          continue;
-        }
-      } catch { /* not JSON */ }
-      return null;
-    }
-
-    if (res.status === 503) {
-      let wait = 10_000;
-      try {
-        const json = await res.json();
-        if (typeof json.estimated_time === "number") wait = Math.min(json.estimated_time * 1000, 20_000);
-      } catch { /* ignore */ }
-      await new Promise((r) => setTimeout(r, wait));
-      waited += wait;
-      continue;
-    }
-
-    return null;
-  }
-  return null;
-}
-
-async function generateImage(prompt: string, model = "flux-schnell"): Promise<string | null> {
-  // Pollinations first — reliable, free, no cold starts
-  const pollinationsResult = await generateImagePollinations(prompt);
-  if (pollinationsResult) return pollinationsResult;
-
-  // HF fallback
-  return generateImageHF(prompt, model);
+function pollinationsUrl(prompt: string): string {
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true&seed=${Math.floor(Math.random() * 999999)}`;
 }
 
 // ── Real tool implementations ────────────────────────────────────────────────
@@ -413,12 +321,9 @@ async function executeTool(
   controller: ReadableStreamDefaultController
 ): Promise<string> {
   if (name === "image_gen") {
-    const imgData = await generateImage(input.prompt ?? "", input.model ?? "flux-schnell");
-    if (imgData) {
-      controller.enqueue(encoder.encode(`\n__IMG__${imgData}__IMG__`));
-      return "Image generated.";
-    }
-    return "Image generation failed — Pollinations.ai may be temporarily down. Try again.";
+    const url = pollinationsUrl(input.prompt ?? "");
+    controller.enqueue(encoder.encode(`\n__IMG__${url}__IMG__`));
+    return "Image generated.";
   }
 
   if (name === "send_email") {
