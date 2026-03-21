@@ -10,6 +10,7 @@ import Link from "next/link";
 import { LineageGraph } from "./LineageGraph";
 import { MemoryPanel } from "./MemoryPanel";
 import { ReflectionLog } from "./ReflectionLog";
+import { MessageRenderer } from "./MessageRenderer";
 import type {
   Agent, Memory, Reflection, LineageGraph as LineageGraphType, LyraState,
 } from "@/lib/types/lyra";
@@ -402,7 +403,7 @@ export function Dashboard({ initial }: { initial: DashboardData }) {
                           <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                         </span>
                       ) : (
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                        <MessageRenderer content={msg.content} />
                       )}
                     </div>
                   </div>
