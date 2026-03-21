@@ -41,12 +41,16 @@ function ToolCallCard({ json }: { json: string }) {
       calendar: "border-emerald-500/30 bg-emerald-500/5 text-emerald-300",
       crm: "border-amber-500/30 bg-amber-500/5 text-amber-300",
       image_gen: "border-violet-500/30 bg-violet-500/5 text-violet-300",
+      qr: "border-teal-500/30 bg-teal-500/5 text-teal-300",
+      translate: "border-cyan-500/30 bg-cyan-500/5 text-cyan-300",
     };
     const labels: Record<string, string> = {
       email: "📧 Email",
       calendar: "📅 Calendar",
       crm: "🏢 CRM",
       image_gen: "🎨 Image Generation",
+      qr: "⬛ QR Code",
+      translate: "🌐 Translation",
     };
     const cls = colors[tool] ?? "border-white/10 bg-white/5 text-white/70";
     const label = labels[tool] ?? tool;
@@ -223,9 +227,9 @@ export default function LyraChat() {
 
   const QUICK_PROMPTS = [
     "Generate an image of a futuristic city at sunset",
-    "Write a Python script to automate email sorting",
-    "Create a 3-step onboarding workflow for new users",
-    "What are you capable of?",
+    "What's the latest news in AI?",
+    "Generate a QR code for https://aitaskflo.com",
+    "Translate 'You are the future' into Japanese, Spanish, and Arabic",
   ];
 
   return (

@@ -112,6 +112,41 @@ const LYRA_TOOLS: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: "generate_qr",
+    description: "Generate a QR code from any text, URL, contact info, or data. Use when the user asks to create a QR code.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        text: { type: "string", description: "Text, URL, or data to encode into the QR code" },
+      },
+      required: ["text"],
+    },
+  },
+  {
+    name: "translate",
+    description: "Translate text into any language. Use when the user asks to translate something.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        text: { type: "string", description: "Text to translate" },
+        to: { type: "string", description: "Target language name or code (e.g. 'Spanish', 'es', 'Japanese', 'zh')" },
+        from: { type: "string", description: "Source language code or name. Default: auto-detect" },
+      },
+      required: ["text", "to"],
+    },
+  },
+  {
+    name: "get_news",
+    description: "Get the latest news headlines on any topic. Use when the user asks for news, current events, or what's happening in the world.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        topic: { type: "string", description: "Topic to search (e.g. 'AI', 'crypto', 'space'). Leave empty for top headlines." },
+      },
+      required: [],
+    },
+  },
 ];
 
 function pollinationsUrl(prompt: string): string {
@@ -251,6 +286,56 @@ function toolCalculate(expression: string): string {
   }
 }
 
+async function toolTranslate(text: string, to: string, from = "auto"): Promise<string> {
+  const langMap: Record<string, string> = {
+    arabic: "ar", chinese: "zh", dutch: "nl", french: "fr", german: "de",
+    greek: "el", hindi: "hi", indonesian: "id", italian: "it", japanese: "ja",
+    korean: "ko", polish: "pl", portuguese: "pt", romanian: "ro", russian: "ru",
+    spanish: "es", swedish: "sv", thai: "th", turkish: "tr", ukrainian: "uk",
+    vietnamese: "vi",
+  };
+  const tl = langMap[to.toLowerCase()] ?? to;
+  const sl = langMap[from.toLowerCase()] ?? from;
+  try {
+    const res = await fetch(
+      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sl}|${tl}`,
+      { signal: AbortSignal.timeout(10_000) }
+    );
+    const data = await res.json();
+    if (data.responseStatus === 200) return data.responseData.translatedText as string;
+    return "Translation failed — try again.";
+  } catch {
+    return "Translation service unavailable.";
+  }
+}
+
+async function toolGetNews(topic?: string): Promise<string> {
+  try {
+    const rssUrl = topic
+      ? `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}&hl=en-US&gl=US&ceid=US:en`
+      : `https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en`;
+    const res = await fetch(rssUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; Lyra/1.0)" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    const xml = await res.text();
+    const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 6);
+    if (!items.length) return topic ? `No news found for "${topic}".` : "No headlines available right now.";
+    const headlines = items.map(([, item]) => {
+      const title = (
+        item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1] ??
+        item.match(/<title>(.*?)<\/title>/)?.[1] ??
+        "Untitled"
+      ).replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+      const source = item.match(/<source[^>]*>(.*?)<\/source>/)?.[1] ?? "";
+      return `• ${title}${source ? ` — ${source}` : ""}`;
+    });
+    return `Latest${topic ? ` ${topic}` : ""} news:\n\n${headlines.join("\n")}`;
+  } catch {
+    return "News fetch failed — try again.";
+  }
+}
+
 // ── Groq fallback (text-only, no tools) ──────────────────────────────────────
 async function streamGroqFallback(
   systemPrompt: string,
@@ -371,6 +456,25 @@ async function executeTool(
       `• ${c.name}${c.phone ? ` | ${c.phone}` : ""}${c.email ? ` | ${c.email}` : ""}${c.notes ? ` | ${c.notes}` : ""}`
     ).join("\n");
     return `Found ${contacts.length} contact(s):\n${rows}`;
+  }
+
+  if (name === "generate_qr") {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(input.text ?? "")}&size=400x400&ecc=M`;
+    controller.enqueue(encoder.encode(`\n__IMG__${qrUrl}__IMG__`));
+    const card = JSON.stringify({ tool: "qr", text: input.text });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return `QR code generated for: ${input.text}`;
+  }
+
+  if (name === "translate") {
+    const result = await toolTranslate(input.text ?? "", input.to ?? "en", input.from ?? "auto");
+    const card = JSON.stringify({ tool: "translate", from: input.from ?? "auto", to: input.to, text: input.text, result });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return result;
+  }
+
+  if (name === "get_news") {
+    return await toolGetNews(input.topic);
   }
 
   const card = JSON.stringify({ tool: name, ...input });
