@@ -1,10 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Keep these out of the SSR bundle.
   // better-sqlite3: native addon, must be loaded by Node directly.
-  // react-syntax-highlighter: CJS module with a circular language registry that
-  // causes Turbopack's SSR evaluator to overflow the call stack.
-  serverExternalPackages: ["better-sqlite3", "react-syntax-highlighter"],
+  serverExternalPackages: ["better-sqlite3"],
   // Godot web exports require SharedArrayBuffer → needs COOP + COEP on both
   // the host page (/play) and the static game files (/game/*).
   async headers() {

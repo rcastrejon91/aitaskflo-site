@@ -3,9 +3,11 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
+import dynamic from "next/dynamic";
 import type { Components } from "react-markdown";
+
+const CodeHighlight = dynamic(() => import("./CodeHighlight"), { ssr: false });
+
 import {
   Mail, Users, QrCode, Globe, Palette, Calendar,
   Copy, Check, ExternalLink, ImageIcon, Gamepad2,
@@ -203,22 +205,7 @@ const mdComponents: Components = {
 
     if (isBlock) {
       return (
-        <SyntaxHighlighter
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          style={oneDark as any}
-          language={lang ?? "text"}
-          PreTag="div"
-          customStyle={{
-            background: "rgba(0,0,0,0.45)",
-            borderRadius: "0.75rem",
-            border: "1px solid rgba(255,255,255,0.07)",
-            fontSize: "0.78rem",
-            margin: "0.75rem 0",
-            padding: "1rem",
-          }}
-        >
-          {code}
-        </SyntaxHighlighter>
+        <CodeHighlight language={lang ?? "text"}>{code}</CodeHighlight>
       );
     }
 
