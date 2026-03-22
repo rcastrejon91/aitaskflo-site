@@ -1,17 +1,35 @@
 "use client";
 
-import { useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import type { Components } from "react-markdown";
-
-const CodeHighlight = dynamic(() => import("./CodeHighlight"), { ssr: false });
-
 import {
   Mail, Users, QrCode, Globe, Palette, Calendar,
   Copy, Check, ExternalLink, ImageIcon, Gamepad2,
 } from "lucide-react";
+
+// react-markdown and remark-gfm are part of the unified CJS ecosystem with
+// circular require() graphs. Top-level imports put them in the SSR bundle
+// where Turbopack's module registry overflows the call stack. Defer them
+// to useEffect so they are only ever loaded in the browser.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MdLib = { ReactMarkdown: any; remarkGfm: any } | null;
+let mdCache: MdLib = null;
+let mdPending: Promise<MdLib> | null = null;
+function loadMd(): Promise<MdLib> {
+  if (mdCache) return Promise.resolve(mdCache);
+  if (!mdPending) {
+    mdPending = Promise.all([
+      import("react-markdown").then((m) => m.default),
+      import("remark-gfm").then((m) => m.default),
+    ]).then(([ReactMarkdown, remarkGfm]) => {
+      mdCache = { ReactMarkdown, remarkGfm };
+      return mdCache;
+    });
+  }
+  return mdPending;
+}
+
+const CodeHighlight = dynamic(() => import("./CodeHighlight"), { ssr: false });
 
 // ── Tool Card ─────────────────────────────────────────────────────────────────
 
@@ -179,82 +197,91 @@ function parseSegments(raw: string): Segment[] {
   return segments;
 }
 
-// ── Markdown components ───────────────────────────────────────────────────────
+// ── Markdown components (built without importing react-markdown types) ─────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mdComponents: Components = {
-  a({ href, children }) {
-    return (
-      <a href={href} target="_blank" rel="noopener noreferrer"
-        className="text-violet-400 hover:text-violet-300 underline underline-offset-2 decoration-violet-500/40 transition-colors inline-flex items-center gap-0.5 break-all">
-        {children}
-        <ExternalLink className="w-2.5 h-2.5 flex-shrink-0 ml-0.5" />
-      </a>
-    );
-  },
-
-  // Suppress default <pre> so SyntaxHighlighter isn't double-wrapped
-  pre({ children }) {
-    return <>{children}</>;
-  },
-
-  code({ className, children }) {
-    const lang = /language-(\w+)/.exec(className ?? "")?.[1];
-    const code = String(children).replace(/\n$/, "");
-    const isBlock = !!lang || code.includes("\n");
-
-    if (isBlock) {
+function buildMdComponents(CodeBlock: any) {
+  return {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    a({ href, children }: any) {
       return (
-        <CodeHighlight language={lang ?? "text"}>{code}</CodeHighlight>
+        <a href={href} target="_blank" rel="noopener noreferrer"
+          className="text-violet-400 hover:text-violet-300 underline underline-offset-2 decoration-violet-500/40 transition-colors inline-flex items-center gap-0.5 break-all">
+          {children}
+          <ExternalLink className="w-2.5 h-2.5 flex-shrink-0 ml-0.5" />
+        </a>
       );
-    }
-
-    return (
-      <code className="px-1.5 py-0.5 rounded-md bg-white/[0.08] text-violet-300 text-[0.82em] font-mono border border-white/[0.06]">
-        {children}
-      </code>
-    );
-  },
-
-  h1({ children }) { return <h1 className="text-lg font-bold mt-5 mb-2 text-white tracking-tight">{children}</h1>; },
-  h2({ children }) { return <h2 className="text-base font-semibold mt-4 mb-1.5 text-white">{children}</h2>; },
-  h3({ children }) { return <h3 className="text-sm font-semibold mt-3 mb-1 text-white/90">{children}</h3>; },
-
-  ul({ children }) { return <ul className="my-2 ml-3 space-y-1 list-disc marker:text-violet-400">{children}</ul>; },
-  ol({ children }) { return <ol className="my-2 ml-3 space-y-1 list-decimal marker:text-violet-400">{children}</ol>; },
-  li({ children }) { return <li className="text-sm text-white/85 leading-relaxed pl-1">{children}</li>; },
-
-  blockquote({ children }) {
-    return (
-      <blockquote className="my-3 pl-3 border-l-2 border-violet-500/50 text-white/55 italic">
-        {children}
-      </blockquote>
-    );
-  },
-
-  p({ children }) { return <p className="text-sm leading-relaxed mb-2 last:mb-0 text-white/90">{children}</p>; },
-  strong({ children }) { return <strong className="font-semibold text-white">{children}</strong>; },
-  em({ children }) { return <em className="text-white/70 italic">{children}</em>; },
-
-  table({ children }) {
-    return (
-      <div className="my-3 overflow-x-auto rounded-xl border border-white/[0.08]">
-        <table className="w-full text-xs border-collapse">{children}</table>
-      </div>
-    );
-  },
-  th({ children }) {
-    return <th className="px-3 py-2 text-left font-semibold text-white/60 bg-white/[0.04] border-b border-white/[0.08]">{children}</th>;
-  },
-  td({ children }) {
-    return <td className="px-3 py-2 text-white/80 border-b border-white/[0.04]">{children}</td>;
-  },
-  hr() { return <hr className="my-4 border-white/[0.07]" />; },
-};
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    pre({ children }: any) { return <>{children}</>; },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    code({ className, children }: any) {
+      const lang = /language-(\w+)/.exec(className ?? "")?.[1];
+      const code = String(children).replace(/\n$/, "");
+      const isBlock = !!lang || code.includes("\n");
+      if (isBlock) return <CodeBlock language={lang ?? "text"}>{code}</CodeBlock>;
+      return (
+        <code className="px-1.5 py-0.5 rounded-md bg-white/[0.08] text-violet-300 text-[0.82em] font-mono border border-white/[0.06]">
+          {children}
+        </code>
+      );
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    h1({ children }: any) { return <h1 className="text-lg font-bold mt-5 mb-2 text-white tracking-tight">{children}</h1>; },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    h2({ children }: any) { return <h2 className="text-base font-semibold mt-4 mb-1.5 text-white">{children}</h2>; },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    h3({ children }: any) { return <h3 className="text-sm font-semibold mt-3 mb-1 text-white/90">{children}</h3>; },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ul({ children }: any) { return <ul className="my-2 ml-3 space-y-1 list-disc marker:text-violet-400">{children}</ul>; },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ol({ children }: any) { return <ol className="my-2 ml-3 space-y-1 list-decimal marker:text-violet-400">{children}</ol>; },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    li({ children }: any) { return <li className="text-sm text-white/85 leading-relaxed pl-1">{children}</li>; },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    blockquote({ children }: any) {
+      return (
+        <blockquote className="my-3 pl-3 border-l-2 border-violet-500/50 text-white/55 italic">
+          {children}
+        </blockquote>
+      );
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    p({ children }: any) { return <p className="text-sm leading-relaxed mb-2 last:mb-0 text-white/90">{children}</p>; },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    strong({ children }: any) { return <strong className="font-semibold text-white">{children}</strong>; },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    em({ children }: any) { return <em className="text-white/70 italic">{children}</em>; },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    table({ children }: any) {
+      return (
+        <div className="my-3 overflow-x-auto rounded-xl border border-white/[0.08]">
+          <table className="w-full text-xs border-collapse">{children}</table>
+        </div>
+      );
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    th({ children }: any) {
+      return <th className="px-3 py-2 text-left font-semibold text-white/60 bg-white/[0.04] border-b border-white/[0.08]">{children}</th>;
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    td({ children }: any) {
+      return <td className="px-3 py-2 text-white/80 border-b border-white/[0.04]">{children}</td>;
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    hr() { return <hr className="my-4 border-white/[0.07]" />; },
+  };
+}
 
 // ── Main renderer ─────────────────────────────────────────────────────────────
 
 export function MessageRenderer({ content }: { content: string }) {
+  const [md, setMd] = useState<MdLib>(null);
+
+  useEffect(() => {
+    loadMd().then(setMd);
+  }, []);
+
   const segments = parseSegments(content);
 
   return (
@@ -262,14 +289,24 @@ export function MessageRenderer({ content }: { content: string }) {
       {segments.map((seg, i) => {
         if (seg.kind === "image") return <GeneratedImage key={i} url={seg.url} />;
         if (seg.kind === "tool")  return <ToolCard key={i} raw={seg.json} />;
-        if (seg.value.trim()) {
+        if (!seg.value.trim()) return null;
+
+        if (!md) {
+          // Plain text fallback until react-markdown loads on the client
           return (
-            <ReactMarkdown key={i} remarkPlugins={[remarkGfm]} components={mdComponents}>
+            <p key={i} className="text-sm leading-relaxed mb-2 last:mb-0 text-white/90 whitespace-pre-wrap">
               {seg.value}
-            </ReactMarkdown>
+            </p>
           );
         }
-        return null;
+
+        const { ReactMarkdown, remarkGfm } = md;
+        const components = buildMdComponents(CodeHighlight);
+        return (
+          <ReactMarkdown key={i} remarkPlugins={[remarkGfm]} components={components}>
+            {seg.value}
+          </ReactMarkdown>
+        );
       })}
     </div>
   );
