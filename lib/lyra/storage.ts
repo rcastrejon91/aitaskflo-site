@@ -1,8 +1,6 @@
 import fs from "fs";
 import path from "path";
 
-// Avoid process.cwd() at module level — it causes Turbopack's NFT tracer
-// to scan the entire project into the SSR bundle (stack overflow).
 const DATA_DIR = process.env.DATA_DIR ?? "/home/aitaskflo/data";
 
 function ensureDataDir() {
