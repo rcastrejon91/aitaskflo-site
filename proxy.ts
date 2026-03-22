@@ -23,5 +23,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/lyra/:path*", "/api/lyra/:path*"],
+  matcher: ["/lyra/:path*", "/api/lyra/:path*", "/play", "/api/game/:path*"],
 };

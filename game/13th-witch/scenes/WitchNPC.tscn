@@ -1,0 +1,45 @@
+[gd_scene load_steps=4 format=3 uid="uid://witch_npc_001"]
+
+[ext_resource type="Script" path="res://scripts/WitchNPC.gd" id="1_witch_sc"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_witch_body"]
+radius = 16.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_witch_interact"]
+radius = 72.0
+
+[node name="WitchNPC" type="Node2D"]
+script = ExtResource("1_witch_sc")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+modulate = Color(0.55, 0.22, 1, 1)
+scale = Vector2(2.0, 2.5)
+
+[node name="NameLabel" type="Label" parent="."]
+offset_left = -80.0
+offset_top = -68.0
+offset_right = 80.0
+offset_bottom = -48.0
+horizontal_alignment = 1
+text = "The 13th Witch"
+modulate = Color(1, 1, 1, 0.6)
+theme_override_font_sizes/font_size = 13
+
+[node name="PromptLabel" type="Label" parent="."]
+offset_left = -70.0
+offset_top = -88.0
+offset_right = 70.0
+offset_bottom = -70.0
+horizontal_alignment = 1
+text = "[E] Speak"
+modulate = Color(1, 0.84, 0.31, 0.9)
+theme_override_font_sizes/font_size = 11
+
+[node name="InteractArea" type="Area2D" parent="."]
+collision_layer = 2
+collision_mask = 1
+monitoring = true
+monitorable = false
+
+[node name="InteractCollision" type="CollisionShape2D" parent="InteractArea"]
+shape = SubResource("CircleShape2D_witch_interact")

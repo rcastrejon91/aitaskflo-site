@@ -17,14 +17,25 @@ var player_max_health: int = 100
 var collected_items: Array[String] = []
 var story_flags: Dictionary = {}
 
-# Server URL for AI dialogue — override with env or export var
-var server_url: String = "http://localhost:3000"
+# Server URL for AI dialogue.
+# Web export: empty string → same-origin requests (browser handles the host).
+# Desktop/headless: reads LYRA_SERVER_URL env var, falls back to port 80.
+var server_url: String = ""
 
 # ── Init ─────────────────────────────────────────────────────────────────────
 
 func _ready() -> void:
 	_setup_input_actions()
-	print("[GameManager] Initialised — The 13th Witch")
+	server_url = _resolve_server_url()
+	print("[GameManager] Initialised — The 13th Witch | server: ", server_url if server_url else "(same-origin)")
+
+func _resolve_server_url() -> String:
+	if OS.has_feature("web"):
+		return ""  # Browser handles origin — no prefix needed
+	var env := OS.get_environment("LYRA_SERVER_URL")
+	if env:
+		return env
+	return "http://localhost:80"
 
 func _setup_input_actions() -> void:
 	_bind("move_left",  KEY_A, KEY_LEFT)

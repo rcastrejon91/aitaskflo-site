@@ -11,7 +11,7 @@ radius = 44.0
 [sub_resource type="PlaceholderTexture2D" id="PlaceholderTexture2D_sprite"]
 size = Vector2(32, 32)
 
-[node name="Player" type="CharacterBody2D"]
+[node name="Player" type="CharacterBody2D" groups=["player"]]
 script = ExtResource("1_player_sc")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
