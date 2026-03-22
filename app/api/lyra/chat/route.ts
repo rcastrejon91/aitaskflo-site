@@ -1,8 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest } from "next/server";
+import { exec as _exec } from "child_process";
+import { promisify } from "util";
+import fsp from "fs/promises";
+import nodePath from "path";
 import { getActiveAgent, getAgent, incrementConversationCount } from "@/lib/lyra/agents";
 import { upsertUser, upsertCrmContact, searchCrmContacts, buildMemoryContext, createTask, listTasks } from "@/lib/lyra/db";
 import { auth } from "@/auth";
+
+const execAsync = promisify(_exec);
 
 
 // Real tool definitions
@@ -728,57 +734,50 @@ async function toolUserLocation(clientIp?: string): Promise<string> {
 
 // ── Godot builder ─────────────────────────────────────────────────────────────
 
+// Default game path for the server. Override with GAME_DIR env var.
+// Hardcoded fallback avoids process.cwd() which causes Turbopack NFT
+// to trace the entire project directory.
+const DEFAULT_GAME_DIR = "/home/aitaskflo/game/13th-witch";
+
 async function toolGodotBuilder(
   action: string,
-  path?: string,
+  filePath?: string,
   content?: string,
   command?: string,
   message?: string
 ): Promise<string> {
-  const { exec } = await import("child_process");
-  const { promisify } = await import("util");
-  const execAsync = promisify(exec);
-  const fsp = await import("fs/promises");
-  const nodePath = await import("path");
+  const GAME_DIR = process.env.GAME_DIR ?? DEFAULT_GAME_DIR;
 
-  const GAME_DIR =
-    process.env.GAME_DIR ??
-    nodePath.default.join(process.cwd(), "game", "13th-witch");
-
-  // Prevent path traversal
   const safePath = (rel: string): string => {
-    const resolved = nodePath.default.resolve(GAME_DIR, rel);
+    const resolved = nodePath.resolve(GAME_DIR, rel);
     if (!resolved.startsWith(GAME_DIR)) throw new Error("Path traversal blocked");
     return resolved;
   };
 
   switch (action) {
     case "write_file": {
-      if (!path || content === undefined) return "write_file requires path and content.";
-      const full = safePath(path);
-      await fsp.default.mkdir(nodePath.default.dirname(full), { recursive: true });
-      await fsp.default.writeFile(full, content, "utf-8");
-      return `✓ Wrote ${path} (${content.length} chars)`;
+      if (!filePath || content === undefined) return "write_file requires path and content.";
+      const full = safePath(filePath);
+      await fsp.mkdir(nodePath.dirname(full), { recursive: true });
+      await fsp.writeFile(full, content, "utf-8");
+      return `✓ Wrote ${filePath} (${content.length} chars)`;
     }
 
     case "read_file": {
-      if (!path) return "read_file requires path.";
+      if (!filePath) return "read_file requires path.";
       try {
-        const text = await fsp.default.readFile(safePath(path), "utf-8");
+        const text = await fsp.readFile(safePath(filePath), "utf-8");
         return text.slice(0, 8000);
       } catch {
-        return `File not found: ${path}`;
+        return `File not found: ${filePath}`;
       }
     }
 
     case "list_files": {
       try {
-        await fsp.default.mkdir(GAME_DIR, { recursive: true });
-        const cwd = path ? safePath(path) : GAME_DIR;
-        const { stdout } = await execAsync("find . -type f | sort | head -80", {
-          cwd,
-          timeout: 10_000,
-        });
+        await fsp.mkdir(GAME_DIR, { recursive: true });
+        const cwd = filePath ? safePath(filePath) : GAME_DIR;
+        const { stdout } = await execAsync("find . -type f | sort | head -80", { cwd, timeout: 10_000 });
         return stdout.trim() || "Directory is empty.";
       } catch (e) {
         return `list_files error: ${e instanceof Error ? e.message : String(e)}`;
@@ -786,19 +785,16 @@ async function toolGodotBuilder(
     }
 
     case "delete_file": {
-      if (!path) return "delete_file requires path.";
-      await fsp.default.unlink(safePath(path));
-      return `✓ Deleted ${path}`;
+      if (!filePath) return "delete_file requires path.";
+      await fsp.unlink(safePath(filePath));
+      return `✓ Deleted ${filePath}`;
     }
 
     case "run_command": {
       if (!command) return "run_command requires command.";
-      await fsp.default.mkdir(GAME_DIR, { recursive: true });
+      await fsp.mkdir(GAME_DIR, { recursive: true });
       try {
-        const { stdout, stderr } = await execAsync(command, {
-          cwd: GAME_DIR,
-          timeout: 60_000,
-        });
+        const { stdout, stderr } = await execAsync(command, { cwd: GAME_DIR, timeout: 60_000 });
         return ((stdout + "\n" + stderr).trim()).slice(0, 4000) || "Command completed (no output)";
       } catch (e: unknown) {
         const err = e as { stdout?: string; stderr?: string; message?: string };
@@ -808,7 +804,7 @@ async function toolGodotBuilder(
 
     case "git_commit": {
       const msg = (message ?? "chore: Lyra auto-commit").replace(/"/g, '\\"');
-      await fsp.default.mkdir(GAME_DIR, { recursive: true });
+      await fsp.mkdir(GAME_DIR, { recursive: true });
       try {
         await execAsync("git add -A", { cwd: GAME_DIR });
         const { stdout } = await execAsync(`git commit -m "${msg}"`, { cwd: GAME_DIR });
