@@ -1,5 +1,4 @@
 import { randomUUID } from "crypto";
-import Anthropic from "@anthropic-ai/sdk";
 import { readStore, updateStore } from "./storage";
 import { storeMemory } from "./memories";
 import { updateLyraState, getLyraState } from "./agents";
@@ -80,6 +79,7 @@ export async function learnAboutTopic(topic: string, agentId: string): Promise<L
   const text = await fetchPageText(article.url);
   if (!text) return null;
 
+  const { default: Anthropic } = await import("@anthropic-ai/sdk");
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   const msg = await client.messages.create({
