@@ -10,21 +10,31 @@ interface TestResult {
   error?: string;
 }
 
+const TEST_TIMEOUT_MS = 15_000;
+
 async function run(
   name: string,
   fn: () => Promise<{ pass: boolean; detail: string }>
 ): Promise<TestResult> {
   const start = Date.now();
+
+  // Hard 15 s ceiling — if fn() doesn't resolve, we mark it failed/timeout.
+  const timeoutPromise = new Promise<{ pass: boolean; detail: string }>(
+    (_, reject) => setTimeout(() => reject(new Error("timeout")), TEST_TIMEOUT_MS)
+  );
+
   try {
-    const { pass, detail } = await fn();
+    const { pass, detail } = await Promise.race([fn(), timeoutPromise]);
     return { name, pass, ms: Date.now() - start, detail };
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const isTimeout = msg === "timeout";
     return {
       name,
       pass: false,
       ms: Date.now() - start,
-      detail: "threw exception",
-      error: err instanceof Error ? err.message : String(err),
+      detail: isTimeout ? "timeout — no response within 15 s" : "threw exception",
+      error: msg,
     };
   }
 }
@@ -54,26 +64,42 @@ export async function GET(req: NextRequest) {
     ...(internalKey ? { "x-lyra-internal-key": internalKey } : {}),
   };
 
-  // ── Chat helper (reads streaming response) ─────────────────────────────────
-  async function chatPost(message: string, timeoutMs = 20000): Promise<string> {
-    const res = await fetch(`${BASE}/api/lyra/chat`, {
-      method: "POST",
-      headers: internalHeaders,
-      body: JSON.stringify({ message, history: [], conversationId: "test-diag", agentId: "lyra-v1" }),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) return `HTTP ${res.status}: ${await res.text().catch(() => "")}`;
-    const reader = res.body?.getReader();
-    if (!reader) return "";
-    let text = "";
-    const dec = new TextDecoder();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      text += dec.decode(value);
-      if (text.length > 8000) break;
+  // ── Chat helper ────────────────────────────────────────────────────────────
+  // Uses an AbortController so cancelling the fetch also cancels the body
+  // stream — without this, reader.read() blocks even after the signal fires.
+  async function chatPost(message: string): Promise<string> {
+    const ac = new AbortController();
+    // Kill both fetch + stream after 12 s (inside the 15 s run() ceiling)
+    const timer = setTimeout(() => ac.abort(), 12_000);
+    try {
+      const res = await fetch(`${BASE}/api/lyra/chat`, {
+        method: "POST",
+        headers: internalHeaders,
+        body: JSON.stringify({ message, history: [], conversationId: "test-diag", agentId: "lyra-v1" }),
+        signal: ac.signal,
+      });
+      if (!res.ok) return `HTTP ${res.status}: ${await res.text().catch(() => "")}`;
+
+      const reader = res.body?.getReader();
+      if (!reader) return "";
+      let text = "";
+      const dec = new TextDecoder();
+      try {
+        while (true) {
+          const { done, value } = await reader.read(); // throws AbortError when ac fires
+          if (done) break;
+          text += dec.decode(value);
+          if (text.length > 6000) break;
+        }
+      } catch {
+        // AbortError or stream error — return whatever we collected so far
+      } finally {
+        reader.cancel().catch(() => {});
+      }
+      return text;
+    } finally {
+      clearTimeout(timer);
     }
-    return text;
   }
 
   const tests: TestResult[] = [];
