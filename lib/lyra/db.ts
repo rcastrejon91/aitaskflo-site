@@ -291,6 +291,16 @@ export function getAuthUserByEmail(email: string): AuthUser | null {
   } catch { return null; }
 }
 
+export function getAuthUserByUsernameOrEmail(login: string): AuthUser | null {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    return db.prepare(
+      "SELECT * FROM auth_users WHERE LOWER(email) = LOWER(?) OR LOWER(name) = LOWER(?)"
+    ).get(login, login) as AuthUser | null;
+  } catch { return null; }
+}
+
 export function getAuthUserById(id: string): AuthUser | null {
   const db = getDb();
   if (!db) return null;

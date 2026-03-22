@@ -42,7 +42,7 @@ function LoginForm() {
       });
 
       if (result?.error) {
-        setError(mode === "login" ? "Invalid email or password" : "Account created but sign-in failed — try logging in");
+        setError(mode === "login" ? "Invalid username/email or password" : "Account created but sign-in failed — try logging in");
         setLoading(false);
         return;
       }
@@ -106,12 +106,14 @@ function LoginForm() {
             )}
 
             <div>
-              <label className="block text-xs text-white/50 mb-1.5">Email</label>
+              <label className="block text-xs text-white/50 mb-1.5">
+                {mode === "login" ? "Email or username" : "Email"}
+              </label>
               <input
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder={mode === "login" ? "you@example.com or username" : "you@example.com"}
                 required
                 className="w-full bg-white/[0.05] border border-white/[0.09] rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-violet-500/50 transition-colors"
               />
