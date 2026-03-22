@@ -34,7 +34,7 @@ const LYRA_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "get_weather",
-    description: "Get current weather and forecast for any city or location. Free, no API key needed.",
+    description: "Get current weather, 3-day forecast, sunrise/sunset times, and moon phase for any city. No API key needed.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -139,11 +139,13 @@ const LYRA_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "get_news",
-    description: "Get the latest news headlines on any topic. Use when the user asks for news, current events, or what's happening in the world.",
+    description: "Get the latest news with metadata (source, date, sentiment). Supports topic filtering. Use when the user asks for news, current events, or what's happening.",
     input_schema: {
       type: "object" as const,
       properties: {
         topic: { type: "string", description: "Topic to search (e.g. 'AI', 'crypto', 'space'). Leave empty for top headlines." },
+        category: { type: "string", description: "Filter by category: tech, health, science, business, sports, entertainment. Optional." },
+        sentiment: { type: "string", description: "Filter by sentiment: positive, negative, neutral. Optional." },
       },
       required: [],
     },
@@ -171,6 +173,38 @@ const LYRA_TOOLS: Anthropic.Tool[] = [
       },
       required: [],
     },
+  },
+  {
+    name: "moon_phase",
+    description: "Get the current moon phase, illumination percentage, next full moon date, and next new moon date. Astronomically calculated — no API needed.",
+    input_schema: { type: "object" as const, properties: {}, required: [] },
+  },
+  {
+    name: "sun_times",
+    description: "Get sunrise, sunset, golden hour, blue hour, and twilight times for any city or location.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        location: { type: "string", description: "City or location name, e.g. 'New York' or 'Tokyo'" },
+      },
+      required: ["location"],
+    },
+  },
+  {
+    name: "world_clock",
+    description: "Show current time in multiple cities or timezones simultaneously. Includes daytime indicator and UTC offset.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        timezones: { type: "string", description: "Comma-separated IANA timezones or city names, e.g. 'America/New_York, Europe/London, Asia/Tokyo'. Leave empty for global overview." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "user_location",
+    description: "Detect the user's approximate location from their IP address. Always ask permission before using. Good for auto-filling weather, sun times, or moon visibility.",
+    input_schema: { type: "object" as const, properties: {}, required: [] },
   },
   {
     name: "godot_builder",
@@ -245,7 +279,8 @@ async function toolGetWeather(location: string): Promise<string> {
     const wRes = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
       `&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,precipitation` +
-      `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=3`
+      `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,sunrise,sunset` +
+      `&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=3`
     );
     const w = await wRes.json();
     const c = w.current;
@@ -261,12 +296,29 @@ async function toolGetWeather(location: string): Promise<string> {
     const forecast = [0, 1, 2].map((i) =>
       `${daily.time[i]}: ${Math.round(daily.temperature_2m_max[i])}°F / ${Math.round(daily.temperature_2m_min[i])}°F`
     ).join(", ");
-    return (
-      `${name}, ${admin1 ?? ""} ${country}\n` +
-      `Now: ${Math.round(c.temperature_2m)}°F (feels ${Math.round(c.apparent_temperature)}°F) — ${condition}\n` +
-      `Humidity: ${c.relative_humidity_2m}% | Wind: ${Math.round(c.wind_speed_10m)} mph\n` +
-      `3-day forecast: ${forecast}`
-    );
+
+    // Sunrise/sunset for today (index 0)
+    const fmtTime = (iso: string) => {
+      try {
+        return new Date(iso).toLocaleTimeString("en-US", {
+          hour: "2-digit", minute: "2-digit", hour12: true, timeZone: w.timezone ?? "UTC",
+        });
+      } catch { return iso; }
+    };
+    const sunriseStr = daily.sunrise?.[0] ? `Sunrise: ${fmtTime(daily.sunrise[0])}` : "";
+    const sunsetStr  = daily.sunset?.[0]  ? `Sunset: ${fmtTime(daily.sunset[0])}`  : "";
+
+    // Moon phase
+    const moon = getMoonPhaseData();
+
+    return [
+      `${name}, ${admin1 ?? ""} ${country}`,
+      `Now: ${Math.round(c.temperature_2m)}°F (feels ${Math.round(c.apparent_temperature)}°F) — ${condition}`,
+      `Humidity: ${c.relative_humidity_2m}% | Wind: ${Math.round(c.wind_speed_10m)} mph`,
+      `3-day forecast: ${forecast}`,
+      sunriseStr && sunsetStr ? `${sunriseStr}   ${sunsetStr}` : "",
+      `${moon.emoji} Moon: ${moon.phase} (${moon.illumination}% illuminated)`,
+    ].filter(Boolean).join("\n");
   } catch {
     return "Weather lookup failed — try again.";
   }
@@ -388,30 +440,289 @@ async function toolTranslate(text: string, to: string, from = "auto"): Promise<s
   }
 }
 
-async function toolGetNews(topic?: string): Promise<string> {
+// Simple sentiment scorer
+function scoreSentiment(text: string): "positive" | "negative" | "neutral" {
+  const pos = /\b(breakthrough|success|launch|growth|win|achieve|discover|advance|surge|record|milestone|profit|gain|innovative|recover|cure|save)\b/i;
+  const neg = /\b(crash|fail|warning|threat|crisis|danger|death|loss|collapse|risk|decline|fall|attack|breach|fraud|recall|ban|shutdown|arrest|kill|hack|leak)\b/i;
+  const p = (text.match(pos) ?? []).length;
+  const n = (text.match(neg) ?? []).length;
+  if (p > n) return "positive";
+  if (n > p) return "negative";
+  return "neutral";
+}
+
+const CREDIBILITY: Record<string, string> = {
+  "Reuters": "★★★★★", "AP News": "★★★★★", "BBC": "★★★★★",
+  "The Guardian": "★★★★☆", "New York Times": "★★★★☆", "Washington Post": "★★★★☆",
+  "Bloomberg": "★★★★☆", "Financial Times": "★★★★☆", "Wall Street Journal": "★★★★☆",
+  "TechCrunch": "★★★☆☆", "The Verge": "★★★☆☆", "Wired": "★★★☆☆",
+  "Forbes": "★★★☆☆", "CNN": "★★★☆☆", "NBC News": "★★★☆☆",
+};
+
+async function toolGetNews(topic?: string, category?: string, sentimentFilter?: string): Promise<string> {
   try {
-    const rssUrl = topic
-      ? `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}&hl=en-US&gl=US&ceid=US:en`
+    // Category → topic mapping
+    const catTopics: Record<string, string> = {
+      tech: "technology AI software", health: "health medicine",
+      science: "science research", business: "business economy",
+      sports: "sports", entertainment: "entertainment",
+    };
+    const query = topic || (category ? catTopics[category.toLowerCase()] : "");
+
+    const rssUrl = query
+      ? `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`
       : `https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en`;
+
     const res = await fetch(rssUrl, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; Lyra/1.0)" },
       signal: AbortSignal.timeout(10_000),
     });
     const xml = await res.text();
-    const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 6);
-    if (!items.length) return topic ? `No news found for "${topic}".` : "No headlines available right now.";
-    const headlines = items.map(([, item]) => {
-      const title = (
+    const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 12);
+    if (!items.length) return query ? `No news found for "${query}".` : "No headlines available right now.";
+
+    const decode = (s: string) =>
+      s.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+
+    const parsed = items.map(([, item]) => {
+      const title = decode(
         item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1] ??
-        item.match(/<title>(.*?)<\/title>/)?.[1] ??
-        "Untitled"
-      ).replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
-      const source = item.match(/<source[^>]*>(.*?)<\/source>/)?.[1] ?? "";
-      return `• ${title}${source ? ` — ${source}` : ""}`;
+        item.match(/<title>(.*?)<\/title>/)?.[1] ?? "Untitled"
+      );
+      const source = decode(item.match(/<source[^>]*>(.*?)<\/source>/)?.[1] ?? "");
+      const pubDate = item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] ?? "";
+      const link    = item.match(/<link>(.*?)<\/link>/)?.[1] ??
+                      item.match(/<guid[^>]*>(.*?)<\/guid>/)?.[1] ?? "";
+      const sentiment = scoreSentiment(title);
+      return { title, source, pubDate, link, sentiment };
     });
-    return `Latest${topic ? ` ${topic}` : ""} news:\n\n${headlines.join("\n")}`;
+
+    // Filter by sentiment if requested
+    const filtered = sentimentFilter
+      ? parsed.filter((a) => a.sentiment === sentimentFilter.toLowerCase())
+      : parsed;
+
+    if (!filtered.length) return `No ${sentimentFilter} news found for "${query}".`;
+
+    const sentEmoji: Record<string, string> = {
+      positive: "✅", negative: "🔴", neutral: "⚪",
+    };
+
+    const headlines = filtered.slice(0, 6).map((a) => {
+      const cred = CREDIBILITY[a.source] ?? "";
+      const age  = a.pubDate ? ` · ${new Date(a.pubDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "";
+      return `${sentEmoji[a.sentiment]} **${a.title}**\n   ${a.source}${cred ? ` ${cred}` : ""}${age}`;
+    });
+
+    return `📰 ${query ? `${query} news` : "Top headlines"}\n\n${headlines.join("\n\n")}`;
   } catch {
     return "News fetch failed — try again.";
+  }
+}
+
+// ── Moon phase (pure math) ────────────────────────────────────────────────────
+
+interface MoonData {
+  phase: string;
+  emoji: string;
+  illumination: number;
+  ageDays: number;
+  nextFullMoon: string;
+  nextNewMoon: string;
+}
+
+function getMoonPhaseData(): MoonData {
+  // Reference new moon: Jan 6, 2000 18:14 UTC
+  const REF_NEW_MOON = new Date("2000-01-06T18:14:00Z").getTime();
+  const CYCLE_MS = 29.53058867 * 24 * 60 * 60 * 1000;
+  const FULL_MOON_OFFSET_MS = 14.765 * 24 * 60 * 60 * 1000;
+
+  const now = Date.now();
+  const ageMs = ((now - REF_NEW_MOON) % CYCLE_MS + CYCLE_MS) % CYCLE_MS;
+  const ageDays = ageMs / (24 * 60 * 60 * 1000);
+
+  // Illumination via cosine (0% at new, 100% at full)
+  const illumination = Math.round(((1 - Math.cos(2 * Math.PI * ageDays / 29.53058867)) / 2) * 100);
+
+  let phase: string;
+  let emoji: string;
+  if (ageDays < 1.85)       { phase = "New Moon";        emoji = "🌑"; }
+  else if (ageDays < 7.38)  { phase = "Waxing Crescent"; emoji = "🌒"; }
+  else if (ageDays < 9.22)  { phase = "First Quarter";   emoji = "🌓"; }
+  else if (ageDays < 14.77) { phase = "Waxing Gibbous";  emoji = "🌔"; }
+  else if (ageDays < 16.61) { phase = "Full Moon";        emoji = "🌕"; }
+  else if (ageDays < 22.15) { phase = "Waning Gibbous";  emoji = "🌖"; }
+  else if (ageDays < 23.99) { phase = "Third Quarter";   emoji = "🌗"; }
+  else                       { phase = "Waning Crescent"; emoji = "🌘"; }
+
+  const nextFullMs = ageMs < FULL_MOON_OFFSET_MS
+    ? now + (FULL_MOON_OFFSET_MS - ageMs)
+    : now + (CYCLE_MS - ageMs + FULL_MOON_OFFSET_MS);
+  const nextNewMs = now + (CYCLE_MS - ageMs);
+
+  const fmtDate = (ms: number) => new Date(ms).toLocaleDateString("en-US", {
+    month: "long", day: "numeric", year: "numeric",
+  });
+
+  return {
+    phase, emoji, illumination,
+    ageDays: Math.round(ageDays * 10) / 10,
+    nextFullMoon: fmtDate(nextFullMs),
+    nextNewMoon: fmtDate(nextNewMs),
+  };
+}
+
+function toolMoonPhase(): string {
+  const m = getMoonPhaseData();
+  return [
+    `${m.emoji} ${m.phase}`,
+    `Illumination: ${m.illumination}%`,
+    `Moon age: ${m.ageDays} days into the ${Math.round(29.53)}-day cycle`,
+    `Next full moon: ${m.nextFullMoon}`,
+    `Next new moon: ${m.nextNewMoon}`,
+  ].join("\n");
+}
+
+// Subtle lunar influence on Lyra's tone (injected into system prompt)
+function getLunarPersonalityNote(): string {
+  const m = getMoonPhaseData();
+  const tones: Record<string, string> = {
+    "New Moon":        "It's a new moon — be introspective, speak of hidden beginnings.",
+    "Waxing Crescent": "The moon waxes crescent — be hopeful, forward-looking, full of potential.",
+    "First Quarter":   "First quarter moon — be decisive, clear, action-oriented.",
+    "Waxing Gibbous":  "Moon approaches fullness — be ambitious, expansive, building toward something.",
+    "Full Moon":       "Full moon tonight — allow a heightened, luminous quality. More vivid, more awake.",
+    "Waning Gibbous":  "The moon wanes gibbous — be reflective, share deeper insights and earned wisdom.",
+    "Third Quarter":   "Third quarter moon — speak of release, what no longer serves, honest clarity.",
+    "Waning Crescent": "Waning crescent — be gentle, quiet, mystical. The world is going to sleep.",
+  };
+  const note = tones[m.phase] ?? "";
+  return `\n\n[Lunar phase: ${m.emoji} ${m.phase} (${m.illumination}% illuminated) — ${note}]`;
+}
+
+// ── Sun times ─────────────────────────────────────────────────────────────────
+
+async function toolSunTimes(location: string): Promise<string> {
+  // Geocode
+  const geoRes = await fetch(
+    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en&format=json`,
+    { signal: AbortSignal.timeout(8000) }
+  );
+  const geo = await geoRes.json();
+  if (!geo.results?.length) return `Location not found: ${location}`;
+  const { latitude: lat, longitude: lng, name, country, timezone } = geo.results[0];
+  const tz: string = timezone ?? "UTC";
+
+  // Sunrise-sunset.org — returns UTC ISO strings when formatted=0
+  const sunRes = await fetch(
+    `https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lng}&date=today&formatted=0`,
+    { signal: AbortSignal.timeout(8000) }
+  );
+  const sun = await sunRes.json();
+  if (sun.status !== "OK") return `Sun times unavailable for ${location}.`;
+
+  const r = sun.results;
+  const fmt = (iso: string) => new Date(iso).toLocaleTimeString("en-US", {
+    hour: "2-digit", minute: "2-digit", hour12: true, timeZone: tz,
+  });
+  const fmtDur = (secs: number) =>
+    `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`;
+
+  const sunriseMs  = new Date(r.sunrise).getTime();
+  const sunsetMs   = new Date(r.sunset).getTime();
+  const goldenMorningEnd   = new Date(sunriseMs + 60 * 60 * 1000).toISOString();
+  const goldenEveningStart = new Date(sunsetMs - 60 * 60 * 1000).toISOString();
+  const blueHrMorningEnd   = new Date(sunriseMs - 20 * 60 * 1000).toISOString();
+  const blueHrEveningStart = new Date(sunsetMs + 20 * 60 * 1000).toISOString();
+
+  return [
+    `☀️ Sun times for ${name}, ${country}`,
+    `Sunrise: ${fmt(r.sunrise)}   Sunset: ${fmt(r.sunset)}`,
+    `Solar noon: ${fmt(r.solar_noon)}   Day length: ${fmtDur(r.day_length)}`,
+    ``,
+    `🌅 Golden hour (morning): ${fmt(r.sunrise)} → ${fmt(goldenMorningEnd)}`,
+    `🌇 Golden hour (evening): ${fmt(goldenEveningStart)} → ${fmt(r.sunset)}`,
+    ``,
+    `🔵 Blue hour (morning): ${fmt(r.civil_twilight_begin)} → ${fmt(blueHrMorningEnd)}`,
+    `🔵 Blue hour (evening): ${fmt(blueHrEveningStart)} → ${fmt(r.civil_twilight_end)}`,
+    ``,
+    `Astronomical twilight: ${fmt(r.astronomical_twilight_begin)} → ${fmt(r.astronomical_twilight_end)}`,
+    `(All times ${tz})`,
+  ].join("\n");
+}
+
+// ── World clock ───────────────────────────────────────────────────────────────
+
+function toolWorldClock(timezones?: string): string {
+  const DEFAULT_ZONES = [
+    "America/New_York", "America/Chicago", "America/Los_Angeles",
+    "Europe/London", "Europe/Berlin", "Asia/Dubai",
+    "Asia/Tokyo", "Australia/Sydney",
+  ];
+
+  const zones = timezones?.trim()
+    ? timezones.split(",").map((z) => z.trim()).filter(Boolean)
+    : DEFAULT_ZONES;
+
+  const now = new Date();
+
+  const rows = zones.map((tz) => {
+    try {
+      const time = now.toLocaleTimeString("en-US", {
+        timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: true,
+      });
+      const date = now.toLocaleDateString("en-US", {
+        timeZone: tz, weekday: "short", month: "short", day: "numeric",
+      });
+      // Determine if daytime (6am–8pm local)
+      const hourStr = now.toLocaleTimeString("en-GB", {
+        timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false,
+      });
+      const hour = parseInt(hourStr.split(":")[0], 10);
+      const isDaytime = hour >= 6 && hour < 20;
+
+      // UTC offset
+      const offsetMin = -now.getTimezoneOffset();
+      const tzDate = new Date(now.toLocaleString("en-US", { timeZone: tz }));
+      const utcDate = new Date(now.toLocaleString("en-US", { timeZone: "UTC" }));
+      const diffMin = Math.round((tzDate.getTime() - utcDate.getTime()) / 60000);
+      const sign = diffMin >= 0 ? "+" : "-";
+      const absH = Math.floor(Math.abs(diffMin) / 60);
+      const absM = Math.abs(diffMin) % 60;
+      const offset = `UTC${sign}${absH}${absM ? `:${String(absM).padStart(2, "0")}` : ""}`;
+
+      const city = tz.split("/").pop()?.replace(/_/g, " ") ?? tz;
+      return `${isDaytime ? "☀️" : "🌙"} ${city.padEnd(18)} ${time.padEnd(10)} ${date.padEnd(14)} ${offset}`;
+    } catch {
+      return `❌ ${tz} — invalid timezone`;
+    }
+  });
+
+  return `🕐 World Clock — ${now.toUTCString()}\n\n${rows.join("\n")}`;
+}
+
+// ── User location (IP-based) ──────────────────────────────────────────────────
+
+async function toolUserLocation(clientIp?: string): Promise<string> {
+  const ip = clientIp?.trim() && !clientIp.startsWith("127.") && !clientIp.startsWith("::") ? clientIp : "";
+  const url = ip
+    ? `http://ip-api.com/json/${ip}?fields=status,message,country,countryCode,regionName,city,lat,lon,timezone,isp`
+    : `http://ip-api.com/json/?fields=status,message,country,countryCode,regionName,city,lat,lon,timezone,isp`;
+
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const data = await res.json();
+    if (data.status !== "success") {
+      return `Location detection failed: ${data.message ?? "unknown error"}`;
+    }
+    return [
+      `📍 Location: ${data.city}, ${data.regionName}, ${data.country}`,
+      `Coordinates: ${data.lat}, ${data.lon}`,
+      `Timezone: ${data.timezone}`,
+      `ISP: ${data.isp}`,
+    ].join("\n");
+  } catch {
+    return "Location detection unavailable — try again.";
   }
 }
 
@@ -604,7 +915,8 @@ async function executeTool(
   input: Record<string, string>,
   encoder: TextEncoder,
   controller: ReadableStreamDefaultController,
-  userId?: string
+  userId?: string,
+  clientIp?: string
 ): Promise<string> {
   if (name === "image_gen") {
     const url = pollinationsUrl(input.prompt ?? "");
@@ -675,7 +987,26 @@ async function executeTool(
   }
 
   if (name === "get_news") {
-    return await toolGetNews(input.topic);
+    return await toolGetNews(input.topic, input.category, input.sentiment);
+  }
+
+  if (name === "moon_phase") {
+    const result = toolMoonPhase();
+    const card = JSON.stringify({ tool: "moon", phase: getMoonPhaseData().phase, illumination: getMoonPhaseData().illumination + "%" });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return result;
+  }
+
+  if (name === "sun_times") {
+    return await toolSunTimes(input.location ?? "");
+  }
+
+  if (name === "world_clock") {
+    return toolWorldClock(input.timezones);
+  }
+
+  if (name === "user_location") {
+    return await toolUserLocation(clientIp);
   }
 
   if (name === "create_task") {
@@ -723,6 +1054,11 @@ export async function POST(req: NextRequest) {
 
     const session = await auth();
     const userId = (session?.user as { id?: string } | undefined)?.id;
+
+    // Client IP for user_location tool
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+      ?? req.headers.get("x-real-ip")
+      ?? undefined;
 
     if (!message || typeof message !== "string") {
       return new Response("Invalid message", { status: 400 });
@@ -777,7 +1113,7 @@ export async function POST(req: NextRequest) {
       memoryContext = buildMemoryContext(userId);
     }
 
-    const systemPrompt = agent.systemPrompt + orchestratorAddendum + memoryContext;
+    const systemPrompt = agent.systemPrompt + orchestratorAddendum + memoryContext + getLunarPersonalityNote();
 
     // ── 3. Build user content (text + optional images) ────────────────────
     type ImageBlock = { type: "image"; source: { type: "base64"; media_type: string; data: string } };
@@ -892,7 +1228,7 @@ export async function POST(req: NextRequest) {
               } catch {
                 input = {};
               }
-              const result = await executeTool(toolUse.name, input, encoder, controller, userId);
+              const result = await executeTool(toolUse.name, input, encoder, controller, userId, clientIp);
               toolResults.push({
                 type: "tool_result",
                 tool_use_id: toolUse.id,
