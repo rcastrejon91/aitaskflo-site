@@ -6,6 +6,7 @@ import fsp from "fs/promises";
 import nodePath from "path";
 import { getActiveAgent, getAgent, incrementConversationCount } from "@/lib/lyra/agents";
 import { upsertUser, upsertCrmContact, searchCrmContacts, buildMemoryContext, createTask, listTasks } from "@/lib/lyra/db";
+import { buildLearningContext } from "@/lib/lyra/weblearner";
 import { auth } from "@/auth";
 
 const execAsync = promisify(_exec);
@@ -1109,7 +1110,7 @@ export async function POST(req: NextRequest) {
       memoryContext = buildMemoryContext(userId);
     }
 
-    const systemPrompt = agent.systemPrompt + orchestratorAddendum + memoryContext + getLunarPersonalityNote();
+    const systemPrompt = agent.systemPrompt + orchestratorAddendum + memoryContext + buildLearningContext() + getLunarPersonalityNote();
 
     // ── 3. Build user content (text + optional images) ────────────────────
     type ImageBlock = { type: "image"; source: { type: "base64"; media_type: string; data: string } };

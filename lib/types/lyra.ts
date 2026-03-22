@@ -1,4 +1,4 @@
-export type MemoryType = "personal" | "shared";
+export type MemoryType = "personal" | "shared" | "learned";
 export type MemoryImportance = "low" | "medium" | "high" | "critical";
 
 export interface Memory {
@@ -13,6 +13,7 @@ export interface Memory {
   agentId: string;
   sourceConversationId?: string;
   userId?: string;
+  source?: string;
 }
 
 export interface Reflection {
@@ -50,8 +51,21 @@ export interface LyraState {
   totalConversations: number;
   totalReflections: number;
   totalEvolutions: number;
+  totalLearnings: number;
   createdAt: string;
   lastUpdatedAt: string;
+}
+
+export interface LearningEntry {
+  id: string;
+  topic: string;
+  source: string;
+  url: string;
+  insights: string[];
+  surprise: string;
+  relevanceNote: string;
+  learnedAt: string;
+  agentId: string;
 }
 
 export interface LineageNode {
