@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 
-const DATA_DIR = process.env.DATA_DIR ?? "/home/aitaskflo/data";
+const DATA_DIR = process.env.DATA_DIR ?? /* turbopackIgnore */ "/home/aitaskflo/data";
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) {
