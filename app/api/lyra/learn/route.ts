@@ -14,7 +14,15 @@ const DEFAULT_TOPICS = [
   "future of work and automation",
 ];
 
+function isAuthorized(req: NextRequest): boolean {
+  const adminKey = process.env.ADMIN_PASSWORD ?? process.env.ADMIN_KEY;
+  if (!adminKey) return true;
+  const provided = req.headers.get("x-admin-key") ?? req.nextUrl.searchParams.get("key");
+  return provided === adminKey;
+}
+
 export async function POST(req: NextRequest) {
+  if (!isAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const body = await req.json().catch(() => ({}));
     const topics: string[] = Array.isArray(body.topics) && body.topics.length
@@ -44,6 +52,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  if (!isAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const limit = parseInt(req.nextUrl.searchParams.get("limit") ?? "20");
   const all = req.nextUrl.searchParams.get("all") === "true";
 
