@@ -221,98 +221,63 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
     <div className="flex flex-col text-white" style={{ height: "100dvh", background: "#09090f" }}>
 
       {/* ── Top bar ─────────────────────────────────────────────── */}
-      <header className="flex items-center gap-3 px-4 h-14 flex-shrink-0 backdrop-blur-xl" style={{ background: "rgba(0,0,0,0.6)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-        <Link href="/" className="transition-colors mr-1" style={{ color: "rgba(255,255,255,0.2)" }}
+      <header className="flex items-center gap-3 px-4 h-12 flex-shrink-0" style={{ background: "rgba(0,0,0,0.5)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+        <Link href="/" className="transition-colors" style={{ color: "rgba(255,255,255,0.2)" }}
           onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.6)")}
           onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.2)")}
         >
           <ArrowLeft className="w-4 h-4" />
         </Link>
 
-        {/* Brand */}
-        <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 2px 12px rgba(109,40,217,0.35)" }}>
-          <Sparkles className="w-3.5 h-3.5 text-white" />
-        </div>
+        {/* Agent name — shown once, cleanly */}
+        <span className="text-sm font-medium text-white/70 truncate">{activeAgent.name}</span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded font-mono flex-shrink-0" style={{ color: "rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.05)" }}>
+          gen {activeAgent.generation}
+        </span>
 
-        {/* Agent name + gen badge */}
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="font-semibold text-sm text-white truncate">{activeAgent.name}</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium flex-shrink-0" style={{ background: "rgba(109,40,217,0.15)", color: "rgb(196,181,253)", border: "1px solid rgba(109,40,217,0.25)" }}>
-            Gen {activeAgent.generation}
-          </span>
-        </div>
-
-        {/* Stats (desktop) */}
-        <div className="hidden md:flex items-center gap-4 ml-3">
-          <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.22)" }}>
-            {data.stats.totalReflections} reflections
-          </span>
-          {activeAgent.averageScore > 0 && (
-            <span className="text-[11px] font-medium" style={{ color: activeAgent.averageScore >= 8 ? "rgb(110,231,183)" : activeAgent.averageScore >= 5 ? "rgb(196,181,253)" : "rgb(252,165,165)" }}>
-              ★ {activeAgent.averageScore.toFixed(1)}
-            </span>
+        {/* Evolution ready — small inline chip instead of a banner */}
+        <AnimatePresence>
+          {evolutionReady && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="flex items-center gap-1.5"
+            >
+              <button
+                onClick={triggerEvolution}
+                disabled={evolving}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all disabled:opacity-40"
+                style={{ background: "rgba(109,40,217,0.15)", border: "1px solid rgba(109,40,217,0.3)", color: "rgb(196,181,253)" }}
+              >
+                {evolving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                {evolving ? "Evolving…" : "Evolve"}
+              </button>
+              <button onClick={() => setEvolutionReady(false)} style={{ color: "rgba(255,255,255,0.25)" }}>
+                <X className="w-3 h-3" />
+              </button>
+            </motion.div>
           )}
-        </div>
+        </AnimatePresence>
 
         <div className="ml-auto flex items-center gap-2">
-          {messages.length >= 2 && (
-            <button
-              onClick={endConversationAndReflect}
-              disabled={isLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-all disabled:opacity-40"
-              style={{ background: "rgba(161,98,7,0.1)", border: "1px solid rgba(161,98,7,0.25)", color: "rgb(252,211,77)" }}
-            >
-              <Lightbulb className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Reflect</span>
-            </button>
+          {activeAgent.averageScore > 0 && (
+            <span className="text-[11px] hidden md:block" style={{ color: "rgba(255,255,255,0.2)" }}>
+              ★ {activeAgent.averageScore.toFixed(1)}
+            </span>
           )}
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="p-1.5 transition-colors"
-            style={{ color: "rgba(255,255,255,0.22)" }}
+            style={{ color: "rgba(255,255,255,0.2)" }}
             title="Sign out"
             onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.6)")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.22)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.2)")}
           >
             <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
       </header>
-
-      {/* ── Evolution banner ─────────────────────────────────────── */}
-      <AnimatePresence>
-        {evolutionReady && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden flex-shrink-0"
-          >
-            <div className="flex items-center gap-3 px-4 py-2.5 text-sm" style={{ background: "linear-gradient(to right, rgba(109,40,217,0.35), rgba(134,25,143,0.35))", borderBottom: "1px solid rgba(109,40,217,0.2)" }}>
-              <Zap className="w-4 h-4 flex-shrink-0" style={{ color: "rgb(196,181,253)" }} />
-              <span className="flex-1" style={{ color: "rgba(255,255,255,0.6)" }}>
-                <span className="font-medium" style={{ color: "rgb(196,181,253)" }}>Ready to evolve.</span>
-                {" "}Create an improved Lyra successor?
-              </span>
-              <button
-                onClick={triggerEvolution}
-                disabled={evolving}
-                className="flex items-center gap-1.5 px-3 py-1 text-white text-xs rounded-lg transition-all disabled:opacity-40"
-                style={{ background: "rgba(109,40,217,0.85)" }}
-              >
-                {evolving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
-                {evolving ? "Evolving…" : "Evolve"}
-              </button>
-              <button onClick={() => setEvolutionReady(false)} style={{ color: "rgba(255,255,255,0.3)" }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.7)")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.3)")}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* ── Body ─────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden min-h-0">
@@ -486,8 +451,27 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
               );
             })}
           </div>
-          <div className="flex-1 overflow-hidden p-3">
-            {rightPanel === "reflection" && <ReflectionLog reflections={data.reflections} agentId={activeAgent.id} />}
+          <div className="flex-1 overflow-hidden p-3 flex flex-col gap-2">
+            {rightPanel === "reflection" && (
+              <>
+                {messages.length >= 2 && (
+                  <button
+                    onClick={endConversationAndReflect}
+                    disabled={isLoading}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium transition-all disabled:opacity-40 flex-shrink-0"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.8)"; (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.15)"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.5)"; (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.08)"; }}
+                  >
+                    {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Lightbulb className="w-3 h-3" />}
+                    Reflect on this conversation
+                  </button>
+                )}
+                <div className="flex-1 overflow-hidden">
+                  <ReflectionLog reflections={data.reflections} agentId={activeAgent.id} />
+                </div>
+              </>
+            )}
             {rightPanel === "lineage" && (
               <div className="overflow-y-auto h-full space-y-3">
                 <LineageGraph graph={data.lineage} activeAgentId={activeAgent.id} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} />
@@ -559,8 +543,25 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="flex-1 overflow-hidden p-3">
-                {rightPanel === "reflection" && <ReflectionLog reflections={data.reflections} agentId={activeAgent.id} />}
+              <div className="flex-1 overflow-hidden p-3 flex flex-col gap-2">
+                {rightPanel === "reflection" && (
+                  <>
+                    {messages.length >= 2 && (
+                      <button
+                        onClick={() => { setMobileRightOpen(false); endConversationAndReflect(); }}
+                        disabled={isLoading}
+                        className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium transition-all disabled:opacity-40 flex-shrink-0"
+                        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" }}
+                      >
+                        {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Lightbulb className="w-3 h-3" />}
+                        Reflect on this conversation
+                      </button>
+                    )}
+                    <div className="flex-1 overflow-hidden">
+                      <ReflectionLog reflections={data.reflections} agentId={activeAgent.id} />
+                    </div>
+                  </>
+                )}
                 {rightPanel === "lineage" && <LineageGraph graph={data.lineage} activeAgentId={activeAgent.id} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} />}
               </div>
             </motion.div>
