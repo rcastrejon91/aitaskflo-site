@@ -359,7 +359,7 @@ async function toolSearchWeb(query: string): Promise<string> {
   try {
     const res = await fetch(
       `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`,
-      { headers: { "User-Agent": "Lyra/1.0" } }
+      { headers: { "User-Agent": "Lyra/1.0" }, signal: AbortSignal.timeout(6_000) }
     );
     const data = await res.json();
     const parts: string[] = [];

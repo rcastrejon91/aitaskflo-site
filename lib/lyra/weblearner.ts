@@ -29,20 +29,20 @@ async function fetchWikipedia(topic: string): Promise<ArticleResult | null> {
   try {
     const search = await fetch(
       `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic.replace(/\s+/g, "_"))}`,
-      { headers: { "User-Agent": "Lyra/1.0 (aitaskflo.com)" }, signal: AbortSignal.timeout(8_000) }
+      { headers: { "User-Agent": "Lyra/1.0 (aitaskflo.com)" }, signal: AbortSignal.timeout(5_000) }
     );
     if (!search.ok) {
       // Try search API to find best matching article
       const res = await fetch(
         `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(topic)}&utf8=&format=json&srlimit=1`,
-        { signal: AbortSignal.timeout(8_000) }
+        { signal: AbortSignal.timeout(5_000) }
       );
       const data = await res.json();
       const title = data?.query?.search?.[0]?.title;
       if (!title) return null;
       const page = await fetch(
         `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`,
-        { signal: AbortSignal.timeout(8_000) }
+        { signal: AbortSignal.timeout(5_000) }
       );
       if (!page.ok) return null;
       const json = await page.json();
@@ -70,7 +70,7 @@ async function fetchDuckDuckGo(topic: string): Promise<ArticleResult | null> {
   try {
     const res = await fetch(
       `https://api.duckduckgo.com/?q=${encodeURIComponent(topic)}&format=json&no_html=1&skip_disambig=1`,
-      { headers: { "User-Agent": "Lyra/1.0" }, signal: AbortSignal.timeout(8_000) }
+      { headers: { "User-Agent": "Lyra/1.0" }, signal: AbortSignal.timeout(5_000) }
     );
     const data = await res.json();
     const parts: string[] = [];
@@ -98,9 +98,11 @@ async function fetchDuckDuckGo(topic: string): Promise<ArticleResult | null> {
 }
 
 async function fetchArticle(topic: string): Promise<ArticleResult | null> {
-  const wiki = await fetchWikipedia(topic);
+  // Race Wikipedia and DuckDuckGo in parallel — take whichever has useful content first
+  const [wiki, ddg] = await Promise.all([fetchWikipedia(topic), fetchDuckDuckGo(topic)]);
   if (wiki && wiki.text.length > 100) return wiki;
-  return fetchDuckDuckGo(topic);
+  if (ddg && ddg.text.length > 50) return ddg;
+  return null;
 }
 
 export async function learnAboutTopic(topic: string, agentId: string): Promise<LearningEntry | null> {
@@ -179,16 +181,13 @@ Return ONLY valid JSON (no markdown):
 }
 
 export async function learnFromTopics(topics: string[], agentId: string): Promise<LearningEntry[]> {
-  const results: LearningEntry[] = [];
-  for (const topic of topics.slice(0, 5)) {
-    try {
-      const entry = await learnAboutTopic(topic, agentId);
-      if (entry) results.push(entry);
-    } catch {
-      // skip failed topics
-    }
-  }
-  return results;
+  // Run all topics in parallel instead of sequentially
+  const settled = await Promise.allSettled(
+    topics.slice(0, 5).map((topic) => learnAboutTopic(topic, agentId))
+  );
+  return settled
+    .filter((r): r is PromiseFulfilledResult<LearningEntry> => r.status === "fulfilled" && r.value !== null)
+    .map((r) => r.value);
 }
 
 export function buildLearningContext(limit = 6): string {
