@@ -340,31 +340,29 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
             {selectedAgentId && (() => {
               const agent = data.agents.find((a) => a.id === selectedAgentId);
               if (!agent) return null;
+              const notes = agent.evolutionNotes ?? "";
+              const shortNotes = notes.length > 120 ? notes.slice(0, 120).trimEnd() + "…" : notes;
               return (
-                <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 space-y-2">
+                <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold">{agent.name}</span>
+                    <div>
+                      <span className="text-xs font-semibold text-white/80">{agent.name}</span>
+                      <span className="text-[10px] text-white/30 ml-2">Gen {agent.generation}</span>
+                    </div>
                     {agent.id !== activeAgent.id && (
-                      <button
-                        onClick={() => switchAgent(agent.id)}
-                        className="text-[11px] text-violet-400 hover:text-violet-300 transition"
-                      >
+                      <button onClick={() => switchAgent(agent.id)} className="text-[10px] text-violet-400 hover:text-violet-300 transition">
                         Switch →
                       </button>
                     )}
                   </div>
-                  <div className="space-y-0.5 text-[11px] text-white/45">
-                    <div>Gen {agent.generation} · {agent.reflectionCount} reflections</div>
-                    <div>{agent.conversationCount} conversations</div>
-                    {agent.averageScore > 0 && (
-                      <div className="text-violet-400">Avg {agent.averageScore.toFixed(1)}/10</div>
-                    )}
-                    {agent.evolutionNotes && (
-                      <div className="mt-1.5 italic leading-relaxed" style={{ color: "#a0a0a0", lineHeight: 1.6 }}>
-                        &ldquo;{agent.evolutionNotes}&rdquo;
-                      </div>
-                    )}
+                  <div className="flex gap-3 text-[10px] text-white/35">
+                    <span>{agent.reflectionCount} reflections</span>
+                    <span>{agent.conversationCount} convos</span>
+                    {agent.averageScore > 0 && <span className="text-violet-400">{agent.averageScore.toFixed(1)}/10</span>}
                   </div>
+                  {shortNotes && (
+                    <p className="text-[10px] italic text-white/30 leading-relaxed">{shortNotes}</p>
+                  )}
                 </div>
               );
             })()}
