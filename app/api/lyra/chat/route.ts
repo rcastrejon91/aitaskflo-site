@@ -1240,28 +1240,26 @@ export async function POST(req: NextRequest) {
             ];
           }
         } catch (err) {
+          const safeEnqueue = (msg: string) => { try { controller.enqueue(encoder.encode(msg)); } catch { /* stream closed */ } };
           if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
             // API key invalid / no model access → fall back to Groq
             try {
               await streamGroqFallback(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller);
             } catch {
-              controller.enqueue(encoder.encode("⚠️ AI service unavailable. Please try again."));
+              safeEnqueue("⚠️ AI service unavailable. Please try again.");
             }
           } else if (err instanceof Anthropic.RateLimitError) {
-            controller.enqueue(encoder.encode("⚠️ Rate limited — please wait a moment and try again."));
+            safeEnqueue("⚠️ Rate limited — please wait a moment and try again.");
           } else if (err instanceof Anthropic.BadRequestError) {
-            // 400: log the actual message so it's visible in server logs
             const msg = (err as { message?: string }).message ?? "Bad request";
             console.error("[Lyra] Anthropic 400 BadRequest:", msg, err.error);
-            controller.enqueue(encoder.encode(`⚠️ Request error: ${msg}`));
+            safeEnqueue(`⚠️ Request error: ${msg}`);
           } else {
-            // Unknown error — log it fully (not as [Object]) and stream a message
             const msg = err instanceof Error ? err.message : String(err);
             console.error("[Lyra] Unexpected API error:", err);
-            controller.enqueue(encoder.encode(`⚠️ Something went wrong: ${msg}`));
+            safeEnqueue(`⚠️ Something went wrong: ${msg}`);
           }
         } finally {
-          // Always try to close — close() throws if already errored, swallow that
           try { controller.close(); } catch { /* already closed */ }
         }
       },
