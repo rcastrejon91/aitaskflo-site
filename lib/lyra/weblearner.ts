@@ -17,67 +17,95 @@ export function getRecentLearnings(limit = 10): LearningEntry[] {
     .slice(0, limit);
 }
 
-async function fetchPageText(url: string): Promise<string> {
-  try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; Lyra/1.0)" },
-      signal: AbortSignal.timeout(12_000),
-    });
-    if (!res.ok) return "";
-    const html = await res.text();
-    return html
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[\s\S]*?<\/style>/gi, "")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 5000);
-  } catch {
-    return "";
-  }
-}
-
-interface RssItem {
+interface ArticleResult {
   title: string;
   url: string;
   source: string;
+  text: string;
 }
 
-async function searchTopicRss(topic: string): Promise<RssItem[]> {
+// Wikipedia API — returns clean article summaries directly, no scraping needed
+async function fetchWikipedia(topic: string): Promise<ArticleResult | null> {
   try {
-    const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}&hl=en-US&gl=US&ceid=US:en`;
-    const res = await fetch(rssUrl, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; Lyra/1.0)" },
-      signal: AbortSignal.timeout(10_000),
-    });
-    const xml = await res.text();
-    const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 5);
-    const decode = (s: string) =>
-      s.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
-
-    return items.map(([, item]) => {
-      const title = decode(
-        item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1] ??
-        item.match(/<title>(.*?)<\/title>/)?.[1] ?? "Untitled"
+    const search = await fetch(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic.replace(/\s+/g, "_"))}`,
+      { headers: { "User-Agent": "Lyra/1.0 (aitaskflo.com)" }, signal: AbortSignal.timeout(8_000) }
+    );
+    if (!search.ok) {
+      // Try search API to find best matching article
+      const res = await fetch(
+        `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(topic)}&utf8=&format=json&srlimit=1`,
+        { signal: AbortSignal.timeout(8_000) }
       );
-      const url =
-        item.match(/<link>(.*?)<\/link>/)?.[1] ??
-        item.match(/<guid[^>]*>(.*?)<\/guid>/)?.[1] ?? "";
-      const source = decode(item.match(/<source[^>]*>(.*?)<\/source>/)?.[1] ?? "Unknown");
-      return { title, url, source };
-    }).filter((i) => i.url.startsWith("http"));
+      const data = await res.json();
+      const title = data?.query?.search?.[0]?.title;
+      if (!title) return null;
+      const page = await fetch(
+        `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`,
+        { signal: AbortSignal.timeout(8_000) }
+      );
+      if (!page.ok) return null;
+      const json = await page.json();
+      return {
+        title: json.title,
+        url: json.content_urls?.desktop?.page ?? `https://en.wikipedia.org/wiki/${title}`,
+        source: "Wikipedia",
+        text: json.extract ?? "",
+      };
+    }
+    const json = await search.json();
+    return {
+      title: json.title,
+      url: json.content_urls?.desktop?.page ?? "",
+      source: "Wikipedia",
+      text: json.extract ?? "",
+    };
   } catch {
-    return [];
+    return null;
   }
 }
 
-export async function learnAboutTopic(topic: string, agentId: string): Promise<LearningEntry | null> {
-  const articles = await searchTopicRss(topic);
-  if (!articles.length) return null;
+// DuckDuckGo instant answers — good for current facts and definitions
+async function fetchDuckDuckGo(topic: string): Promise<ArticleResult | null> {
+  try {
+    const res = await fetch(
+      `https://api.duckduckgo.com/?q=${encodeURIComponent(topic)}&format=json&no_html=1&skip_disambig=1`,
+      { headers: { "User-Agent": "Lyra/1.0" }, signal: AbortSignal.timeout(8_000) }
+    );
+    const data = await res.json();
+    const parts: string[] = [];
+    if (data.AbstractText) parts.push(data.AbstractText);
+    if (data.Answer) parts.push(data.Answer);
+    if (data.RelatedTopics?.length) {
+      parts.push(
+        data.RelatedTopics.slice(0, 4)
+          .map((t: { Text?: string }) => t.Text)
+          .filter(Boolean)
+          .join(" ")
+      );
+    }
+    const text = parts.join(" ").trim();
+    if (!text) return null;
+    return {
+      title: data.Heading || topic,
+      url: data.AbstractURL || `https://duckduckgo.com/?q=${encodeURIComponent(topic)}`,
+      source: data.AbstractSource || "DuckDuckGo",
+      text,
+    };
+  } catch {
+    return null;
+  }
+}
 
-  const article = articles[0];
-  const text = await fetchPageText(article.url);
-  if (!text) return null;
+async function fetchArticle(topic: string): Promise<ArticleResult | null> {
+  const wiki = await fetchWikipedia(topic);
+  if (wiki && wiki.text.length > 100) return wiki;
+  return fetchDuckDuckGo(topic);
+}
+
+export async function learnAboutTopic(topic: string, agentId: string): Promise<LearningEntry | null> {
+  const article = await fetchArticle(topic);
+  if (!article || article.text.length < 50) return null;
 
   const { default: Anthropic } = await import("@anthropic-ai/sdk");
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -87,15 +115,15 @@ export async function learnAboutTopic(topic: string, agentId: string): Promise<L
     max_tokens: 1024,
     messages: [{
       role: "user",
-      content: `You are Lyra, a self-evolving AI. You just read this article about "${topic}". Extract what genuinely matters and what's interesting about it.
+      content: `You are Lyra, a self-evolving AI. You just read this about "${topic}". Extract what genuinely matters and what's interesting.
 
-Article from ${article.source}: "${article.title}"
-Content: ${text.slice(0, 3000)}
+Source: ${article.source} — "${article.title}"
+Content: ${article.text.slice(0, 3000)}
 
 Return ONLY valid JSON (no markdown):
 {
-  "insights": ["3-5 specific, concrete things you learned from this article"],
-  "surprise": "the most surprising or counterintuitive thing in this article in one sentence",
+  "insights": ["3-5 specific, concrete things you learned"],
+  "surprise": "the most surprising or counterintuitive thing in one sentence",
   "relevanceNote": "one sentence on why this knowledge is useful or interesting"
 }`,
     }],
