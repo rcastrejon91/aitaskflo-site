@@ -416,11 +416,12 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                       </div>
                     )}
                     <div
-                      className={`max-w-[80%] sm:max-w-xl rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                      className={`max-w-[80%] sm:max-w-xl rounded-2xl px-4 py-3 leading-relaxed ${
                         msg.role === "user"
-                          ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 shadow-lg shadow-violet-500/15"
-                          : "bg-white/[0.05] border border-white/[0.08]"
+                          ? "text-sm bg-gradient-to-r from-violet-600 to-fuchsia-600 shadow-lg shadow-violet-500/15"
+                          : "text-[15px] bg-white/[0.05] border border-white/[0.08]"
                       }`}
+                      style={msg.role === "assistant" ? { lineHeight: "1.65" } : {}}
                     >
                       {msg.content === "" && isLoading ? (
                         <span className="flex gap-1">
@@ -440,27 +441,49 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
           </div>
 
           {/* Input */}
-          <div className="px-4 py-3 border-t border-white/[0.06] bg-black/20 flex-shrink-0">
-            <div className="max-w-3xl mx-auto flex items-end gap-2">
-              <div className="flex-1 bg-white/[0.05] border border-white/[0.10] rounded-xl overflow-hidden focus-within:border-violet-500/50 transition-colors">
-                <textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={handleInput}
-                  onKeyDown={handleKeyDown}
-                  placeholder={`Message ${activeAgent.name}…`}
-                  disabled={isLoading}
-                  className="w-full bg-transparent text-white placeholder-white/25 px-4 py-3 resize-none focus:outline-none text-sm"
-                  style={{ minHeight: "48px", maxHeight: "160px" }}
-                />
+          <div className="px-4 pt-2 pb-3 border-t border-white/[0.06] flex-shrink-0" style={{ background: "#111113" }}>
+            <div className="max-w-3xl mx-auto">
+              {/* Prompt chips — always visible above input */}
+              {messages.length > 0 && (
+                <div className="flex gap-2 flex-wrap mb-2">
+                  {QUICK_PROMPTS.map((p) => (
+                    <button
+                      key={p.text}
+                      onClick={() => { setInput(p.text); textareaRef.current?.focus(); }}
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] text-white/50 hover:text-white/80 border border-white/[0.08] hover:border-violet-500/40 transition-all"
+                      style={{ background: "rgba(255,255,255,0.04)", backdropFilter: "blur(8px)" }}
+                    >
+                      <span>{p.icon}</span>{p.text}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-end gap-2">
+                <div
+                  className="flex-1 border rounded-xl overflow-hidden transition-all"
+                  style={{ background: "#1a1a1a", borderColor: "rgba(255,255,255,0.10)" }}
+                >
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={handleInput}
+                    onKeyDown={handleKeyDown}
+                    placeholder={`Message ${activeAgent.name}…`}
+                    disabled={isLoading}
+                    className="w-full bg-transparent text-white placeholder-white/25 px-4 py-3 resize-none focus:outline-none text-sm"
+                    style={{ minHeight: "48px", maxHeight: "160px" }}
+                    onFocus={(e) => { e.currentTarget.parentElement!.style.borderColor = "rgba(139,92,246,0.6)"; e.currentTarget.parentElement!.style.boxShadow = "0 0 0 1px rgba(139,92,246,0.2)"; }}
+                    onBlur={(e) => { e.currentTarget.parentElement!.style.borderColor = "rgba(255,255,255,0.10)"; e.currentTarget.parentElement!.style.boxShadow = "none"; }}
+                  />
+                </div>
+                <button
+                  onClick={sendMessage}
+                  disabled={!input.trim() || isLoading}
+                  className="bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 disabled:opacity-30 text-white p-3 rounded-xl transition-all shadow-lg shadow-violet-500/20 flex-shrink-0"
+                >
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </button>
               </div>
-              <button
-                onClick={sendMessage}
-                disabled={!input.trim() || isLoading}
-                className="bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 disabled:opacity-30 text-white p-3 rounded-xl transition-all shadow-lg shadow-violet-500/20 flex-shrink-0"
-              >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              </button>
             </div>
           </div>
         </main>
