@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Send, Loader2, Brain, Lightbulb, GitBranch,
-  Zap, ArrowLeft, CheckCircle, AlertCircle, X, PanelLeftClose, PanelLeftOpen, LogOut, SlidersHorizontal,
+  Zap, ArrowLeft, CheckCircle, AlertCircle, X, LogOut, SlidersHorizontal,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
@@ -31,7 +31,7 @@ interface DashboardData {
   stats: { totalAgents: number; totalMemories: number; totalReflections: number; generations: number };
 }
 
-type RightPanel = "memory" | "reflection";
+type RightPanel = "memory" | "reflection" | "lineage";
 
 function generateId(): string {
   if (typeof globalThis !== "undefined" && globalThis.crypto?.randomUUID) {
@@ -49,7 +49,6 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
   const [conversationId] = useState(() => generateId());
   const [evolving, setEvolving] = useState(false);
   const [evolutionReady, setEvolutionReady] = useState(false);
-  const [leftOpen, setLeftOpen] = useState(true);
   const [mobileRightOpen, setMobileRightOpen] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState(initial.activeAgent.id);
   const [notification, setNotification] = useState<{ type: "success" | "error"; msg: string } | null>(null);
@@ -271,13 +270,6 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
             </button>
           )}
 
-          <button
-            onClick={() => setLeftOpen(!leftOpen)}
-            className="p-1.5 text-white/30 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5"
-            title="Toggle lineage panel"
-          >
-            {leftOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
-          </button>
         </div>
       </header>
 
@@ -314,60 +306,6 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
 
       {/* ── 3-column body ───────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden min-h-0">
-
-        {/* Left — Lineage */}
-        <div
-          className="border-r border-white/[0.06] bg-black/20 flex flex-col overflow-hidden transition-all duration-250 flex-shrink-0"
-          style={{ width: leftOpen ? "260px" : "0px" }}
-        >
-          <div className="flex-1 overflow-y-auto p-4 min-w-[260px]">
-            <div className="flex items-center gap-2 mb-4">
-              <GitBranch className="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />
-              <span className="text-[11px] font-semibold text-white/50 uppercase tracking-widest">
-                Lineage Tree
-              </span>
-            </div>
-
-            <div className="mb-4">
-              <LineageGraph
-                graph={data.lineage}
-                activeAgentId={activeAgent.id}
-                selectedAgentId={selectedAgentId}
-                onSelectAgent={setSelectedAgentId}
-              />
-            </div>
-
-            {selectedAgentId && (() => {
-              const agent = data.agents.find((a) => a.id === selectedAgentId);
-              if (!agent) return null;
-              const notes = agent.evolutionNotes ?? "";
-              const shortNotes = notes.length > 120 ? notes.slice(0, 120).trimEnd() + "…" : notes;
-              return (
-                <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-semibold text-white/80">{agent.name}</span>
-                      <span className="text-[10px] text-white/30 ml-2">Gen {agent.generation}</span>
-                    </div>
-                    {agent.id !== activeAgent.id && (
-                      <button onClick={() => switchAgent(agent.id)} className="text-[10px] text-violet-400 hover:text-violet-300 transition">
-                        Switch →
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex gap-3 text-[10px] text-white/35">
-                    <span>{agent.reflectionCount} reflections</span>
-                    <span>{agent.conversationCount} convos</span>
-                    {agent.averageScore > 0 && <span className="text-violet-400">{agent.averageScore.toFixed(1)}/10</span>}
-                  </div>
-                  {shortNotes && (
-                    <p className="text-[10px] italic text-white/30 leading-relaxed">{shortNotes}</p>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-        </div>
 
         {/* Center — Chat */}
         <main className="flex-1 flex flex-col overflow-hidden min-w-0">
@@ -486,31 +424,58 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
           </div>
         </main>
 
-        {/* Right — Memory / Reflection */}
+        {/* Right — Memory / Reflection / Lineage */}
         <aside className="w-72 border-l border-white/[0.06] bg-black/20 flex flex-col flex-shrink-0 overflow-hidden hidden lg:flex">
-          {/* Tabs */}
           <div className="flex border-b border-white/[0.06] flex-shrink-0">
-            {(["memory", "reflection"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setRightPanel(tab)}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-all ${
-                  rightPanel === tab
-                    ? tab === "memory"
-                      ? "text-violet-400 border-b-2 border-violet-500 bg-violet-500/5"
-                      : "text-amber-400 border-b-2 border-amber-500 bg-amber-500/5"
-                    : "text-white/35 hover:text-white/60"
-                }`}
-              >
-                {tab === "memory" ? <Brain className="w-3.5 h-3.5" /> : <Lightbulb className="w-3.5 h-3.5" />}
-                {tab === "memory" ? "Memory" : "Reflections"}
-              </button>
-            ))}
+            {(["memory", "reflection", "lineage"] as const).map((tab) => {
+              const active = rightPanel === tab;
+              const accent = tab === "memory" ? "text-violet-400 border-violet-500 bg-violet-500/5"
+                           : tab === "reflection" ? "text-amber-400 border-amber-500 bg-amber-500/5"
+                           : "text-fuchsia-400 border-fuchsia-500 bg-fuchsia-500/5";
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setRightPanel(tab)}
+                  className={`flex-1 flex items-center justify-center gap-1 py-3 text-[11px] font-medium transition-all ${active ? `${accent} border-b-2` : "text-white/35 hover:text-white/60"}`}
+                >
+                  {tab === "memory" ? <Brain className="w-3 h-3" /> : tab === "reflection" ? <Lightbulb className="w-3 h-3" /> : <GitBranch className="w-3 h-3" />}
+                  {tab === "memory" ? "Memory" : tab === "reflection" ? "Reflections" : "Lineage"}
+                </button>
+              );
+            })}
           </div>
           <div className="flex-1 overflow-hidden p-3">
-            {rightPanel === "memory"
-              ? <MemoryPanel memories={data.memories} activeAgentId={activeAgent.id} onMemoryAdded={refreshAll} />
-              : <ReflectionLog reflections={data.reflections} agentId={activeAgent.id} />}
+            {rightPanel === "memory" && <MemoryPanel memories={data.memories} activeAgentId={activeAgent.id} onMemoryAdded={refreshAll} />}
+            {rightPanel === "reflection" && <ReflectionLog reflections={data.reflections} agentId={activeAgent.id} />}
+            {rightPanel === "lineage" && (
+              <div className="overflow-y-auto h-full space-y-3">
+                <LineageGraph graph={data.lineage} activeAgentId={activeAgent.id} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} />
+                {selectedAgentId && (() => {
+                  const agent = data.agents.find((a) => a.id === selectedAgentId);
+                  if (!agent) return null;
+                  const notes = agent.evolutionNotes ?? "";
+                  return (
+                    <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-semibold text-white/80">{agent.name}</span>
+                          <span className="text-[10px] text-white/30 ml-2">Gen {agent.generation}</span>
+                        </div>
+                        {agent.id !== activeAgent.id && (
+                          <button onClick={() => switchAgent(agent.id)} className="text-[10px] text-violet-400 hover:text-violet-300 transition">Switch →</button>
+                        )}
+                      </div>
+                      <div className="flex gap-3 text-[10px] text-white/35">
+                        <span>{agent.reflectionCount} reflections</span>
+                        <span>{agent.conversationCount} convos</span>
+                        {agent.averageScore > 0 && <span className="text-violet-400">{agent.averageScore.toFixed(1)}/10</span>}
+                      </div>
+                      {notes && <p className="text-[10px] italic text-white/30 leading-relaxed">{notes}</p>}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </aside>
       </div>
@@ -536,17 +501,19 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
             >
               <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
                 <div className="flex gap-2">
-                  {(["memory", "reflection"] as const).map((tab) => (
+                  {(["memory", "reflection", "lineage"] as const).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setRightPanel(tab)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                         rightPanel === tab
-                          ? tab === "memory" ? "bg-violet-500/20 text-violet-300" : "bg-amber-500/20 text-amber-300"
+                          ? tab === "memory" ? "bg-violet-500/20 text-violet-300"
+                          : tab === "reflection" ? "bg-amber-500/20 text-amber-300"
+                          : "bg-fuchsia-500/20 text-fuchsia-300"
                           : "text-white/40 hover:text-white/60"
                       }`}
                     >
-                      {tab === "memory" ? "Memory" : "Reflections"}
+                      {tab === "memory" ? "Memory" : tab === "reflection" ? "Reflections" : "Lineage"}
                     </button>
                   ))}
                 </div>
@@ -555,9 +522,9 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                 </button>
               </div>
               <div className="flex-1 overflow-hidden p-3">
-                {rightPanel === "memory"
-                  ? <MemoryPanel memories={data.memories} activeAgentId={activeAgent.id} onMemoryAdded={refreshAll} />
-                  : <ReflectionLog reflections={data.reflections} agentId={activeAgent.id} />}
+                {rightPanel === "memory" && <MemoryPanel memories={data.memories} activeAgentId={activeAgent.id} onMemoryAdded={refreshAll} />}
+                {rightPanel === "reflection" && <ReflectionLog reflections={data.reflections} agentId={activeAgent.id} />}
+                {rightPanel === "lineage" && <LineageGraph graph={data.lineage} activeAgentId={activeAgent.id} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} />}
               </div>
             </motion.div>
           </motion.div>
