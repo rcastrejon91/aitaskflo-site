@@ -307,5 +307,40 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(event);
   }
 
+  if (action === "clean_memories") {
+    const BAD_PHRASES = [
+      "not actually provided",
+      "Google News",
+      "no actual",
+      "only the title",
+      "no substantive",
+      "article content",
+      "content was not",
+      "content is not",
+    ];
+    const DATA_DIR = nodePath.join(APP_DIR, "data");
+
+    const cleanFile = async (filename: string, contentKey: string) => {
+      const filePath = nodePath.join(DATA_DIR, filename);
+      const raw = await fsp.readFile(filePath, "utf-8");
+      const items: Array<Record<string, unknown>> = JSON.parse(raw);
+      const clean = items.filter((item) => {
+        const text = contentKey === "insights"
+          ? ((item.insights as string[]) ?? []).join(" ")
+          : (item[contentKey] as string) ?? "";
+        return !BAD_PHRASES.some((phrase) => text.includes(phrase));
+      });
+      await fsp.writeFile(filePath, JSON.stringify(clean, null, 2), "utf-8");
+      return { total: items.length, kept: clean.length, removed: items.length - clean.length };
+    };
+
+    const [memories, learnings] = await Promise.all([
+      cleanFile("memories.json", "content"),
+      cleanFile("learnings.json", "insights"),
+    ]);
+
+    return NextResponse.json({ memories, learnings });
+  }
+
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 }

@@ -65,6 +65,7 @@ export default function HealerPage() {
   const [healEvent, setHealEvent]   = useState<HealEvent | null>(null);
   const [history, setHistory]       = useState<HealEvent[] | null>(null);
   const [error, setError]           = useState("");
+  const [cleanResult, setCleanResult] = useState<{ memories: { removed: number; kept: number }; learnings: { removed: number; kept: number } } | null>(null);
 
   async function callHealer(act: string) {
     if (!key) return;
@@ -77,7 +78,8 @@ export default function HealerPage() {
       if (act === "scan")     { setScan(data as ScanResult); }
       if (act === "diagnose") { setDiagnosis(data as DiagnoseResult); }
       if (act === "heal")     { setHealEvent(data as HealEvent); }
-      if (act === "history")  { setHistory((data as { history: HealEvent[] }).history); }
+      if (act === "history")       { setHistory((data as { history: HealEvent[] }).history); }
+      if (act === "clean_memories") { setCleanResult(data); }
       setStatus("done");
     } catch (e) {
       setError(String(e));
@@ -132,6 +134,14 @@ export default function HealerPage() {
         ))}
 
         <button
+          onClick={() => { setAction("scan"); callHealer("clean_memories"); }}
+          disabled={loading || !key}
+          className="px-5 py-2.5 rounded-xl font-semibold text-sm bg-amber-700/60 hover:bg-amber-600/60 text-amber-200 transition-colors disabled:opacity-40"
+        >
+          🧹 Clean Memories
+        </button>
+
+        <button
           onClick={() => callHealer("history")}
           disabled={loading || !key}
           className="px-5 py-2.5 rounded-xl font-semibold text-sm bg-white/5 hover:bg-white/10 text-white/60 transition-colors disabled:opacity-40"
@@ -144,6 +154,15 @@ export default function HealerPage() {
         <div className="mb-6 p-4 bg-red-950/40 border border-red-500/30 rounded-xl text-sm text-red-300">
           {error}
         </div>
+      )}
+
+      {/* Clean memories result */}
+      {cleanResult && (
+        <section className="mb-8 p-4 rounded-xl border border-amber-500/25 bg-amber-950/20 text-sm space-y-1">
+          <p className="font-semibold text-amber-300">Memory cleanup complete</p>
+          <p className="text-white/60">Memories: <span className="text-white">{cleanResult.memories.removed} removed</span>, {cleanResult.memories.kept} kept</p>
+          <p className="text-white/60">Learnings: <span className="text-white">{cleanResult.learnings.removed} removed</span>, {cleanResult.learnings.kept} kept</p>
+        </section>
       )}
 
       {/* Scan result */}
