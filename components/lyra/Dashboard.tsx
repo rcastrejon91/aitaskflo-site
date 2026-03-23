@@ -3,13 +3,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Sparkles, Send, Loader2, Brain, Lightbulb, GitBranch,
+  Sparkles, Send, Loader2, Lightbulb, GitBranch,
   Zap, ArrowLeft, CheckCircle, AlertCircle, X, LogOut, SlidersHorizontal,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { LineageGraph } from "./LineageGraph";
-import { MemoryPanel } from "./MemoryPanel";
 import { ReflectionLog } from "./ReflectionLog";
 import { MessageRenderer } from "./MessageRenderer";
 import type {
@@ -31,7 +30,7 @@ interface DashboardData {
   stats: { totalAgents: number; totalMemories: number; totalReflections: number; generations: number };
 }
 
-type RightPanel = "memory" | "reflection" | "lineage";
+type RightPanel = "reflection" | "lineage";
 
 function generateId(): string {
   if (typeof globalThis !== "undefined" && globalThis.crypto?.randomUUID) {
@@ -45,7 +44,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [rightPanel, setRightPanel] = useState<RightPanel>("memory");
+  const [rightPanel, setRightPanel] = useState<RightPanel>("reflection");
   const [conversationId] = useState(() => generateId());
   const [evolving, setEvolving] = useState(false);
   const [evolutionReady, setEvolutionReady] = useState(false);
@@ -66,13 +65,12 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
 
   const refreshAll = useCallback(async () => {
     try {
-      const [stateRes, agentsRes, memoriesRes] = await Promise.all([
+      const [stateRes, agentsRes] = await Promise.all([
         fetch("/api/lyra/state"),
         fetch("/api/lyra/agents"),
-        fetch("/api/lyra/memories?limit=50"),
       ]);
-      const [stateData, agentsData, memoriesData] = await Promise.all([
-        stateRes.json(), agentsRes.json(), memoriesRes.json(),
+      const [stateData, agentsData] = await Promise.all([
+        stateRes.json(), agentsRes.json(),
       ]);
       setData((prev) => ({
         ...prev,
@@ -81,7 +79,6 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
         stats: stateData.stats ?? prev.stats,
         agents: agentsData.agents ?? prev.agents,
         lineage: agentsData.lineage ?? prev.lineage,
-        memories: memoriesData.memories ?? prev.memories,
       }));
     } catch { /* ignore */ }
   }, []);
@@ -90,7 +87,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
     if (!input.trim() || isLoading) return;
     const text = input.trim();
     setInput("");
-    if (textareaRef.current) textareaRef.current.style.height = "48px";
+    if (textareaRef.current) textareaRef.current.style.height = "52px";
 
     const history = messages.map((m) => ({ role: m.role, content: m.content }));
     setMessages((prev) => [...prev, { role: "user", content: text }, { role: "assistant", content: "" }]);
@@ -210,7 +207,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
     const ta = e.target;
-    ta.style.height = "48px";
+    ta.style.height = "52px";
     ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
   };
 
@@ -221,47 +218,68 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
   ];
 
   return (
-    <div className="flex flex-col bg-slate-950 text-white" style={{ height: "100dvh" }}>
+    <div className="flex flex-col text-white" style={{ height: "100dvh", background: "#09090f" }}>
 
       {/* ── Top bar ─────────────────────────────────────────────── */}
-      <header className="flex items-center gap-3 px-4 h-14 bg-black/40 border-b border-white/[0.06] flex-shrink-0">
-        <Link href="/" className="text-white/30 hover:text-white/70 transition-colors mr-1">
+      <header className="flex items-center gap-3 px-4 h-14 flex-shrink-0 backdrop-blur-xl" style={{ background: "rgba(0,0,0,0.6)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+        <Link href="/" className="transition-colors mr-1" style={{ color: "rgba(255,255,255,0.2)" }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.6)")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.2)")}
+        >
           <ArrowLeft className="w-4 h-4" />
         </Link>
 
         {/* Brand */}
-        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-violet-500/30 flex-shrink-0">
+        <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 2px 12px rgba(109,40,217,0.35)" }}>
           <Sparkles className="w-3.5 h-3.5 text-white" />
         </div>
-        <div className="flex items-baseline gap-2 min-w-0">
-          <span className="font-semibold text-sm truncate">{activeAgent.name}</span>
-          <span className="text-[11px] text-white/30 flex-shrink-0">Gen {activeAgent.generation}</span>
+
+        {/* Agent name + gen badge */}
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-semibold text-sm text-white truncate">{activeAgent.name}</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium flex-shrink-0" style={{ background: "rgba(109,40,217,0.15)", color: "rgb(196,181,253)", border: "1px solid rgba(109,40,217,0.25)" }}>
+            Gen {activeAgent.generation}
+          </span>
+        </div>
+
+        {/* Stats (desktop) */}
+        <div className="hidden md:flex items-center gap-4 ml-3">
+          <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.22)" }}>
+            {data.stats.totalReflections} reflections
+          </span>
+          {activeAgent.averageScore > 0 && (
+            <span className="text-[11px] font-medium" style={{ color: activeAgent.averageScore >= 8 ? "rgb(110,231,183)" : activeAgent.averageScore >= 5 ? "rgb(196,181,253)" : "rgb(252,165,165)" }}>
+              ★ {activeAgent.averageScore.toFixed(1)}
+            </span>
+          )}
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            className="p-1.5 text-white/30 hover:text-white/60 transition-colors"
-            title="Sign out"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-          </button>
-
           {messages.length >= 2 && (
             <button
               onClick={endConversationAndReflect}
               disabled={isLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 text-amber-400 text-xs rounded-lg transition-all disabled:opacity-40"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-all disabled:opacity-40"
+              style={{ background: "rgba(161,98,7,0.1)", border: "1px solid rgba(161,98,7,0.25)", color: "rgb(252,211,77)" }}
             >
               <Lightbulb className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Reflect</span>
             </button>
           )}
-
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="p-1.5 transition-colors"
+            style={{ color: "rgba(255,255,255,0.22)" }}
+            title="Sign out"
+            onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.6)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.22)")}
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
         </div>
       </header>
 
-      {/* ── Evolution banner ────────────────────────────────────── */}
+      {/* ── Evolution banner ─────────────────────────────────────── */}
       <AnimatePresence>
         {evolutionReady && (
           <motion.div
@@ -270,21 +288,25 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden flex-shrink-0"
           >
-            <div className="flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-violet-900/70 to-fuchsia-900/70 border-b border-violet-500/20 text-sm">
-              <Zap className="w-4 h-4 text-violet-400 flex-shrink-0" />
-              <span className="flex-1 text-white/70">
-                <span className="text-violet-300 font-medium">Ready to evolve.</span>
+            <div className="flex items-center gap-3 px-4 py-2.5 text-sm" style={{ background: "linear-gradient(to right, rgba(109,40,217,0.35), rgba(134,25,143,0.35))", borderBottom: "1px solid rgba(109,40,217,0.2)" }}>
+              <Zap className="w-4 h-4 flex-shrink-0" style={{ color: "rgb(196,181,253)" }} />
+              <span className="flex-1" style={{ color: "rgba(255,255,255,0.6)" }}>
+                <span className="font-medium" style={{ color: "rgb(196,181,253)" }}>Ready to evolve.</span>
                 {" "}Create an improved Lyra successor?
               </span>
               <button
                 onClick={triggerEvolution}
                 disabled={evolving}
-                className="flex items-center gap-1.5 px-3 py-1 bg-violet-500 hover:bg-violet-600 text-white text-xs rounded-lg transition-all disabled:opacity-40"
+                className="flex items-center gap-1.5 px-3 py-1 text-white text-xs rounded-lg transition-all disabled:opacity-40"
+                style={{ background: "rgba(109,40,217,0.85)" }}
               >
                 {evolving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
                 {evolving ? "Evolving…" : "Evolve"}
               </button>
-              <button onClick={() => setEvolutionReady(false)} className="text-white/30 hover:text-white/60">
+              <button onClick={() => setEvolutionReady(false)} style={{ color: "rgba(255,255,255,0.3)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.7)")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.3)")}
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -292,25 +314,46 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
         )}
       </AnimatePresence>
 
-      {/* ── 3-column body ───────────────────────────────────────── */}
+      {/* ── Body ─────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden min-h-0">
 
         {/* Center — Chat */}
         <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-4">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-8 space-y-5">
             {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center px-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full max-w-lg">
+              <div className="flex flex-col items-center justify-center h-full text-center px-4 gap-8">
+                {/* Hero icon + greeting */}
+                <div>
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xl" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 8px 32px rgba(109,40,217,0.35)" }}>
+                    <Sparkles className="w-8 h-8 text-white" />
+                  </div>
+                  <h2 className="text-xl font-semibold text-white mb-1">{activeAgent.name}</h2>
+                  <p className="text-sm" style={{ color: "rgba(255,255,255,0.3)" }}>
+                    Generation {activeAgent.generation} · Ask me anything
+                  </p>
+                </div>
+
+                {/* Quick prompt cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-lg">
                   {QUICK_PROMPTS.map((p) => (
                     <button
                       key={p.text}
                       onClick={() => { setInput(p.text); textareaRef.current?.focus(); }}
-                      className="p-3 border border-white/[0.10] hover:border-violet-500/40 rounded-xl text-left transition-all"
-                      style={{ background: "rgba(255,255,255,0.05)", backdropFilter: "blur(10px)" }}
+                      className="p-4 rounded-xl text-left transition-all"
+                      style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(109,40,217,0.4)";
+                        (e.currentTarget as HTMLButtonElement).style.background = "rgba(109,40,217,0.06)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.07)";
+                        (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.025)";
+                      }}
                     >
-                      <div className="text-base mb-1">{p.icon}</div>
-                      <p className="text-xs text-white/50 leading-snug">{p.text}</p>
+                      <div className="text-xl mb-2.5">{p.icon}</div>
+                      <p className="text-xs leading-relaxed" style={{ color: "rgba(255,255,255,0.4)" }}>{p.text}</p>
                     </button>
                   ))}
                 </div>
@@ -320,23 +363,28 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                 {messages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                     {msg.role === "assistant" && (
-                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center mr-2.5 flex-shrink-0 mt-1">
-                        <Sparkles className="w-3 h-3 text-white" />
+                      <div className="w-7 h-7 rounded-xl flex items-center justify-center mr-2.5 flex-shrink-0 mt-0.5" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 2px 10px rgba(109,40,217,0.3)" }}>
+                        <Sparkles className="w-3.5 h-3.5 text-white" />
                       </div>
                     )}
                     <div
-                      className={`max-w-[80%] sm:max-w-xl rounded-2xl px-4 py-3 leading-relaxed ${
-                        msg.role === "user"
-                          ? "text-sm bg-gradient-to-r from-violet-600 to-fuchsia-600 shadow-lg shadow-violet-500/15"
-                          : "text-[15px] bg-white/[0.05] border border-white/[0.08]"
-                      }`}
-                      style={msg.role === "assistant" ? { lineHeight: "1.65" } : {}}
+                      className={`max-w-[80%] sm:max-w-xl rounded-2xl px-4 py-3 ${msg.role === "user" ? "text-sm text-white" : "text-[15px] text-white/90"}`}
+                      style={msg.role === "user" ? {
+                        background: "linear-gradient(135deg, rgba(109,40,217,0.9), rgba(134,25,143,0.85))",
+                        border: "1px solid rgba(109,40,217,0.3)",
+                        boxShadow: "0 4px 20px rgba(109,40,217,0.2)",
+                      } : {
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.07)",
+                        borderLeft: "2px solid rgba(109,40,217,0.45)",
+                        lineHeight: "1.65",
+                      }}
                     >
                       {msg.content === "" && isLoading ? (
-                        <span className="flex gap-1">
-                          <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                          <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                          <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                        <span className="flex gap-1 items-center">
+                          <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: "rgba(255,255,255,0.5)", animationDelay: "0ms" }} />
+                          <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: "rgba(255,255,255,0.5)", animationDelay: "150ms" }} />
+                          <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: "rgba(255,255,255,0.5)", animationDelay: "300ms" }} />
                         </span>
                       ) : (
                         <MessageRenderer content={msg.content} />
@@ -349,28 +397,37 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
             )}
           </div>
 
-          {/* Input */}
-          <div className="px-4 pt-2 pb-3 border-t border-white/[0.06] flex-shrink-0" style={{ background: "#111113" }}>
+          {/* Input area */}
+          <div className="px-4 pt-3 pb-4 flex-shrink-0" style={{ background: "#09090f", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
             <div className="max-w-3xl mx-auto">
-              {/* Prompt chips — always visible above input */}
+              {/* Prompt chips */}
               {messages.length > 0 && (
-                <div className="flex gap-2 flex-wrap mb-2">
+                <div className="flex gap-2 flex-wrap mb-2.5">
                   {QUICK_PROMPTS.map((p) => (
                     <button
                       key={p.text}
                       onClick={() => { setInput(p.text); textareaRef.current?.focus(); }}
-                      className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] text-white/50 hover:text-white/80 border border-white/[0.08] hover:border-violet-500/40 transition-all"
-                      style={{ background: "rgba(255,255,255,0.04)", backdropFilter: "blur(8px)" }}
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] transition-all"
+                      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.38)" }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(109,40,217,0.4)";
+                        (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.7)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.07)";
+                        (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.38)";
+                      }}
                     >
                       <span>{p.icon}</span>{p.text}
                     </button>
                   ))}
                 </div>
               )}
+
               <div className="flex items-end gap-2">
                 <div
-                  className="flex-1 border rounded-xl overflow-hidden transition-all"
-                  style={{ background: "#1a1a1a", borderColor: "rgba(255,255,255,0.10)" }}
+                  className="flex-1 rounded-2xl overflow-hidden transition-all"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
                 >
                   <textarea
                     ref={textareaRef}
@@ -379,46 +436,57 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                     onKeyDown={handleKeyDown}
                     placeholder={`Message ${activeAgent.name}…`}
                     disabled={isLoading}
-                    className="w-full bg-transparent text-white placeholder-white/25 px-4 py-3 resize-none focus:outline-none text-sm"
-                    style={{ minHeight: "48px", maxHeight: "160px" }}
-                    onFocus={(e) => { e.currentTarget.parentElement!.style.borderColor = "rgba(139,92,246,0.6)"; e.currentTarget.parentElement!.style.boxShadow = "0 0 0 1px rgba(139,92,246,0.2)"; }}
-                    onBlur={(e) => { e.currentTarget.parentElement!.style.borderColor = "rgba(255,255,255,0.10)"; e.currentTarget.parentElement!.style.boxShadow = "none"; }}
+                    className="w-full bg-transparent text-white px-4 py-3.5 resize-none focus:outline-none text-sm"
+                    style={{ minHeight: "52px", maxHeight: "160px", caretColor: "rgb(167,139,250)", color: "rgba(255,255,255,0.9)" }}
+                    onFocus={(e) => {
+                      e.currentTarget.parentElement!.style.borderColor = "rgba(109,40,217,0.5)";
+                      e.currentTarget.parentElement!.style.boxShadow = "0 0 0 3px rgba(109,40,217,0.1)";
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.parentElement!.style.borderColor = "rgba(255,255,255,0.08)";
+                      e.currentTarget.parentElement!.style.boxShadow = "none";
+                    }}
                   />
                 </div>
                 <button
                   onClick={sendMessage}
                   disabled={!input.trim() || isLoading}
-                  className="bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 disabled:opacity-30 text-white p-3 rounded-xl transition-all shadow-lg shadow-violet-500/20 flex-shrink-0"
+                  className="text-white p-3.5 rounded-2xl transition-all flex-shrink-0 disabled:opacity-25"
+                  style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 4px 16px rgba(109,40,217,0.3)" }}
                 >
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                 </button>
               </div>
+              <p className="text-center text-[10px] mt-2" style={{ color: "rgba(255,255,255,0.14)" }}>
+                Enter to send · Shift+Enter for new line
+              </p>
             </div>
           </div>
         </main>
 
-        {/* Right — Memory / Reflection / Lineage */}
-        <aside className="w-72 border-l border-white/[0.06] bg-black/20 flex flex-col flex-shrink-0 overflow-hidden hidden lg:flex">
-          <div className="flex border-b border-white/[0.06] flex-shrink-0">
-            {(["memory", "reflection", "lineage"] as const).map((tab) => {
+        {/* Right — Reflection / Lineage */}
+        <aside className="w-72 flex-col flex-shrink-0 overflow-hidden hidden lg:flex" style={{ background: "rgba(0,0,0,0.35)", borderLeft: "1px solid rgba(255,255,255,0.05)" }}>
+          <div className="flex flex-shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+            {(["reflection", "lineage"] as const).map((tab) => {
               const active = rightPanel === tab;
-              const accent = tab === "memory" ? "text-violet-400 border-violet-500 bg-violet-500/5"
-                           : tab === "reflection" ? "text-amber-400 border-amber-500 bg-amber-500/5"
-                           : "text-fuchsia-400 border-fuchsia-500 bg-fuchsia-500/5";
+              const accentColor = tab === "reflection" ? "rgb(252,211,77)" : "rgb(217,70,239)";
               return (
                 <button
                   key={tab}
                   onClick={() => setRightPanel(tab)}
-                  className={`flex-1 flex items-center justify-center gap-1 py-3 text-[11px] font-medium transition-all ${active ? `${accent} border-b-2` : "text-white/35 hover:text-white/60"}`}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-3 text-[11px] font-medium transition-all"
+                  style={active
+                    ? { color: accentColor, borderBottom: `2px solid ${accentColor}` }
+                    : { color: "rgba(255,255,255,0.28)" }
+                  }
                 >
-                  {tab === "memory" ? <Brain className="w-3 h-3" /> : tab === "reflection" ? <Lightbulb className="w-3 h-3" /> : <GitBranch className="w-3 h-3" />}
-                  {tab === "memory" ? "Memory" : tab === "reflection" ? "Reflections" : "Lineage"}
+                  {tab === "reflection" ? <Lightbulb className="w-3 h-3" /> : <GitBranch className="w-3 h-3" />}
+                  {tab === "reflection" ? "Reflections" : "Lineage"}
                 </button>
               );
             })}
           </div>
           <div className="flex-1 overflow-hidden p-3">
-            {rightPanel === "memory" && <MemoryPanel memories={data.memories} activeAgentId={activeAgent.id} onMemoryAdded={refreshAll} />}
             {rightPanel === "reflection" && <ReflectionLog reflections={data.reflections} agentId={activeAgent.id} />}
             {rightPanel === "lineage" && (
               <div className="overflow-y-auto h-full space-y-3">
@@ -426,24 +494,22 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                 {selectedAgentId && (() => {
                   const agent = data.agents.find((a) => a.id === selectedAgentId);
                   if (!agent) return null;
-                  const notes = agent.evolutionNotes ?? "";
                   return (
-                    <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 space-y-2">
+                    <div className="rounded-xl p-3" style={{ border: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}>
                       <div className="flex items-center justify-between">
                         <div>
-                          <span className="text-xs font-semibold text-white/80">{agent.name}</span>
-                          <span className="text-[10px] text-white/30 ml-2">Gen {agent.generation}</span>
+                          <span className="text-xs font-semibold" style={{ color: "rgba(255,255,255,0.8)" }}>{agent.name}</span>
+                          <span className="text-[10px] ml-2" style={{ color: "rgba(255,255,255,0.28)" }}>Gen {agent.generation}</span>
                         </div>
                         {agent.id !== activeAgent.id && (
-                          <button onClick={() => switchAgent(agent.id)} className="text-[10px] text-violet-400 hover:text-violet-300 transition">Switch →</button>
+                          <button onClick={() => switchAgent(agent.id)} className="text-[10px] transition-colors" style={{ color: "rgb(167,139,250)" }}
+                            onMouseEnter={(e) => (e.currentTarget.style.color = "rgb(196,181,253)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.color = "rgb(167,139,250)")}
+                          >
+                            Switch →
+                          </button>
                         )}
                       </div>
-                      <div className="flex gap-3 text-[10px] text-white/35">
-                        <span>{agent.reflectionCount} reflections</span>
-                        <span>{agent.conversationCount} convos</span>
-                        {agent.averageScore > 0 && <span className="text-violet-400">{agent.averageScore.toFixed(1)}/10</span>}
-                      </div>
-                      {notes && <p className="text-[10px] italic text-white/30 leading-relaxed">{notes}</p>}
                     </div>
                   );
                 })()}
@@ -453,7 +519,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
         </aside>
       </div>
 
-      {/* ── Mobile right panel overlay ──────────────────────────── */}
+      {/* ── Mobile right panel overlay ────────────────────────── */}
       <AnimatePresence>
         {mobileRightOpen && (
           <motion.div
@@ -463,39 +529,37 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
             className="fixed inset-0 z-40 lg:hidden"
             onClick={() => setMobileRightOpen(false)}
           >
-            <div className="absolute inset-0 bg-black/60" />
+            <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.75)" }} />
             <motion.div
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className="absolute right-0 top-0 bottom-0 w-80 bg-slate-950 border-l border-white/[0.08] flex flex-col"
+              className="absolute right-0 top-0 bottom-0 w-80 flex flex-col"
+              style={{ background: "#0d0d14", borderLeft: "1px solid rgba(255,255,255,0.07)" }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+              <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                 <div className="flex gap-2">
-                  {(["memory", "reflection", "lineage"] as const).map((tab) => (
+                  {(["reflection", "lineage"] as const).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setRightPanel(tab)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                        rightPanel === tab
-                          ? tab === "memory" ? "bg-violet-500/20 text-violet-300"
-                          : tab === "reflection" ? "bg-amber-500/20 text-amber-300"
-                          : "bg-fuchsia-500/20 text-fuchsia-300"
-                          : "text-white/40 hover:text-white/60"
-                      }`}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                      style={rightPanel === tab
+                        ? { background: tab === "reflection" ? "rgba(161,98,7,0.15)" : "rgba(134,25,143,0.15)", color: tab === "reflection" ? "rgb(252,211,77)" : "rgb(240,171,252)" }
+                        : { color: "rgba(255,255,255,0.38)" }
+                      }
                     >
-                      {tab === "memory" ? "Memory" : tab === "reflection" ? "Reflections" : "Lineage"}
+                      {tab === "reflection" ? "Reflections" : "Lineage"}
                     </button>
                   ))}
                 </div>
-                <button onClick={() => setMobileRightOpen(false)} className="text-white/40 hover:text-white/70">
+                <button onClick={() => setMobileRightOpen(false)} style={{ color: "rgba(255,255,255,0.38)" }}>
                   <X className="w-4 h-4" />
                 </button>
               </div>
               <div className="flex-1 overflow-hidden p-3">
-                {rightPanel === "memory" && <MemoryPanel memories={data.memories} activeAgentId={activeAgent.id} onMemoryAdded={refreshAll} />}
                 {rightPanel === "reflection" && <ReflectionLog reflections={data.reflections} agentId={activeAgent.id} />}
                 {rightPanel === "lineage" && <LineageGraph graph={data.lineage} activeAgentId={activeAgent.id} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} />}
               </div>
@@ -504,26 +568,34 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
         )}
       </AnimatePresence>
 
-      {/* ── Mobile FAB ──────────────────────────────────────────── */}
+      {/* ── Mobile FAB ────────────────────────────────────────── */}
       <button
         onClick={() => setMobileRightOpen(true)}
-        className="fixed bottom-20 right-4 z-30 lg:hidden w-11 h-11 rounded-full bg-violet-600 hover:bg-violet-500 shadow-lg shadow-violet-500/30 flex items-center justify-center transition-all"
+        className="fixed bottom-20 right-4 z-30 lg:hidden w-11 h-11 rounded-full flex items-center justify-center transition-all"
+        style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 4px 20px rgba(109,40,217,0.4)" }}
       >
         <SlidersHorizontal className="w-4 h-4 text-white" />
       </button>
 
-      {/* ── Toast notification ──────────────────────────────────── */}
+      {/* ── Toast notification ───────────────────────────────── */}
       <AnimatePresence>
         {notification && (
           <motion.div
             initial={{ opacity: 0, y: 8, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.95 }}
-            className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm shadow-2xl ${
-              notification.type === "success"
-                ? "bg-emerald-950 border border-emerald-500/30 text-emerald-300"
-                : "bg-red-950 border border-red-500/30 text-red-300"
-            }`}
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm shadow-2xl"
+            style={notification.type === "success" ? {
+              background: "rgba(6,78,59,0.97)",
+              border: "1px solid rgba(16,185,129,0.3)",
+              color: "rgb(110,231,183)",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+            } : {
+              background: "rgba(69,10,10,0.97)",
+              border: "1px solid rgba(239,68,68,0.3)",
+              color: "rgb(252,165,165)",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+            }}
           >
             {notification.type === "success"
               ? <CheckCircle className="w-4 h-4 flex-shrink-0" />
@@ -535,4 +607,3 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
     </div>
   );
 }
-
