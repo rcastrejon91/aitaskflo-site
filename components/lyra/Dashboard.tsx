@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Send, Loader2, Brain, Lightbulb, GitBranch,
-  Zap, ArrowLeft, CheckCircle, AlertCircle, X, PanelLeftClose, PanelLeftOpen, LogOut,
+  Zap, ArrowLeft, CheckCircle, AlertCircle, X, PanelLeftClose, PanelLeftOpen, LogOut, SlidersHorizontal,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
@@ -50,6 +50,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
   const [evolving, setEvolving] = useState(false);
   const [evolutionReady, setEvolutionReady] = useState(false);
   const [leftOpen, setLeftOpen] = useState(true);
+  const [mobileRightOpen, setMobileRightOpen] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState(initial.activeAgent.id);
   const [notification, setNotification] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -359,7 +360,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                       <div className="text-violet-400">Avg {agent.averageScore.toFixed(1)}/10</div>
                     )}
                     {agent.evolutionNotes && (
-                      <div className="mt-1.5 italic text-white/35 leading-relaxed">
+                      <div className="mt-1.5 italic leading-relaxed" style={{ color: "#a0a0a0", lineHeight: 1.6 }}>
                         &ldquo;{agent.evolutionNotes}&rdquo;
                       </div>
                     )}
@@ -396,7 +397,8 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                     <button
                       key={p.text}
                       onClick={() => { setInput(p.text); textareaRef.current?.focus(); }}
-                      className="p-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] hover:border-violet-500/30 rounded-xl text-left transition-all"
+                      className="p-3 border border-white/[0.10] hover:border-violet-500/40 rounded-xl text-left transition-all"
+                      style={{ background: "rgba(255,255,255,0.05)", backdropFilter: "blur(10px)" }}
                     >
                       <div className="text-base mb-1">{p.icon}</div>
                       <p className="text-xs text-white/50 leading-snug">{p.text}</p>
@@ -491,6 +493,63 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
           </div>
         </aside>
       </div>
+
+      {/* ── Mobile right panel overlay ──────────────────────────── */}
+      <AnimatePresence>
+        {mobileRightOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 lg:hidden"
+            onClick={() => setMobileRightOpen(false)}
+          >
+            <div className="absolute inset-0 bg-black/60" />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="absolute right-0 top-0 bottom-0 w-80 bg-slate-950 border-l border-white/[0.08] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+                <div className="flex gap-2">
+                  {(["memory", "reflection"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setRightPanel(tab)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                        rightPanel === tab
+                          ? tab === "memory" ? "bg-violet-500/20 text-violet-300" : "bg-amber-500/20 text-amber-300"
+                          : "text-white/40 hover:text-white/60"
+                      }`}
+                    >
+                      {tab === "memory" ? "Memory" : "Reflections"}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => setMobileRightOpen(false)} className="text-white/40 hover:text-white/70">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden p-3">
+                {rightPanel === "memory"
+                  ? <MemoryPanel memories={data.memories} activeAgentId={activeAgent.id} onMemoryAdded={refreshAll} />
+                  : <ReflectionLog reflections={data.reflections} agentId={activeAgent.id} />}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Mobile FAB ──────────────────────────────────────────── */}
+      <button
+        onClick={() => setMobileRightOpen(true)}
+        className="fixed bottom-20 right-4 z-30 lg:hidden w-11 h-11 rounded-full bg-violet-600 hover:bg-violet-500 shadow-lg shadow-violet-500/30 flex items-center justify-center transition-all"
+      >
+        <SlidersHorizontal className="w-4 h-4 text-white" />
+      </button>
 
       {/* ── Toast notification ──────────────────────────────────── */}
       <AnimatePresence>

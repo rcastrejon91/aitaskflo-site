@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Brain, Plus, Star, Clock, Users } from "lucide-react";
+import { Brain, Plus, Star, Clock } from "lucide-react";
 import type { Memory, MemoryImportance, MemoryType } from "@/lib/types/lyra";
 
 const IMPORTANCE_COLOR: Record<MemoryImportance, string> = {
@@ -19,6 +19,14 @@ const IMPORTANCE_GLOW: Record<MemoryImportance, string> = {
   low: "",
 };
 
+const TYPE_PILL: Record<string, string> = {
+  personal: "bg-sky-500/15 text-sky-300 border-sky-500/25",
+  shared:   "bg-purple-500/15 text-purple-300 border-purple-500/25",
+  learned:  "bg-amber-500/15 text-amber-300 border-amber-500/25",
+};
+
+const TAG_PILL = "bg-white/[0.07] text-white/50 border border-white/[0.08]";
+
 interface Props {
   memories: Memory[];
   activeAgentId: string;
@@ -26,8 +34,8 @@ interface Props {
 }
 
 function MemoryCard({ memory }: { memory: Memory }) {
-  const colorClass = IMPORTANCE_COLOR[memory.importance];
   const glowClass = IMPORTANCE_GLOW[memory.importance];
+  const typePill = TYPE_PILL[memory.type] ?? TYPE_PILL.personal;
   const ageMs = Date.now() - new Date(memory.createdAt).getTime();
   const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
   const ageLabel = ageDays === 0 ? "today" : ageDays === 1 ? "1d ago" : `${ageDays}d ago`;
@@ -36,33 +44,26 @@ function MemoryCard({ memory }: { memory: Memory }) {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`border rounded-xl p-3 shadow-lg ${glowClass} ${colorClass} mb-2`}
+      className={`border border-white/[0.07] rounded-xl p-3 shadow-lg bg-white/[0.03] ${glowClass} mb-2`}
     >
-      <p className="text-white/90 text-sm leading-relaxed mb-2">{memory.content}</p>
-      <div className="flex items-center gap-3 text-xs opacity-60">
-        <span className="flex items-center gap-1">
-          <Clock className="w-3 h-3" />
-          {ageLabel}
+      <p className="text-white/85 text-xs leading-relaxed mb-2.5" style={{ lineHeight: 1.6 }}>{memory.content}</p>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${typePill}`}>
+          {memory.type}
         </span>
-        <span className="flex items-center gap-1">
-          <Star className="w-3 h-3" />
-          {memory.accessCount}x accessed
+        <span className="text-[10px] text-white/30 flex items-center gap-0.5">
+          <Clock className="w-2.5 h-2.5" />{ageLabel}
         </span>
-        {memory.type === "shared" && (
-          <span className="flex items-center gap-1">
-            <Users className="w-3 h-3" />
-            shared
+        {memory.accessCount > 0 && (
+          <span className="text-[10px] text-white/30 flex items-center gap-0.5">
+            <Star className="w-2.5 h-2.5" />{memory.accessCount}x
           </span>
         )}
-        {memory.tags.length > 0 && (
-          <span className="flex gap-1 flex-wrap">
-            {memory.tags.slice(0, 2).map((tag) => (
-              <span key={tag} className="px-1.5 py-0.5 rounded bg-white/10">
-                {tag}
-              </span>
-            ))}
+        {memory.tags.slice(0, 3).map((tag) => (
+          <span key={tag} className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] border ${TAG_PILL}`}>
+            {tag}
           </span>
-        )}
+        ))}
       </div>
     </motion.div>
   );

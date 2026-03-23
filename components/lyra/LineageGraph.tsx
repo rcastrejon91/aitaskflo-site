@@ -51,7 +51,7 @@ function AgentNode({
 }) {
   const { agent, x, y } = node;
   const color = isActive ? "#a855f7" : isSelected ? "#ec4899" : "#6366f1";
-  const label = agent.name.replace("Lyra ", "v");
+  const label = agent.name.replace("Lyra ", "");
 
   return (
     <motion.g
