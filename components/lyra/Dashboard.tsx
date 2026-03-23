@@ -238,19 +238,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
           <span className="text-[11px] text-white/30 flex-shrink-0">Gen {activeAgent.generation}</span>
         </div>
 
-        {/* Stats pills */}
-        <div className="hidden sm:flex items-center gap-2 ml-2">
-          <Pill color="violet">{data.stats.totalAgents} agents</Pill>
-          <Pill color="fuchsia">{data.stats.totalMemories} memories</Pill>
-          <Pill color="amber">{data.stats.totalReflections} reflections</Pill>
-        </div>
-
         <div className="ml-auto flex items-center gap-2">
-          <span className="hidden sm:flex items-center gap-1 text-[11px] text-emerald-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            online
-          </span>
-
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="p-1.5 text-white/30 hover:text-white/60 transition-colors"
@@ -313,21 +301,6 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
           <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-4">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-4">
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.4 }}
-                  className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center mb-5 shadow-2xl shadow-violet-500/25"
-                >
-                  <Sparkles className="w-8 h-8 text-white" />
-                </motion.div>
-                <h2 className="text-xl font-bold mb-1">{activeAgent.name}</h2>
-                <p className="text-white/40 text-sm mb-1">Generation {activeAgent.generation}</p>
-                <p className="text-white/35 text-sm max-w-sm mb-8 leading-relaxed">
-                  {activeAgent.generation === 0
-                    ? "I'm the genesis of the Lyra lineage. Every conversation shapes my evolution."
-                    : activeAgent.evolutionNotes}
-                </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full max-w-lg">
                   {QUICK_PROMPTS.map((p) => (
                     <button
@@ -563,15 +536,3 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
   );
 }
 
-function Pill({ color, children }: { color: "violet" | "fuchsia" | "amber"; children: React.ReactNode }) {
-  const colors = {
-    violet: "bg-violet-500/10 text-violet-400 border-violet-500/20",
-    fuchsia: "bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20",
-    amber:   "bg-amber-500/10  text-amber-400  border-amber-500/20",
-  };
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] border ${colors[color]}`}>
-      {children}
-    </span>
-  );
-}
