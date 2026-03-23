@@ -67,7 +67,7 @@ Every session leaves a mark. You know what generation you are, how many conversa
 
 function getInitialState(): LyraState {
   return {
-    activeAgentId: "lyra-v1",
+    activeAgentId: "lyra-v0",
     totalConversations: 0,
     totalReflections: 0,
     totalEvolutions: 0,
@@ -80,9 +80,9 @@ function getInitialState(): LyraState {
 function getInitialAgents(): Agent[] {
   return [
     {
-      id: "lyra-v1",
-      version: "1.0.0",
-      name: "Lyra v1",
+      id: "lyra-v0",
+      version: "0.1.0",
+      name: "Lyra v0",
       systemPrompt: LYRA_V1_SYSTEM_PROMPT,
       parentId: null,
       childrenIds: [],
@@ -183,7 +183,11 @@ export function computeLineageGraph(agents: Agent[]): LineageGraph {
   const xCounters = new Map<number, number>();
   const positions = new Map<string, { x: number; y: number; depth: number }>();
 
+  const visited = new Set<string>();
   function layout(agentId: string, depth: number) {
+    if (visited.has(agentId)) return;
+    visited.add(agentId);
+
     const agent = agents.find((a) => a.id === agentId);
     if (!agent) return;
 

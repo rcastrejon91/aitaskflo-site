@@ -92,11 +92,16 @@ Return ONLY a JSON object — no markdown, no preamble:
     throw new Error("Evolution response missing systemPrompt field.");
   }
 
-  // Generate new agent ID
+  // Generate new agent ID — ensure no collision with existing agent IDs
   const allAgents = getAllAgents();
   const nextGen = parent.generation + 1;
-  const siblingCount = allAgents.filter((a) => a.parentId === parentAgentId).length;
-  const newId = `lyra-v${nextGen}${siblingCount > 0 ? `-${String.fromCharCode(97 + siblingCount)}` : ""}`;
+  const existingIds = new Set(allAgents.map((a) => a.id));
+  let siblingCount = allAgents.filter((a) => a.parentId === parentAgentId).length;
+  let newId = `lyra-v${nextGen}${siblingCount > 0 ? `-${String.fromCharCode(97 + siblingCount)}` : ""}`;
+  while (existingIds.has(newId)) {
+    siblingCount++;
+    newId = `lyra-v${nextGen}-${String.fromCharCode(97 + siblingCount)}`;
+  }
 
   const newAgent: Agent = {
     id: newId,
