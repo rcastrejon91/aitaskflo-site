@@ -18,6 +18,27 @@ function LoginForm() {
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [destination, setDestination] = useState(callbackUrl);
+
+  const DESTINATIONS = [
+    { label: "Lyra", path: "/lyra" },
+    { label: "Play", path: "/play" },
+    { label: "Admin", path: "/admin/healer" },
+  ];
+
+  async function quickLogin(dest: string) {
+    if (!email || !password) return;
+    setError("");
+    setLoading(true);
+    try {
+      const result = await signIn("credentials", { email, password, redirect: false });
+      if (result?.error) { setError("Invalid credentials"); setLoading(false); return; }
+      router.push(dest);
+    } catch {
+      setError("Something went wrong.");
+      setLoading(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,7 +68,7 @@ function LoginForm() {
         return;
       }
 
-      router.push(callbackUrl);
+      router.push(destination);
     } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);
@@ -146,13 +167,36 @@ function LoginForm() {
               </div>
             )}
 
+            {mode === "login" && (
+              <div className="space-y-2">
+                <p className="text-[11px] text-white/30 text-center">Go to</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {DESTINATIONS.map((d) => (
+                    <button
+                      key={d.path}
+                      type="button"
+                      onClick={() => quickLogin(d.path)}
+                      disabled={loading || !email || !password}
+                      className={`py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-30 border ${
+                        destination === d.path
+                          ? "bg-violet-500/20 border-violet-500/50 text-violet-300"
+                          : "bg-white/[0.04] border-white/[0.08] text-white/50 hover:text-white/80 hover:border-white/20"
+                      }`}
+                    >
+                      {loading ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : `→ ${d.label}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading}
               className="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-600 hover:from-violet-400 hover:to-fuchsia-500 disabled:opacity-40 text-white text-sm font-semibold transition-all shadow-lg shadow-violet-500/20 flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {mode === "login" ? "Sign in" : "Create account"}
+              {mode === "login" ? "Sign in → Lyra" : "Create account"}
             </button>
           </form>
         </div>
