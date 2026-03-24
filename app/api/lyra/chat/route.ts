@@ -1547,18 +1547,25 @@ async function executeTool(
   }
 
   if (name === "build_game") {
-    const concept = input.concept ?? "a 2D platformer";
-    const genre = input.genre ?? "platformer";
-    const slug = (input.name ?? concept).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40) || "my-game";
+    const rawConcept = input.concept ?? "a 2D platformer";
+    const rawGenre = input.genre ?? "platformer";
+
+    // Auto-enhance concept if user referenced a known game
+    const { detectGameInspiration } = await import("@/lib/lyra/gamedev");
+    const inspiration = detectGameInspiration(rawConcept + " " + rawGenre);
+    const concept = inspiration ? `${rawConcept} — inspired by: ${inspiration.concept}. Key features: ${inspiration.keyFeatures}` : rawConcept;
+    const genre = inspiration ? inspiration.genre : rawGenre;
+
+    const slug = (input.name ?? rawConcept).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40) || "my-game";
     const BASE_GAME_DIR = process.env.GAME_DIR ? nodePath.dirname(process.env.GAME_DIR) : "/home/aitaskflo/game";
     const gameDir = nodePath.join(BASE_GAME_DIR, slug);
 
-    // Complex simulation genres need more turns to build all systems
+    // Complex genres need more turns
     const g = genre.toLowerCase();
-    const isComplex = g.includes("sim") || g.includes("tycoon") || g.includes("life") || g.includes("management") || g.includes("rpg");
+    const isComplex = g.includes("sim") || g.includes("tycoon") || g.includes("life") || g.includes("management") || g.includes("rpg") || g.includes("asymmetric") || g.includes("open world");
     const maxTurns = isComplex ? 45 : 30;
 
-    controller.enqueue(encoder.encode(`\n🎮 Starting ${isComplex ? "complex " : ""}game build for **${concept}** (${genre})…\n`));
+    controller.enqueue(encoder.encode(`\n🎮 Starting ${isComplex ? "complex " : ""}game build for **${rawConcept}** (${genre})…\n`));
 
     const result = await buildGame(concept, genre, gameDir, (progress) => {
       try {

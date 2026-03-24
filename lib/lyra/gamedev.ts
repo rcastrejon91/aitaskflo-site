@@ -171,6 +171,63 @@ func load_game():
 ══════════════════ END GAME BRAIN ══════════════════
 `;
 
+// ── Game inspiration map ──────────────────────────────────────────────────────
+// Maps real game references to genre + concept so Lyra knows exactly what to build
+
+export const GAME_INSPIRATIONS: Record<string, { genre: string; concept: string; keyFeatures: string }> = {
+  "resident evil": {
+    genre: "survival_horror",
+    concept: "survival horror with limited ammo, puzzle-locked doors, terrifying monsters in confined spaces",
+    keyFeatures: "fixed camera rooms OR over-shoulder, inventory grid, herbs, typewriter saves, boss fights, unlockable weapons",
+  },
+  "silent hill": {
+    genre: "psychological_horror",
+    concept: "psychological horror where the world reflects the protagonist's trauma, monsters embody inner demons",
+    keyFeatures: "radio static near monsters, fog everywhere, Otherworld shift, sanity system, disturbing imagery, deep lore",
+  },
+  "dead by daylight": {
+    genre: "asymmetric_horror",
+    concept: "asymmetric multiplayer — 4 survivors repair generators to escape while 1 killer hunts them",
+    keyFeatures: "skill checks, stealth, pallets, hooks, terror radius heartbeat, unique killer powers, fog atmosphere",
+  },
+  "charmed": {
+    genre: "supernatural_action",
+    concept: "witches with elemental powers defend good against supernatural evil, casting spells and fighting demons",
+    keyFeatures: "book of shadows spell crafting, three powers (telekinesis, premonition, time freeze), whitelighters, potion brewing, demon vanquishing",
+  },
+  "devil may cry": {
+    genre: "supernatural_action",
+    concept: "stylish action combat with guns and sword against demons, style ranking system",
+    keyFeatures: "combo system with style meter (D through SSS), weapon switching mid-combo, devil trigger power mode, airborne combos",
+  },
+  "hollow knight": {
+    genre: "metroidvania",
+    concept: "dark atmospheric metroidvania with precise combat, exploration, and deep lore",
+    keyFeatures: "nail combat with parry, soul system for healing/spells, charm equipping, map exploration, boss gauntlets, underground kingdom setting",
+  },
+  "stardew valley": {
+    genre: "simulation",
+    concept: "farming life sim with social relationships, dungeon exploration, and seasonal events",
+    keyFeatures: "farming crops per season, relationship building with villagers, mine dungeon combat, crafting, fishing, community center restoration",
+  },
+  "the witcher": {
+    genre: "rpg",
+    concept: "open world dark fantasy RPG as a monster hunter navigating morally grey choices",
+    keyFeatures: "sign magic system (5 spells), alchemy potions with toxicity, bestiary, dialogue choices with consequences, crossbow, two sword styles",
+  },
+};
+
+/**
+ * Detects if the user is referencing a real game and returns genre/concept guidance.
+ */
+export function detectGameInspiration(text: string): { genre: string; concept: string; keyFeatures: string } | null {
+  const lower = text.toLowerCase();
+  for (const [game, data] of Object.entries(GAME_INSPIRATIONS)) {
+    if (lower.includes(game)) return data;
+  }
+  return null;
+}
+
 // ── Context builder ───────────────────────────────────────────────────────────
 
 /**
@@ -179,7 +236,12 @@ func load_game():
  */
 export function buildGameContext(message: string): string {
   if (isGameTopic(message)) {
-    return GAME_DEV_CONTEXT;
+    // Add inspiration note if a known game is referenced
+    const inspiration = detectGameInspiration(message);
+    const inspirationNote = inspiration
+      ? `\nKNOWN GAME REFERENCE DETECTED — build inspired by this:\nGenre: ${inspiration.genre}\nConcept: ${inspiration.concept}\nKey features to include: ${inspiration.keyFeatures}\n`
+      : "";
+    return GAME_DEV_CONTEXT + inspirationNote;
   }
   return "";
 }
@@ -463,18 +525,371 @@ Overall mood = weighted average of all needs → drives animation blending, spee
     bubble.queue_free()
 `,
 
-    "life sim": `# alias to simulation
+    "life sim": `# alias to simulation`,
+    sims: `# alias to simulation`,
+
+    survival_horror: `
+SURVIVAL HORROR PATTERNS (Resident Evil / Silent Hill style):
+
+────────── ATMOSPHERE + LIGHTING ──────────
+- Dynamic darkness: CanvasModulate node set to Color(0.05, 0.05, 0.08) for near-black world
+- Flashlight: PointLight2D on player; cone via texture mask; flicker shader on low battery
+  var battery = 100.0
+  func _process(delta): battery -= 0.5 * delta; if battery < 20: flicker_flashlight()
+  func flicker_flashlight(): flashlight.energy = randf_range(0.6, 1.2)
+- Room lighting: each room has its own PointLight2D/SpotLight2D; flickering on corruption
+- Fog of war: use LightOccluder2D shapes on walls so darkness blocks sight
+- Ambient shader: CanvasItem shader with animated noise overlay for grain/distortion
+
+────────── FEAR / TENSION SYSTEM ──────────
+var fear = 0.0  # 0 = calm, 100 = terrified
+const FEAR_SOURCES = { "monster_nearby": 2.0, "dark_room": 0.3, "dead_body": 5.0, "monster_sight": 8.0 }
+func _process(delta):
+  fear = move_toward(fear, 0.0, 0.5 * delta)  # slow decay when safe
+  _apply_fear_effects()
+func _apply_fear_effects():
+  if fear > 70: AudioManager.play_heartbeat(remap(fear, 70, 100, 0.8, 1.6))
+  if fear > 50: camera.add_trauma(fear / 1000.0)  # subtle constant shake
+  if fear > 80: apply_vignette_shader(remap(fear, 80, 100, 0.0, 0.6))
+
+────────── INVENTORY (RE-style grid) ──────────
+const GRID_W = 6; const GRID_H = 4  # attache case grid
+var grid: Array = []  # 2D bool array, true = occupied
+class InventoryItem:
+  var item_data: ItemResource
+  var grid_x: int; var grid_y: int
+  var width: int; var height: int  # item size in grid cells
+  var quantity: int = 1
+func can_place(item, gx, gy) -> bool:
+  for dx in item.width:
+    for dy in item.height:
+      if gx+dx >= GRID_W or gy+dy >= GRID_H: return false
+      if grid[gy+dy][gx+dx]: return false
+  return true
+func auto_place(item) -> bool:  # try every slot, place if fits
+  for y in GRID_H:
+    for x in GRID_W:
+      if can_place(item, x, y): place_item(item, x, y); return true
+  return false
+
+────────── MONSTER AI (RE/SH style) ──────────
+enum State { PATROL, INVESTIGATE, HUNT, ATTACK, STUNNED, DEAD }
+- Patrol: move between patrol points, slow pace, head bob animation
+- Hearing: if player noise (running, shooting) within hearing_range → Investigate last heard position
+- Sight: raycast cone (120° wide, sight_range px); if player in cone + no wall → HUNT
+- Hunt: pathfind directly to player; speed increases as hunt time grows
+- Lose sight: if player out of sight for 8 seconds → return to Investigate then Patrol
+- Lunge attack: when within melee_range → play wind-up anim (0.6s) → dash forward → damage
+- Stunned by flashlight: if flashlight directly on monster for 2s → Stunned for 3s, fear -40
+- Noise system: running = 80 noise, walking = 20, crouching = 5, shooting = 150
+  const noise_decay = 30.0  # per second
+  var player_noise_level = 0.0
+
+────────── SURVIVAL RESOURCES ──────────
+- Ammo: limited, picked up in small quantities; player must decide when to fight vs flee
+- Health items: First Aid Spray (full heal), Herb combos (G+R=medium, G+G+R=large)
+- Item examination: right-click → rotate/zoom item, may reveal hidden secrets
+- Safe rooms: no enemies spawn; save at typewriter; ambient calm music; inventory management
+- Checkpoint system: autosave on entering new area; manual save costs ink ribbon (resource)
+
+────────── PUZZLE DESIGN ──────────
+- Lock + key: colored key cards, crests, medallions — classic RE style
+- Environmental clues: examine objects to get partial codes; combine items
+- Blocked paths: boards (crowbar), locked doors (key), blocked (push object)
+- Escape the room logic: find 3 items to combine → unlock exit
+- Note/diary system: scattered documents that build lore and hint at solutions
+
+────────── CAMERA (RE fixed angle OR top-down) ──────────
+Option A — Fixed camera zones (classic RE feel):
+  Each room has a CameraZone Area2D; entering it switches Camera2D to that room's camera
+  Player moves relative to camera direction (tank controls or screen-relative)
+Option B — Top-down with limited visibility:
+  Camera follows player; darkness + flashlight cone; map shows explored rooms only
 `,
-    sims: `# alias to simulation
+
+    psychological_horror: `
+PSYCHOLOGICAL HORROR PATTERNS (Silent Hill style):
+
+────────── SANITY SYSTEM ──────────
+var sanity = 100.0  # public, synced to horror effects
+func decrease_sanity(amount: float, reason: String):
+  sanity = max(0.0, sanity - amount)
+  sanity_changed.emit(sanity, reason)
+  if sanity < 30: _enter_disturbed_state()
+  if sanity < 10: _enter_breakdown()
+
+func _process(delta):
+  # Restore sanity in safe lit areas
+  if in_safe_room and light_level > 0.5:
+    sanity = min(100.0, sanity + 2.0 * delta)
+
+# Sanity drains from: darkness, monster sight, reading disturbing notes, monster proximity
+const SANITY_DRAIN = { "dark_room": 1.0, "monster_visible": 5.0, "disturbing_note": 10.0, "monster_touch": 20.0 }
+
+────────── VISUAL DISTORTIONS ──────────
+# Apply via ShaderMaterial on CanvasLayer:
+# Low sanity: screen wobble, color desaturation, double vision
+# Hallucinations: spawn fake monsters that don't damage but cause fear
+# Static noise: ChromaticAberration shader intensity = (1.0 - sanity/100.0) * 0.02
+# Screen tilt: camera.rotation = sin(Time.get_ticks_msec()*0.001) * (1.0-sanity/100.0) * 0.05
+func _enter_disturbed_state():
+  hallucination_timer.start(randf_range(10.0, 30.0))
+  AudioManager.start_tinnitus()
+  distortion_shader.set("intensity", 0.015)
+
+────────── OTHERWORLD TRANSITION ──────────
+# The world shifts between Normal and Otherworld (dark, rust, flesh aesthetic)
+var in_otherworld = false
+func trigger_otherworld_shift():
+  in_otherworld = !in_otherworld
+  # Play transition animation: static, darkness, screen shake
+  # Replace tileset: swap normal tiles for otherworld variant
+  # Spawn more aggressive monsters
+  # Change ambient music to industrial noise
+  $TransitionPlayer.play("otherworld_shift")
+  await $TransitionPlayer.animation_finished
+  tilemap.tile_set = OTHERWORLD_TILESET if in_otherworld else NORMAL_TILESET
+  AudioManager.play_music(OTHERWORLD_MUSIC if in_otherworld else NORMAL_MUSIC)
+
+────────── MONSTER AS METAPHOR ──────────
+# Each monster type represents a psychological state:
+# Design enemies to embody themes: guilt, fear, repression, rage
+# Monster behavior changes based on player's sanity level
+# Low sanity = monsters are faster, more aggressive, more numerous
+# High sanity = some monsters won't even appear
+
+────────── RADIO / PROXIMITY ALERT ──────────
+# Static radio crackles when monster is nearby (iconic SH mechanic)
+@onready var radio: AudioStreamPlayer = $Radio
+var radio_intensity = 0.0
+func _process(delta):
+  var nearest_dist = 9999.0
+  for monster in get_tree().get_nodes_in_group("monsters"):
+    nearest_dist = min(nearest_dist, global_position.distance_to(monster.global_position))
+  radio_intensity = clamp(1.0 - nearest_dist / radio_range, 0.0, 1.0)
+  radio.volume_db = linear_to_db(radio_intensity)
+  radio.pitch_scale = randf_range(0.95, 1.05) if radio_intensity > 0.1 else 1.0
+`,
+
+    supernatural_action: `
+SUPERNATURAL ACTION PATTERNS (Charmed / open world magic / Devil May Cry style):
+
+────────── SPELL / POWER SYSTEM ──────────
+class_name SpellData extends Resource
+@export var spell_name: String
+@export var power_cost: float = 25.0
+@export var cooldown: float = 2.0
+@export var damage: float = 50.0
+@export var range: float = 400.0
+@export var effect_type: String  # "fire", "ice", "lightning", "telekinesis", "time", "charm"
+@export var projectile_scene: PackedScene
+@export var area_radius: float = 0.0  # 0 = single target, >0 = AOE
+
+# Player spell manager:
+var equipped_spells: Array[SpellData] = []  # up to 4 equipped
+var spell_cooldowns: Dictionary = {}
+var power = 100.0; var max_power = 100.0
+const POWER_REGEN = 8.0  # per second
+
+func _process(delta):
+  power = min(max_power, power + POWER_REGEN * delta)
+  for spell in spell_cooldowns:
+    spell_cooldowns[spell] = max(0.0, spell_cooldowns[spell] - delta)
+
+func cast_spell(spell: SpellData, target_pos: Vector2):
+  if power < spell.power_cost: return  # not enough power
+  if spell_cooldowns.get(spell.spell_name, 0.0) > 0: return  # on cooldown
+  power -= spell.power_cost
+  spell_cooldowns[spell.spell_name] = spell.cooldown
+  _execute_spell(spell, target_pos)
+
+func _execute_spell(spell: SpellData, pos: Vector2):
+  match spell.effect_type:
+    "telekinesis": _telekinesis_grab(pos)
+    "time": _slow_time(spell)
+    "fire": _spawn_projectile(spell, pos)
+    "lightning": _chain_lightning(spell, pos)
+    "charm": _charm_enemy_at(pos)
+    "shield": _spawn_shield(spell)
+
+────────── SIGNATURE POWERS ──────────
+# Telekinesis (like Eleven / Charmed):
+var grabbed_object: RigidBody2D = null
+func _telekinesis_grab(pos):
+  var bodies = get_overlapping_bodies_at(pos, 60.0)
+  if bodies.size() > 0:
+    grabbed_object = bodies[0]
+    grabbed_object.gravity_scale = 0
+func _telekinesis_hold(delta):
+  if grabbed_object:
+    var target = get_global_mouse_position()
+    grabbed_object.linear_velocity = (target - grabbed_object.global_position) * 10.0
+func _telekinesis_throw():
+  if grabbed_object:
+    var dir = (get_global_mouse_position() - global_position).normalized()
+    grabbed_object.gravity_scale = 1.0
+    grabbed_object.apply_central_impulse(dir * 1800.0)
+    grabbed_object = null
+
+# Time manipulation:
+func _slow_time(spell: SpellData):
+  Engine.time_scale = 0.25
+  create_tween().tween_property(Engine, "time_scale", 1.0, spell.duration)
+  # Visual: desaturate + blue tint shader during slow-mo
+
+# Chain lightning:
+func _chain_lightning(spell: SpellData, origin: Vector2):
+  var hit = [] ; var current = origin
+  for i in 4:  # chain up to 4 enemies
+    var nearest = _nearest_enemy_not_in(hit, current, spell.range / (i + 1))
+    if not nearest: break
+    _spawn_lightning_arc(current, nearest.global_position)
+    nearest.get_node("HurtboxComponent").take_hit(spell.damage * pow(0.7, i), Vector2.ZERO)
+    hit.append(nearest); current = nearest.global_position
+
+────────── COMBO SYSTEM (DMC-style) ──────────
+var combo_count = 0
+var combo_timer = 0.0
+const COMBO_WINDOW = 2.5  # seconds before combo resets
+var combo_ratings = { 0: "D", 5: "C", 10: "B", 20: "A", 35: "S", 50: "SS", 75: "SSS" }
+
+func on_hit():
+  combo_count += 1; combo_timer = COMBO_WINDOW
+  var rating = "D"
+  for threshold in combo_ratings:
+    if combo_count >= threshold: rating = combo_ratings[threshold]
+  combo_changed.emit(combo_count, rating)
+  # Bonus: higher combo = more damage, more power regen, flashier effects
+
+func _process(delta):
+  if combo_timer > 0:
+    combo_timer -= delta
+  else:
+    combo_count = 0; combo_changed.emit(0, "")
+
+────────── OPEN WORLD MAGIC ──────────
+- Spell discovery: find grimoire pages, learn from NPCs, unlock by defeating bosses
+- Power progression: each spell has 3 tiers upgraded with "essence" from enemies
+- Ley lines: magical paths on the map; walking them restores power faster
+- Covens/sanctuaries: safe zones where spells can be learned and upgraded
+- Corruption zones: dark magic areas; stronger enemies, better loot, sanity drain
+- Day/night: some spells stronger at night; spirits more active; portals open
+
+────────── SUPERNATURAL ENEMY TYPES ──────────
+- Demon: standard melee, fire weakness, teleport to player when out of sight
+- Wraith: invisible until within 150px; phasing through walls; light spell reveals
+- Possessed human: faster than demons, mimics player animations, fear aura
+- Elder god: boss tier; multiple phases; requires specific spell weakness to damage
+- Familiar (enemy witch's pet): small+fast; buffs the witch; kill it first
+- Shadow: only vulnerable during own attack animation; otherwise reflects all damage
+
+────────── RITUAL / SPELL CRAFTING ──────────
+# Combine ingredients to craft spells or potions:
+var grimoire: Dictionary = {}  # known recipes
+class Ingredient extends Resource:
+  var name: String; var element: String; var power: float
+func craft(ingredients: Array[Ingredient]) -> SpellData:
+  var key = ingredients.map(func(i): return i.name).sorted().join("+")
+  if key in grimoire: return grimoire[key]
+  return null  # unknown combination
+`,
+
+    asymmetric_horror: `
+ASYMMETRIC MULTIPLAYER HORROR PATTERNS (Dead by Daylight style):
+
+────────── CORE LOOP ──────────
+4 Survivors vs 1 Killer — survivors repair generators to escape; killer hunts to sacrifice them.
+Roles are fundamentally different code paths sharing the same world.
+
+────────── SURVIVOR SYSTEMS ──────────
+# Generator repair (skill check mini-game):
+var gen_progress = 0.0  # 0-100%
+var repair_speed = 1.0  # % per second
+var great_skill_check_bonus = 2.0  # extra progress on great
+var fail_penalty = 10.0  # progress lost + loud noise
+
+func _repair_tick(delta):
+  gen_progress += repair_speed * delta
+  # Random skill check: flash UI circle, player must hit space in arc
+  if should_trigger_skill_check():
+    start_skill_check()
+
+# Health states: Healthy → Injured → Dying → Dead
+enum HealthState { HEALTHY, INJURED, DYING, HOOKED, DEAD }
+# Injured: slower movement, leaves blood trails, breathing sounds louder
+# Dying: crawl only; can self-recover slowly; teammate can pick up
+
+# Stealth mechanics:
+var noise_level = 0.0  # 0-100; killer can detect high noise
+var crouch_speed = 0.65  # multiplier when crouching
+var sprint_noise = 75.0; var walk_noise = 25.0; var crouch_noise = 5.0
+
+# Hiding: lockers (press E to enter; hide in darkness; killer can check)
+# Pallets: stun killer for 3s; break after use; block path briefly
+# Windows: fast vault (loud) vs slow vault (quiet)
+
+────────── KILLER SYSTEMS ──────────
+var terror_radius = 32.0  # meters — heartbeat plays for survivors in this range
+var movement_speed = 4.6  # slightly faster than survivors (4.0)
+var lunge_range = 2.5  # extra distance on attack
+var power_cooldown = 0.0  # unique killer power
+
+# The Chase:
+# Red light on minimap when killer is near; scratches on screen show direction
+# Obsession: one survivor is marked; killer gets bonus for sacrificing them
+
+# Hooking:
+func hook_survivor(survivor: Node):
+  survivor.enter_hooked_state()  # 60s on hook before death; wiggle to escape
+  # Stage 1: wiggle/struggle; Stage 2: Entity attacks (must be saved quickly)
+
+# Unique killer powers (mix and match):
+# Teleport: blink to a marked location instantly (Nurse)
+# Bear traps: place on ground; survivor gets caught; must wiggle free (Trapper)
+# Chainsaw: charge up sprint; instant down on hit; loud warning (Hillbilly)
+# Possession: take control of objects/crows to scout (Ghost Face variant)
+
+────────── MULTIPLAYER ARCHITECTURE ──────────
+# Godot 4 multiplayer (ENet):
+func _ready():
+  if multiplayer.is_server():
+    setup_as_host()
+  else:
+    setup_as_client()
+
+@rpc("any_peer", "call_local", "reliable")
+func sync_position(pos: Vector2, rot: float):
+  global_position = pos; rotation = rot
+
+@rpc("authority", "call_local", "reliable")
+func on_generator_progress(gen_id: int, progress: float):
+  generators[gen_id].progress = progress
+
+# Use MultiplayerSynchronizer for smooth position sync
+# Use MultiplayerSpawner to spawn players on all clients
+
+────────── MAPS + ATMOSPHERE ──────────
+- Procedural map: pre-built room chunks connected randomly each match
+- Totems: hidden objects that can be cleansed for perks or curse removal
+- Basement: special area; stronger hooks but harder escape; extra hooks
+- Fog: aesthetic + strategic; low visibility; distance attenuation on sounds
+- Ambient sounds: distant generators humming; crows flutter when killer passes
 `,
   };
 
   // Match genre to closest key
   const keys = Object.keys(patterns);
-  // Check for simulation/life sim aliases
-  if (g.includes("sim") || g.includes("life") || g.includes("tycoon") || g.includes("management")) {
-    return patterns["simulation"];
-  }
+
+  // Specific game/genre mappings
+  if (g.includes("sim") || g.includes("life") || g.includes("tycoon") || g.includes("management")) return patterns["simulation"];
+  if (g.includes("resident") || g.includes("survival horror") || g.includes("survival_horror") || g.includes("re ") || g.includes("re2")) return patterns["survival_horror"];
+  if (g.includes("silent") || g.includes("psychological") || g.includes("psych horror")) return patterns["psychological_horror"];
+  if (g.includes("charmed") || g.includes("supernatural") || g.includes("magic") || g.includes("witch") || g.includes("spell") || g.includes("dmc") || g.includes("devil may")) return patterns["supernatural_action"];
+  if (g.includes("dead by") || g.includes("dbd") || g.includes("asymmetric") || g.includes("multiplayer horror")) return patterns["asymmetric_horror"];
+  if (g.includes("horror") && (g.includes("action") || g.includes("fight") || g.includes("combat"))) return patterns["survival_horror"];
+  if (g.includes("horror")) return patterns["psychological_horror"];
+  if (g.includes("open world") || g.includes("openworld")) return patterns["supernatural_action"];
+
   const match = keys.find(k => g.includes(k) || k.includes(g)) ?? "platformer";
   return patterns[match] ?? patterns["platformer"];
 }
