@@ -305,7 +305,7 @@ ACTIONS:
       type: "object" as const,
       properties: {
         concept: { type: "string", description: "Game concept, story, and main mechanic" },
-        genre: { type: "string", description: "Game genre: platformer, rpg, shooter, puzzle, roguelike, adventure, horror, racing" },
+        genre: { type: "string", description: "Game genre: platformer, rpg, shooter, puzzle, roguelike, adventure, horror, racing, simulation, life sim, tycoon" },
         name: { type: "string", description: "Name/slug for the game project folder (lowercase, hyphens)" },
       },
       required: ["concept"],
@@ -1553,7 +1553,12 @@ async function executeTool(
     const BASE_GAME_DIR = process.env.GAME_DIR ? nodePath.dirname(process.env.GAME_DIR) : "/home/aitaskflo/game";
     const gameDir = nodePath.join(BASE_GAME_DIR, slug);
 
-    controller.enqueue(encoder.encode(`\n🎮 Starting game build for **${concept}** (${genre})…\n`));
+    // Complex simulation genres need more turns to build all systems
+    const g = genre.toLowerCase();
+    const isComplex = g.includes("sim") || g.includes("tycoon") || g.includes("life") || g.includes("management") || g.includes("rpg");
+    const maxTurns = isComplex ? 45 : 30;
+
+    controller.enqueue(encoder.encode(`\n🎮 Starting ${isComplex ? "complex " : ""}game build for **${concept}** (${genre})…\n`));
 
     const result = await buildGame(concept, genre, gameDir, (progress) => {
       try {
@@ -1561,9 +1566,13 @@ async function executeTool(
           controller.enqueue(encoder.encode(`\n📄 ${progress.message}`));
         } else if (progress.type === "status") {
           controller.enqueue(encoder.encode(`\n⚡ ${progress.message}`));
+        } else if (progress.type === "phase") {
+          controller.enqueue(encoder.encode(`\n\n**Phase: ${progress.message}**\n`));
+        } else if (progress.type === "art") {
+          controller.enqueue(encoder.encode(`\n🎨 Concept art generated`));
         }
       } catch { /* stream closed */ }
-    });
+    }, maxTurns);
 
     const card = JSON.stringify({
       tool: "game_build",

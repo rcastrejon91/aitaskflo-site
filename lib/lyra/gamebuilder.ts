@@ -179,12 +179,43 @@ Call write_file once to create "DESIGN.md" with:
 
 Then call done() with the design summary. Keep this phase to 1-2 tool calls.`;
 
-    case "build":
-      return `${base}
+    case "build": {
+      const g = genre.toLowerCase();
+      const isSimulation = g.includes("sim") || g.includes("tycoon") || g.includes("life") || g.includes("management");
 
-PHASE 2 — BUILD
-Your job: write ALL the game code. Build the complete game.
+      const simRequirements = `
+SIMULATION GAME — REQUIRED SYSTEMS (write all of these):
+✓ project.godot (autoloads: SimManager, AudioManager, SaveManager, BuildManager)
+✓ scripts/autoloads/SimManager.gd      — world time (30x speed), relationship graph, global signals
+✓ scripts/autoloads/AudioManager.gd
+✓ scripts/autoloads/SaveManager.gd    — serialize/deserialize full sim state to JSON
+✓ scripts/autoloads/BuildManager.gd   — grid snap (64px), ghost preview, place/rotate/sell furniture
+✓ scripts/sim/NeedsComponent.gd       — 6 needs (hunger/energy/fun/social/hygiene/bladder), decay, critical signal at <20
+✓ scripts/sim/ActionQueue.gd          — ActionData class, queue execute one at a time, await navigation
+✓ scripts/sim/InteractableObject.gd   — affordances dict, interaction_point, can_use(), start_use(), stop_use()
+✓ scripts/sim/SimCharacter.gd         — autonomous AI: check needs → find object → pathfind → use → thought bubble
+✓ scenes/objects/Bed.tscn             — energy+80, hygiene mild; use_duration 480s (8hr sleep)
+✓ scenes/objects/Fridge.tscn          — hunger+70; use_duration 30s
+✓ scenes/objects/Toilet.tscn          — bladder+90; use_duration 20s
+✓ scenes/objects/Sofa.tscn            — fun+30, energy+20; use_duration 60s; max_users 3
+✓ scenes/objects/Shower.tscn          — hygiene+80; use_duration 45s
+✓ scenes/objects/Computer.tscn        — fun+40; use_duration variable; career skill option
+✓ scenes/world/House.tscn             — living room, bedroom, bathroom, kitchen, exterior yard; all objects placed
+✓ scenes/characters/PlayerSim.tscn    — character player controls via click-to-move or direct
+✓ scenes/characters/NPCSim.tscn       — fully autonomous Sim with own needs + social AI
+✓ scenes/ui/NeedsHUD.gd + NeedsHUD.tscn  — 6 colored bars, mood label, money display, world clock
+✓ scenes/ui/BuildMode.gd + BuildMode.tscn — furniture catalog with prices, grid ghost, B to toggle
+✓ scenes/ui/RelationshipPanel.gd + RelationshipPanel.tscn — relationship bars per known Sim, tier labels
+✓ scenes/ui/MainMenu.gd + MainMenu.tscn
+✓ scenes/ui/PauseMenu.gd + PauseMenu.tscn
 
+CRITICAL: SimCharacter autonomous AI loop must actually work:
+  Every 2 seconds: find most critical need → find nearest free InteractableObject that satisfies it
+  → NavigationAgent2D path to interaction_point → on arrival: animate + tick need + show thought bubble
+  Social interaction: if social need < 30 AND another Sim within 200px → walk to them, play chat anim,
+  both get +15 social, relationship score +8`;
+
+      const actionRequirements = `
 REQUIRED FILES (must write all of these):
 ✓ project.godot (with autoloads configured)
 ✓ scripts/autoloads/GameManager.gd
@@ -201,11 +232,21 @@ REQUIRED FILES (must write all of these):
 ✓ scenes/ui/HUD.gd + HUD.tscn (health bar, score, time)
 ✓ scenes/ui/MainMenu.gd + MainMenu.tscn (title, play button, credits)
 ✓ scenes/ui/GameOver.gd + GameOver.tscn (score, retry, menu buttons)
-✓ scenes/ui/PauseMenu.gd + PauseMenu.tscn
+✓ scenes/ui/PauseMenu.gd + PauseMenu.tscn`;
+
+      return `${base}
+
+PHASE 2 — BUILD
+Your job: write ALL the game code. Build the complete game.
+
+${isSimulation ? simRequirements : actionRequirements}
 
 USE write_files for batches of related files (faster).
-Start with project.godot + autoloads, then player, then enemies, then levels, then UI.
+${isSimulation
+  ? "Start with project.godot + all autoloads, then NeedsComponent + ActionQueue + InteractableObject + SimCharacter, then all room objects, then House scene, then UI panels."
+  : "Start with project.godot + autoloads, then player, then enemies, then levels, then UI."}
 Do not call done() until ALL files are written.`;
+    }
 
     case "polish":
       return `${base}

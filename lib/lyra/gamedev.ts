@@ -288,10 +288,193 @@ RACING PATTERNS:
 - Rubber-band AI: AI cars adjust speed based on distance to player (closer when behind)
 - Minimap: small canvas in corner showing track outline + car positions
 `,
+
+    simulation: `
+LIFE SIMULATION PATTERNS (Sims-style):
+
+────────── NEEDS SYSTEM ──────────
+Every character has 6-8 needs, each 0-100, decaying over time:
+  var needs = {
+    "hunger": 80.0,    # decay: 2.0/min
+    "energy": 90.0,    # decay: 1.5/min
+    "fun": 60.0,       # decay: 1.0/min
+    "social": 70.0,    # decay: 0.8/min
+    "hygiene": 85.0,   # decay: 0.5/min
+    "bladder": 95.0,   # decay: 3.0/min
+  }
+  const DECAY_RATES = { "hunger": 0.033, "energy": 0.025, "fun": 0.017, "social": 0.013, "hygiene": 0.008, "bladder": 0.05 }
+  func _process(delta):
+    for need in needs:
+      needs[need] = max(0.0, needs[need] - DECAY_RATES[need] * delta)
+  func get_most_critical_need() -> String:
+    return needs.keys().reduce(func(a, b): return a if needs[a] < needs[b] else b)
+  signal need_critical(need_name)   # fire at < 20
+  signal need_satisfied(need_name)  # fire at > 90
+
+────────── ACTION QUEUE + AGENT AI ──────────
+Characters queue up actions and execute them one at a time:
+  var action_queue: Array[ActionData] = []
+  var current_action: ActionData = null
+
+  class ActionData:
+    var target_node: Node2D
+    var interaction_type: String  # "eat", "sleep", "watch_tv", "chat"
+    var need_satisfied: String
+    var duration: float
+    var animation: String
+
+  func decide_next_action():
+    var need = get_most_critical_need()
+    var best_object = find_best_object_for(need)
+    if best_object:
+      action_queue.append(ActionData.new(best_object, best_object.get_interaction(need), need, best_object.use_duration, "use"))
+    await navigate_to(best_object.interaction_point)
+    execute_action(current_action)
+
+────────── OBJECT AFFORDANCE SYSTEM ──────────
+Every furniture/object exposes what needs it satisfies and by how much:
+  class_name InteractableObject extends Node2D
+  @export var object_name: String = "Couch"
+  @export var affordances: Dictionary = {
+    "fun": 30.0,      # +30 fun when used
+    "energy": 20.0,   # +20 energy when napping
+    "social": 10.0,   # +10 social if others nearby
+  }
+  @export var use_duration: float = 120.0  # seconds to use
+  @export var max_users: int = 2
+  @export var interaction_point: Vector2 = Vector2.ZERO
+  var current_users: Array[Node] = []
+
+  func get_interaction(need: String) -> String:
+    return affordances.keys()[0] if need not in affordances else need
+
+  func can_use() -> bool:
+    return current_users.size() < max_users
+
+  func start_use(character: Node):
+    current_users.append(character)
+    started_use.emit(character)
+
+  func stop_use(character: Node):
+    current_users.erase(character)
+
+────────── RELATIONSHIP GRAPH ──────────
+Track relationship score between every pair of characters:
+  # In SimManager autoload:
+  var relationships: Dictionary = {}  # key: "id1_id2", value: float -100..100
+
+  func get_relationship(a: int, b: int) -> float:
+    var key = "%d_%d" % [min(a,b), max(a,b)]
+    return relationships.get(key, 0.0)
+
+  func change_relationship(a: int, b: int, delta: float):
+    var key = "%d_%d" % [min(a,b), max(a,b)]
+    relationships[key] = clamp(relationships.get(key, 0.0) + delta, -100.0, 100.0)
+
+  # Social interactions: chat +5..+15, fight -20..-40, compliment +10, flirt +15 (if rel > 30)
+  # Relationship tiers: Stranger 0, Acquaintance 20, Friend 50, Best Friend 80, Enemy < -30, Nemesis < -70
+
+────────── WORLD TIME SYSTEM ──────────
+  # SimManager autoload
+  var world_time: float = 8.0 * 60.0  # minutes from midnight (8:00 AM start)
+  var time_scale: float = 30.0         # 1 real second = 30 sim seconds
+  const MINUTES_PER_DAY = 1440.0
+
+  func _process(delta):
+    world_time = fmod(world_time + delta * time_scale / 60.0 * 60.0, MINUTES_PER_DAY)
+    var hour = int(world_time / 60.0)
+    var minute = int(fmod(world_time, 60.0))
+    time_updated.emit(hour, minute)
+
+  func get_time_string() -> String:
+    var h = int(world_time / 60.0)
+    var m = int(fmod(world_time, 60.0))
+    return "%02d:%02d %s" % [h % 12 if h % 12 != 0 else 12, m, "AM" if h < 12 else "PM"]
+
+  func is_night() -> bool:
+    return world_time < 6.0 * 60.0 or world_time > 22.0 * 60.0
+
+────────── BUILD MODE (furniture placement) ──────────
+  var build_mode: bool = false
+  var held_item: PackedScene = null
+  var ghost_item: Node2D = null    # transparent preview
+  const GRID_SIZE = 64             # pixels per tile
+
+  func snap_to_grid(pos: Vector2) -> Vector2:
+    return Vector2(round(pos.x / GRID_SIZE) * GRID_SIZE, round(pos.y / GRID_SIZE) * GRID_SIZE)
+
+  func _input(event):
+    if not build_mode: return
+    if event is InputEventMouseMotion:
+      ghost_item.global_position = snap_to_grid(get_global_mouse_position())
+    if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+      place_furniture(snap_to_grid(get_global_mouse_position()))
+    if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+      rotate_ghost()
+
+  # Placement validation: check no overlap with existing furniture using Area2D query
+
+────────── MONEY + CAREER SYSTEM ──────────
+  var simoleons: int = 20000       # starting money
+  var career: String = "Unemployed"
+  var career_level: int = 0
+  var work_start: float = 9.0 * 60.0
+  var work_end: float = 17.0 * 60.0
+
+  # Career tracks: Scientist, Artist, Business, Criminal, Athletic
+  const CAREER_SALARIES = { "Unemployed": 0, "Scientist": 180, "Artist": 120, "Business": 200 }  # per work day
+
+  func collect_paycheck():
+    simoleons += CAREER_SALARIES.get(career, 0) * (1 + career_level * 0.1)
+    money_changed.emit(simoleons)
+
+  func buy_item(cost: int) -> bool:
+    if simoleons >= cost:
+      simoleons -= cost
+      money_changed.emit(simoleons)
+      return true
+    return false
+
+────────── MOOD CALCULATION ──────────
+Overall mood = weighted average of all needs → drives animation blending, speech bubbles, color tint:
+  func get_mood() -> float:  # 0.0 = miserable, 1.0 = ecstatic
+    var weights = { "hunger": 2.0, "energy": 1.5, "fun": 1.2, "social": 1.0, "hygiene": 0.8, "bladder": 2.5 }
+    var total_weight = weights.values().reduce(func(a,b): return a + b)
+    var weighted_sum = 0.0
+    for need in needs:
+      weighted_sum += (needs[need] / 100.0) * weights.get(need, 1.0)
+    return weighted_sum / total_weight
+
+  func get_mood_name() -> String:
+    var m = get_mood()
+    if m > 0.85: return "Ecstatic"
+    elif m > 0.65: return "Happy"
+    elif m > 0.45: return "Fine"
+    elif m > 0.25: return "Uncomfortable"
+    else: return "Miserable"
+
+────────── SPEECH BUBBLES + EMOTIONS ──────────
+  # Spawn speech bubble above character showing current thought/emotion
+  func show_thought(icon: Texture2D, duration: float = 3.0):
+    var bubble = SPEECH_BUBBLE_SCENE.instantiate()
+    bubble.set_icon(icon)
+    add_child(bubble)
+    await get_tree().create_timer(duration).timeout
+    bubble.queue_free()
+`,
+
+    "life sim": `# alias to simulation
+`,
+    sims: `# alias to simulation
+`,
   };
 
   // Match genre to closest key
   const keys = Object.keys(patterns);
+  // Check for simulation/life sim aliases
+  if (g.includes("sim") || g.includes("life") || g.includes("tycoon") || g.includes("management")) {
+    return patterns["simulation"];
+  }
   const match = keys.find(k => g.includes(k) || k.includes(g)) ?? "platformer";
   return patterns[match] ?? patterns["platformer"];
 }
