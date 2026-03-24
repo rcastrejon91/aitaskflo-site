@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import {
   Mail, Users, QrCode, Globe, Palette, Calendar,
   Copy, Check, ExternalLink, ImageIcon, Gamepad2,
+  BookOpen, ChevronLeft, ChevronRight, Download,
 } from "lucide-react";
 
 // react-markdown and remark-gfm are part of the unified CJS ecosystem with
@@ -48,13 +49,17 @@ const TOOL_CONFIG: Record<string, {
   calendar:  { label: "Calendar Event",  icon: Calendar,  gradient: "from-emerald-950/80 to-emerald-900/30", border: "border-emerald-500/30", accent: "text-emerald-300" },
   godot:     { label: "Game Build",      icon: Gamepad2,  gradient: "from-rose-950/80 to-purple-900/30",      border: "border-rose-500/30",    accent: "text-rose-300" },
   task:      { label: "Task",            icon: Calendar,  gradient: "from-sky-950/80 to-sky-900/30",           border: "border-sky-500/30",     accent: "text-sky-300" },
+  book:      { label: "Book Generated",  icon: BookOpen,  gradient: "from-violet-950/80 to-fuchsia-900/30",   border: "border-violet-500/30",  accent: "text-violet-300" },
 };
 
 function ToolCard({ raw }: { raw: string }) {
   const [copied, setCopied] = useState(false);
   try {
-    const obj = JSON.parse(raw) as Record<string, string>;
-    const tool = obj.tool;
+    const obj = JSON.parse(raw) as Record<string, unknown>;
+    const tool = obj.tool as string;
+
+    // Book tool gets its own full-featured card
+    if (tool === "book") return <BookCard raw={raw} />;
     const cfg = TOOL_CONFIG[tool] ?? {
       label: tool, icon: Globe,
       gradient: "from-white/5 to-transparent", border: "border-white/15", accent: "text-white/60",
@@ -85,7 +90,7 @@ function ToolCard({ raw }: { raw: string }) {
             {fields.map(([k, v]) => (
               <div key={k} className="flex gap-3 text-xs">
                 <span className="text-white/35 capitalize min-w-[56px] flex-shrink-0">{k}</span>
-                <span className="text-white/85 break-all leading-relaxed">{v}</span>
+                <span className="text-white/85 break-all leading-relaxed">{typeof v === "string" ? v : JSON.stringify(v)}</span>
               </div>
             ))}
           </div>
@@ -95,6 +100,132 @@ function ToolCard({ raw }: { raw: string }) {
   } catch {
     return null;
   }
+}
+
+// ── Book Card ─────────────────────────────────────────────────────────────────
+
+interface BookChapter { number: number; title: string; content: string; imageUrl: string; }
+interface BookData {
+  title: string; subtitle: string; author: string; description: string;
+  coverUrl: string; genre: string; chapters: BookChapter[]; createdAt: string;
+}
+
+function BookCard({ raw }: { raw: string }) {
+  const [page, setPage] = useState(0);
+
+  let book: BookData;
+  try { book = JSON.parse(raw) as BookData; }
+  catch { return null; }
+
+  if (!book.title || !Array.isArray(book.chapters)) return null;
+
+  const totalPages = book.chapters.length + 1;
+
+  function download() {
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${book.title}</title>
+<style>body{font-family:Georgia,serif;max-width:800px;margin:0 auto;padding:40px;color:#1a1a1a;line-height:1.8}
+.cover{text-align:center;padding:80px 0;border-bottom:2px solid #333;margin-bottom:60px}
+.cover img{width:300px;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.3);margin-bottom:32px}
+.cover h1{font-size:2.5em;margin:0 0 8px}.cover h2{font-size:1.2em;color:#555;font-weight:normal}
+.chapter{margin-bottom:80px;page-break-before:always}
+.chapter img{width:100%;max-width:600px;border-radius:8px;margin:24px auto 32px;display:block}
+.chapter h2{font-size:1.8em;border-bottom:1px solid #ddd;padding-bottom:12px;margin-bottom:24px}
+.chapter p{margin:0 0 16px;text-align:justify}</style></head><body>
+<div class="cover"><img src="${book.coverUrl}" alt="Cover"/>
+<h1>${book.title}</h1>${book.subtitle ? `<h2>${book.subtitle}</h2>` : ""}
+<div style="color:#777">by ${book.author}</div>
+<p style="font-style:italic;color:#555;max-width:500px;margin:24px auto">${book.description}</p></div>
+${book.chapters.map((ch) => `<div class="chapter">
+<h2>Chapter ${ch.number}: ${ch.title}</h2>
+<img src="${ch.imageUrl}" alt="Chapter ${ch.number}"/>
+${ch.content.split("\n").filter(Boolean).map((p) => `<p>${p}</p>`).join("")}
+</div>`).join("")}</body></html>`;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+    a.download = `${book.title.replace(/[^a-z0-9]/gi, "_")}.html`;
+    a.click();
+  }
+
+  const ch = page > 0 ? book.chapters[page - 1] : null;
+
+  return (
+    <div className="mt-3 rounded-2xl overflow-hidden border border-violet-500/20 bg-gradient-to-br from-violet-950/60 to-fuchsia-950/30">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-violet-500/20">
+        <span className="flex items-center gap-2 text-xs font-semibold tracking-wide text-violet-300">
+          <BookOpen className="w-3.5 h-3.5" />
+          Book Generated · {book.genre}
+        </span>
+        <button onClick={download} className="flex items-center gap-1 text-xs text-white/40 hover:text-violet-300 transition-colors">
+          <Download className="w-3 h-3" /> Download
+        </button>
+      </div>
+
+      {/* Cover page */}
+      {page === 0 && (
+        <div className="flex flex-col sm:flex-row gap-5 p-5">
+          <img src={book.coverUrl} alt="Cover"
+            className="w-full sm:w-36 rounded-xl object-cover flex-shrink-0"
+            style={{ aspectRatio: "3/4", boxShadow: "0 6px 24px rgba(0,0,0,0.5)" }} />
+          <div className="flex flex-col justify-center min-w-0">
+            <p className="text-[10px] text-violet-400 uppercase tracking-widest mb-1">{book.genre}</p>
+            <h3 className="text-lg font-bold text-white mb-0.5 leading-tight">{book.title}</h3>
+            {book.subtitle && <p className="text-white/50 text-sm mb-1">{book.subtitle}</p>}
+            <p className="text-white/30 text-xs mb-3">by {book.author}</p>
+            <p className="text-white/65 text-xs leading-relaxed italic mb-4">{book.description}</p>
+            <div>
+              <p className="text-[10px] text-white/25 mb-2 uppercase tracking-wide">Contents</p>
+              <ul className="space-y-1">
+                {book.chapters.map((c) => (
+                  <li key={c.number}>
+                    <button onClick={() => setPage(c.number)}
+                      className="text-xs text-white/45 hover:text-violet-300 transition-colors text-left">
+                      {c.number}. {c.title}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Chapter page */}
+      {ch && (
+        <div className="p-5">
+          <p className="text-[10px] text-violet-400 uppercase tracking-widest mb-1">Chapter {ch.number}</p>
+          <h3 className="text-base font-bold text-white mb-4">{ch.title}</h3>
+          <img src={ch.imageUrl} alt={ch.title}
+            className="w-full max-w-sm mx-auto rounded-xl object-cover mb-5"
+            style={{ aspectRatio: "16/9", boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }} />
+          <div className="space-y-2 max-h-72 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10">
+            {ch.content.split("\n").filter(Boolean).map((p, i) => (
+              <p key={i} className="text-xs text-white/75 leading-relaxed">{p}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Navigation */}
+      <div className="flex items-center justify-between px-4 py-3 border-t border-violet-500/10">
+        <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}
+          className="flex items-center gap-1 text-xs text-white/40 hover:text-white/70 disabled:opacity-20 transition-colors">
+          <ChevronLeft className="w-3.5 h-3.5" /> Prev
+        </button>
+        <div className="flex gap-1">
+          {Array.from({ length: totalPages }).map((_, i) => (
+            <button key={i} onClick={() => setPage(i)}
+              className="w-1.5 h-1.5 rounded-full transition-all"
+              style={{ background: i === page ? "rgb(139,92,246)" : "rgba(255,255,255,0.15)" }} />
+          ))}
+        </div>
+        <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1}
+          className="flex items-center gap-1 text-xs text-white/40 hover:text-white/70 disabled:opacity-20 transition-colors">
+          Next <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ── Generated Image ───────────────────────────────────────────────────────────

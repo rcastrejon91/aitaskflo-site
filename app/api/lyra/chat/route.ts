@@ -8,6 +8,7 @@ import { getActiveAgent, getAgent, incrementConversationCount } from "@/lib/lyra
 import { upsertUser, upsertCrmContact, searchCrmContacts, buildMemoryContext, extractAndStoreFacts, createTask, listTasks, getSubscription, getTodayUsage, incrementUsage } from "@/lib/lyra/db";
 import { PLANS } from "@/lib/stripe";
 import { buildLearningContext } from "@/lib/lyra/weblearner";
+import { generateBook } from "@/lib/lyra/bookgen";
 import { auth } from "@/auth";
 
 const execAsync = promisify(_exec);
@@ -246,6 +247,20 @@ Actions: write_file, read_file, list_files, delete_file, run_command, git_commit
         },
       },
       required: ["action"],
+    },
+  },
+  {
+    name: "write_book",
+    description:
+      "Write a complete book with chapters and AI-generated illustrations. Use whenever the user asks to write, create, or generate a book, story, or novel.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        concept: { type: "string", description: "The story concept or premise" },
+        genre: { type: "string", description: "Genre: fantasy, sci-fi, romance, thriller, mystery, adventure, horror, children's" },
+        chapters: { type: "string", description: "Number of chapters (3, 5, 7, or 10)" },
+      },
+      required: ["concept"],
     },
   },
 ];
@@ -1254,6 +1269,24 @@ async function executeTool(
     });
     controller.enqueue(encoder.encode(`\n${card}`));
     return result;
+  }
+
+  if (name === "write_book") {
+    const concept = input.concept ?? "an epic adventure";
+    const genre = input.genre ?? "fantasy";
+    const chapterCount = Math.min(10, Math.max(1, parseInt(input.chapters ?? "5", 10) || 5));
+
+    // Stream progress messages into the chat
+    const progress = (msg: string) => {
+      try { controller.enqueue(encoder.encode(`\n✨ ${msg}`)); } catch { /* closed */ }
+    };
+
+    const book = await generateBook(concept, genre, chapterCount, progress);
+
+    // Emit a book card that the frontend will render
+    const card = JSON.stringify({ tool: "book", ...book });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return `Book "${book.title}" is ready! ${book.chapters.length} chapters generated.`;
   }
 
   const card = JSON.stringify({ tool: name, ...input });
