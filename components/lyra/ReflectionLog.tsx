@@ -121,32 +121,17 @@ export function ReflectionLog({ reflections, agentId }: Props) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Lightbulb className="w-4 h-4 text-yellow-400" />
-          <span className="text-sm font-semibold text-white">
-            Reflections{" "}
-            <span className="text-white/40 font-normal">({sorted.length})</span>
+      {avgScore > 0 && (
+        <div className="flex justify-end mb-2">
+          <span className="text-[10px] text-white/35">
+            avg <span className="text-purple-400 font-semibold">{avgScore.toFixed(1)}/10</span>
           </span>
         </div>
-        {avgScore > 0 && (
-          <span className="text-xs text-white/50">
-            avg{" "}
-            <span className="text-purple-400 font-semibold">
-              {avgScore.toFixed(1)}/10
-            </span>
-          </span>
-        )}
-      </div>
-
-      {/* List */}
+      )}
       <div className="flex-1 overflow-y-auto">
         {sorted.length === 0 ? (
-          <div className="text-center text-white/30 text-xs py-8">
-            No reflections yet.
-            <br />
-            End a conversation to generate one.
+          <div className="text-center text-white/25 text-xs py-8 leading-relaxed">
+            No reflections yet.<br />End a conversation to generate one.
           </div>
         ) : (
           sorted.map((r, i) => (

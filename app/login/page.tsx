@@ -76,25 +76,38 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0d0d0f] flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 overflow-hidden" style={{ background: "#080810" }}>
+      {/* Background blobs */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[700px] h-[500px] rounded-full blur-[130px]" style={{ background: "rgba(109,40,217,0.1)" }} />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[400px] h-[400px] rounded-full blur-[110px]" style={{ background: "rgba(134,25,143,0.07)" }} />
+        <div className="absolute inset-0" style={{
+          backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.02) 1px, transparent 0)",
+          backgroundSize: "44px 44px"
+        }} />
+      </div>
+
       {/* Back to home */}
-      <Link href="/" className="absolute top-6 left-6 flex items-center gap-2 text-white/30 hover:text-white/70 transition-colors text-sm">
+      <Link href="/" className="absolute top-6 left-6 flex items-center gap-2 text-sm transition-colors" style={{ color: "rgba(255,255,255,0.28)" }}
+        onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.7)")}
+        onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.28)")}
+      >
         <ArrowLeft className="w-4 h-4" />
         Home
       </Link>
 
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-sm relative">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-2xl shadow-violet-500/30 mb-4">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 shadow-2xl" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 8px 32px rgba(109,40,217,0.35)" }}>
             <Sparkles className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white">Lyra</h1>
-          <p className="text-white/40 text-sm mt-1">by AITaskFlo</p>
+          <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.35)" }}>by AITaskFlo</p>
         </div>
 
         {/* Card */}
-        <div className="bg-white/[0.04] border border-white/[0.09] rounded-2xl p-6 backdrop-blur-sm">
+        <div className="rounded-2xl p-6 backdrop-blur-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
           {/* Tabs */}
           <div className="flex rounded-xl bg-white/[0.04] p-1 mb-6">
             {(["login", "register"] as const).map((tab) => (
@@ -212,8 +225,8 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#0d0d0f] flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#080810" }}>
+        <Loader2 className="w-6 h-6 animate-spin" style={{ color: "rgb(167,139,250)" }} />
       </div>
     }>
       <LoginForm />

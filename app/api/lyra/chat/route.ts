@@ -5,7 +5,8 @@ import { promisify } from "util";
 import fsp from "fs/promises";
 import nodePath from "path";
 import { getActiveAgent, getAgent, incrementConversationCount } from "@/lib/lyra/agents";
-import { upsertUser, upsertCrmContact, searchCrmContacts, buildMemoryContext, createTask, listTasks } from "@/lib/lyra/db";
+import { upsertUser, upsertCrmContact, searchCrmContacts, buildMemoryContext, extractAndStoreFacts, createTask, listTasks, getSubscription, getTodayUsage, incrementUsage } from "@/lib/lyra/db";
+import { PLANS } from "@/lib/stripe";
 import { buildLearningContext } from "@/lib/lyra/weblearner";
 import { auth } from "@/auth";
 
@@ -965,6 +966,161 @@ async function streamOllamaFallback(
   }
 }
 
+// ── Task Router (Option 2) ────────────────────────────────────────────────────
+
+interface RouterDecision {
+  route: "claude" | "groq" | "ollama";
+  taskType: "simple" | "creative" | "code" | "factual" | "tool" | "analysis";
+  useParallel: boolean;
+}
+
+async function routeTask(
+  message: string,
+  history: Array<{ role: string; content: string }>
+): Promise<RouterDecision> {
+  const DEFAULT: RouterDecision = { route: "claude", taskType: "analysis", useParallel: false };
+
+  // Tool-use requests always go to Claude (only model with tools)
+  const toolKeywords = /send email|search(?: the web| for)?|weather|translate|qr code|calculate|generat(?:e|ing) image|draw|create image|news|what(?:'s| is) the time|moon phase|sunrise|sunset/i;
+  if (toolKeywords.test(message)) return { ...DEFAULT, taskType: "tool" };
+
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!groqKey) return DEFAULT;
+
+  try {
+    const context = history
+      .slice(-2)
+      .map((m) => `${m.role}: ${String(m.content).slice(0, 100)}`)
+      .join("\n");
+
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        max_tokens: 60,
+        temperature: 0,
+        messages: [{
+          role: "user",
+          content: `Classify this chat message. Reply ONLY with a JSON object — no explanation.
+${context ? `Context:\n${context}\n` : ""}Message: "${message.slice(0, 300)}"
+
+JSON: {"route":"claude|groq","taskType":"simple|creative|code|factual|analysis","parallel":true|false}
+Rules:
+- route=groq: greetings, jokes, simple facts, small talk, one-liners
+- route=claude: code, reasoning, creative writing, long content, anything complex
+- parallel=true only for: analysis, comparisons, explanations where multiple AI perspectives help
+- parallel=false for everything else`,
+        }],
+      }),
+      signal: AbortSignal.timeout(3_000),
+    });
+
+    if (!res.ok) return DEFAULT;
+    const data = await res.json();
+    const text: string = data.choices?.[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
+
+    return {
+      route: parsed.route === "groq" ? "groq" : "claude",
+      taskType: parsed.taskType ?? "analysis",
+      useParallel: parsed.parallel === true && process.env.ENABLE_PARALLEL !== "false",
+    };
+  } catch {
+    return DEFAULT;
+  }
+}
+
+// ── Parallel Agents + Judge (Option 3) ───────────────────────────────────────
+
+async function streamParallelJudge(
+  systemPrompt: string,
+  messages: Array<{ role: string; content: string }>,
+  encoder: TextEncoder,
+  controller: ReadableStreamDefaultController,
+  anthropicKey: string
+): Promise<void> {
+  const groqKey = process.env.GROQ_API_KEY;
+
+  const flatMessages = messages.map((m) => ({
+    role: m.role as "user" | "assistant",
+    content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+  }));
+
+  const lastUserMessage =
+    [...flatMessages].reverse().find((m) => m.role === "user")?.content ?? "";
+
+  // Run Claude Sonnet + Groq simultaneously (non-streaming for comparison)
+  const [claudeResult, groqResult] = await Promise.allSettled([
+    new Anthropic({ apiKey: anthropicKey }).messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: flatMessages,
+    }).then((r) => (r.content.find((b) => b.type === "text") as { type: "text"; text: string } | undefined)?.text ?? ""),
+
+    groqKey
+      ? fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            max_tokens: 1024,
+            messages: [{ role: "system", content: systemPrompt }, ...flatMessages],
+          }),
+          signal: AbortSignal.timeout(20_000),
+        })
+          .then((r) => r.json())
+          .then((d) => (d.choices?.[0]?.message?.content as string) ?? "")
+      : Promise.resolve(""),
+  ]);
+
+  const claudeText = claudeResult.status === "fulfilled" ? claudeResult.value : "";
+  const groqText   = groqResult.status   === "fulfilled" ? groqResult.value   : "";
+
+  // If only one succeeded, use it
+  if (!claudeText && !groqText) {
+    controller.enqueue(encoder.encode("⚠️ All models failed. Please try again."));
+    return;
+  }
+  if (!groqText || !claudeText) {
+    controller.enqueue(encoder.encode(claudeText || groqText));
+    return;
+  }
+
+  // Judge: pick the better response
+  let winner = claudeText;
+  if (groqKey) {
+    try {
+      const judgeData = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
+        body: JSON.stringify({
+          model: "llama-3.1-8b-instant",
+          max_tokens: 10,
+          temperature: 0,
+          messages: [{
+            role: "user",
+            content: `You are a judge. Pick the better AI response to this question.
+Question: "${lastUserMessage.slice(0, 400)}"
+Response A: "${claudeText.slice(0, 600)}"
+Response B: "${groqText.slice(0, 600)}"
+Reply ONLY with the letter A or B.`,
+          }],
+        }),
+        signal: AbortSignal.timeout(5_000),
+      }).then((r) => r.json());
+
+      const verdict: string = judgeData.choices?.[0]?.message?.content?.trim() ?? "A";
+      winner = verdict.startsWith("B") ? groqText : claudeText;
+    } catch {
+      // Judge failed — default to Claude
+    }
+  }
+
+  controller.enqueue(encoder.encode(winner));
+}
+
 // ── Tool dispatcher ───────────────────────────────────────────────────────────
 
 async function executeTool(
@@ -1121,6 +1277,22 @@ export async function POST(req: NextRequest) {
       return new Response("Invalid message", { status: 400 });
     }
 
+    // ── Usage gating ──────────────────────────────────────────────────────
+    if (userId) {
+      const sub = getSubscription(userId);
+      const plan = PLANS[sub.plan as keyof typeof PLANS] ?? PLANS.free;
+      if (plan.messagesPerDay !== Infinity) {
+        const usage = getTodayUsage(userId);
+        if (usage >= plan.messagesPerDay) {
+          return new Response(
+            JSON.stringify({ error: "limit_reached", plan: sub.plan, limit: plan.messagesPerDay }),
+            { status: 429, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        incrementUsage(userId);
+      }
+    }
+
     const agent = agentId ? getAgent(agentId) : getActiveAgent();
     if (!agent) return new Response("Agent not found", { status: 404 });
 
@@ -1167,7 +1339,7 @@ export async function POST(req: NextRequest) {
     let memoryContext = "";
     if (userId) {
       upsertUser(userId);
-      memoryContext = buildMemoryContext(userId);
+      memoryContext = buildMemoryContext(userId, message);
     }
 
     const systemPrompt = agent.systemPrompt + orchestratorAddendum + memoryContext + buildLearningContext() + getLunarPersonalityNote();
@@ -1212,6 +1384,13 @@ export async function POST(req: NextRequest) {
       { role: "user" as const, content: (userContent.length === 1 ? message : userContent) as Anthropic.MessageParam["content"] },
     ];
 
+    // ── Router: classify task before deciding which model handles it ──────
+    const decision = await routeTask(message, cleanHistory).catch(() => ({
+      route: "claude" as const,
+      taskType: "analysis" as const,
+      useParallel: false,
+    }));
+
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
       async start(controller) {
@@ -1221,6 +1400,18 @@ export async function POST(req: NextRequest) {
           // No Anthropic key — fall back to Groq immediately
           if (!anthropicKey) {
             await streamGroqFallback(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller);
+            return;
+          }
+
+          // Route: simple/fast tasks go directly to Groq
+          if (decision.route === "groq" && !decision.useParallel) {
+            await streamGroqFallback(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller);
+            return;
+          }
+
+          // Parallel mode: fan out to multiple models, judge picks best
+          if (decision.useParallel) {
+            await streamParallelJudge(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller, anthropicKey);
             return;
           }
 
@@ -1326,6 +1517,11 @@ export async function POST(req: NextRequest) {
     });
 
     incrementConversationCount(agent.id).catch(console.error);
+
+    // Extract and store facts from this exchange (non-blocking)
+    if (userId) {
+      extractAndStoreFacts(userId, message, "").catch(console.error);
+    }
 
     return new Response(readable, {
       headers: {

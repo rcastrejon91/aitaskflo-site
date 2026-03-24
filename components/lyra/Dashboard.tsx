@@ -18,6 +18,9 @@ import type {
 interface Message {
   role: "user" | "assistant";
   content: string;
+  kind?: "reflection" | "evolution";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  meta?: any;
 }
 
 interface DashboardData {
@@ -31,6 +34,148 @@ interface DashboardData {
 }
 
 type RightPanel = "reflection" | "lineage";
+
+// ── Crystal Ball Loading Animation ───────────────────────────────────────────
+
+function CrystalBallLoader() {
+  return (
+    <span className="flex items-center gap-3 py-1">
+      <span className="relative flex-shrink-0" style={{ width: 36, height: 36 }}>
+        {/* Glow behind ball */}
+        <span className="absolute inset-0 rounded-full animate-pulse" style={{
+          background: "radial-gradient(circle, rgba(139,92,246,0.4) 0%, transparent 70%)",
+          transform: "scale(1.4)",
+        }} />
+        {/* Crystal ball body */}
+        <span className="absolute inset-0 rounded-full" style={{
+          background: "radial-gradient(circle at 35% 35%, rgba(255,255,255,0.18) 0%, rgba(139,92,246,0.35) 40%, rgba(76,29,149,0.7) 100%)",
+          boxShadow: "0 0 16px rgba(139,92,246,0.5), inset 0 1px 2px rgba(255,255,255,0.15)",
+          border: "1px solid rgba(139,92,246,0.4)",
+        }} />
+        {/* Inner swirl */}
+        <span className="absolute rounded-full" style={{
+          width: 10, height: 10, top: 8, left: 8,
+          background: "radial-gradient(circle, rgba(255,255,255,0.55) 0%, rgba(196,181,253,0.2) 100%)",
+          animation: "ping 1.8s cubic-bezier(0,0,0.2,1) infinite",
+        }} />
+        {/* Base */}
+        <span className="absolute bottom-0 left-1/2 -translate-x-1/2" style={{
+          width: 20, height: 4,
+          background: "linear-gradient(90deg, transparent, rgba(139,92,246,0.4), transparent)",
+          borderRadius: "50%",
+        }} />
+
+        {/* Floating stars */}
+        {[
+          { size: 3, top: -4,  left: 20, delay: "0s",    dur: "2s"   },
+          { size: 2, top: 2,   left: 34, delay: "0.4s",  dur: "2.3s" },
+          { size: 3, top: -6,  left: 8,  delay: "0.8s",  dur: "1.9s" },
+          { size: 2, top: 14,  left: 38, delay: "1.1s",  dur: "2.5s" },
+          { size: 2, top: -2,  left: -2, delay: "0.6s",  dur: "2.1s" },
+        ].map((s, i) => (
+          <span key={i} className="absolute rounded-full" style={{
+            width: s.size, height: s.size,
+            top: s.top, left: s.left,
+            background: "rgba(196,181,253,0.9)",
+            boxShadow: "0 0 4px rgba(196,181,253,0.8)",
+            animation: `bounce ${s.dur} ${s.delay} ease-in-out infinite`,
+            opacity: 0.8,
+          }} />
+        ))}
+      </span>
+
+      <span className="flex flex-col gap-0.5">
+        <span className="text-xs text-violet-300/70 animate-pulse" style={{ letterSpacing: "0.05em" }}>
+          Lyra is thinking…
+        </span>
+        <span className="flex gap-1">
+          {[0, 1, 2].map((i) => (
+            <span key={i} className="rounded-full" style={{
+              width: 4, height: 4,
+              background: "rgba(139,92,246,0.6)",
+              animation: `bounce 1.2s ${i * 0.2}s ease-in-out infinite`,
+            }} />
+          ))}
+        </span>
+      </span>
+    </span>
+  );
+}
+
+// ── In-chat animated event cards ─────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function ReflectionChatCard({ reflection }: { reflection: any }) {
+  const score: number = reflection?.score ?? 0;
+  const color = score >= 8 ? "#22c55e" : score >= 5 ? "#a855f7" : "#f97316";
+  const stars = "✦".repeat(Math.round(score / 2));
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: "spring", damping: 18, stiffness: 260 }}
+      className="my-3 rounded-2xl overflow-hidden"
+      style={{ border: "1px solid rgba(139,92,246,0.25)", background: "linear-gradient(135deg, rgba(88,28,235,0.12) 0%, rgba(109,40,217,0.06) 100%)" }}
+    >
+      <div className="flex items-center gap-2.5 px-4 py-2.5" style={{ borderBottom: "1px solid rgba(139,92,246,0.15)" }}>
+        <span className="text-base">🔮</span>
+        <span className="text-xs font-semibold text-violet-300 tracking-wide">Reflection</span>
+        <span className="ml-auto text-xs font-bold tabular-nums" style={{ color }}>{score}/10</span>
+        <span className="text-xs" style={{ color, letterSpacing: "-1px" }}>{stars}</span>
+      </div>
+      <div className="px-4 py-3 space-y-2.5">
+        {reflection?.conversationSummary && (
+          <p className="text-xs text-white/55 leading-relaxed italic">{reflection.conversationSummary}</p>
+        )}
+        {reflection?.whatWentWell?.length > 0 && (
+          <div>
+            <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-widest">Went well</span>
+            <ul className="mt-1 space-y-0.5">
+              {reflection.whatWentWell.map((item: string, i: number) => (
+                <li key={i} className="text-xs text-white/60 pl-3">• {item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {reflection?.whatToImprove?.length > 0 && (
+          <div>
+            <span className="text-[10px] font-semibold text-orange-400 uppercase tracking-widest">To improve</span>
+            <ul className="mt-1 space-y-0.5">
+              {reflection.whatToImprove.map((item: string, i: number) => (
+                <li key={i} className="text-xs text-white/60 pl-3">• {item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function EvolutionChatCard({ agent }: { agent: any }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: "spring", damping: 15, stiffness: 200 }}
+      className="my-3 rounded-2xl overflow-hidden text-center py-5 px-4"
+      style={{ border: "1px solid rgba(217,70,239,0.3)", background: "linear-gradient(135deg, rgba(134,25,143,0.15) 0%, rgba(88,28,235,0.1) 100%)" }}
+    >
+      <motion.div
+        animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.15, 1] }}
+        transition={{ duration: 1.2, ease: "easeInOut" }}
+        className="text-4xl mb-2"
+      >✨</motion.div>
+      <p className="text-xs font-semibold text-fuchsia-300 tracking-widest uppercase mb-1">Evolution</p>
+      <p className="text-sm font-bold text-white">{agent?.name ?? "New generation"}</p>
+      {agent?.evolutionNotes && (
+        <p className="text-xs text-white/45 mt-1.5 leading-relaxed">{agent.evolutionNotes}</p>
+      )}
+      <p className="text-[10px] text-white/25 mt-2">Gen {agent?.generation ?? "?"}</p>
+    </motion.div>
+  );
+}
 
 function generateId(): string {
   if (typeof globalThis !== "undefined" && globalThis.crypto?.randomUUID) {
@@ -152,7 +297,13 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
       const result = await res.json();
       if (result.reflection) {
         setData((prev) => ({ ...prev, reflections: [result.reflection, ...prev.reflections] }));
-        setRightPanel("reflection");
+        // Push reflection as animated chat card
+        setMessages((prev) => [...prev, {
+          role: "assistant",
+          content: "",
+          kind: "reflection",
+          meta: result.reflection,
+        }]);
         showNotification("success", `Reflection complete — score: ${result.reflection.score}/10`);
         if (result.evolutionReady) setEvolutionReady(true);
       }
@@ -175,6 +326,12 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
       });
       const result = await res.json();
       if (result.newAgent) {
+        setMessages((prev) => [...prev, {
+          role: "assistant",
+          content: "",
+          kind: "evolution",
+          meta: result.newAgent,
+        }]);
         showNotification("success", `Lyra evolved to ${result.newAgent.name}!`);
         await refreshAll();
       } else {
@@ -325,38 +482,44 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
               </div>
             ) : (
               <>
-                {messages.map((msg, i) => (
-                  <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                    {msg.role === "assistant" && (
-                      <div className="w-7 h-7 rounded-xl flex items-center justify-center mr-2.5 flex-shrink-0 mt-0.5" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 2px 10px rgba(109,40,217,0.3)" }}>
-                        <Sparkles className="w-3.5 h-3.5 text-white" />
-                      </div>
-                    )}
-                    <div
-                      className={`max-w-[80%] sm:max-w-xl rounded-2xl px-4 py-3 ${msg.role === "user" ? "text-sm text-white" : "text-[15px] text-white/90"}`}
-                      style={msg.role === "user" ? {
-                        background: "linear-gradient(135deg, rgba(109,40,217,0.9), rgba(134,25,143,0.85))",
-                        border: "1px solid rgba(109,40,217,0.3)",
-                        boxShadow: "0 4px 20px rgba(109,40,217,0.2)",
-                      } : {
-                        background: "rgba(255,255,255,0.04)",
-                        border: "1px solid rgba(255,255,255,0.07)",
-                        borderLeft: "2px solid rgba(109,40,217,0.45)",
-                        lineHeight: "1.65",
-                      }}
-                    >
-                      {msg.content === "" && isLoading ? (
-                        <span className="flex gap-1 items-center">
-                          <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: "rgba(255,255,255,0.5)", animationDelay: "0ms" }} />
-                          <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: "rgba(255,255,255,0.5)", animationDelay: "150ms" }} />
-                          <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: "rgba(255,255,255,0.5)", animationDelay: "300ms" }} />
-                        </span>
-                      ) : (
-                        <MessageRenderer content={msg.content} />
+                {messages.map((msg, i) => {
+                  // Reflection event card
+                  if (msg.kind === "reflection") {
+                    return <ReflectionChatCard key={i} reflection={msg.meta} />;
+                  }
+                  // Evolution event card
+                  if (msg.kind === "evolution") {
+                    return <EvolutionChatCard key={i} agent={msg.meta} />;
+                  }
+                  return (
+                    <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                      {msg.role === "assistant" && (
+                        <div className="w-7 h-7 rounded-xl flex items-center justify-center mr-2.5 flex-shrink-0 mt-0.5" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 2px 10px rgba(109,40,217,0.3)" }}>
+                          <Sparkles className="w-3.5 h-3.5 text-white" />
+                        </div>
                       )}
+                      <div
+                        className={`max-w-[80%] sm:max-w-xl rounded-2xl px-4 py-3 ${msg.role === "user" ? "text-sm text-white" : "text-[15px] text-white/90"}`}
+                        style={msg.role === "user" ? {
+                          background: "linear-gradient(135deg, rgba(109,40,217,0.9), rgba(134,25,143,0.85))",
+                          border: "1px solid rgba(109,40,217,0.3)",
+                          boxShadow: "0 4px 20px rgba(109,40,217,0.2)",
+                        } : {
+                          background: "rgba(255,255,255,0.04)",
+                          border: "1px solid rgba(255,255,255,0.07)",
+                          borderLeft: "2px solid rgba(109,40,217,0.45)",
+                          lineHeight: "1.65",
+                        }}
+                      >
+                        {msg.content === "" && isLoading ? (
+                          <CrystalBallLoader />
+                        ) : (
+                          <MessageRenderer content={msg.content} />
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <div ref={messagesEndRef} />
               </>
             )}
@@ -445,8 +608,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                     : { color: "rgba(255,255,255,0.28)" }
                   }
                 >
-                  {tab === "reflection" ? <Lightbulb className="w-3 h-3" /> : <GitBranch className="w-3 h-3" />}
-                  {tab === "reflection" ? "Reflections" : "Lineage"}
+                  {tab === "reflection" ? <Lightbulb className="w-3.5 h-3.5" /> : <GitBranch className="w-3.5 h-3.5" />}
                 </button>
               );
             })}
@@ -535,7 +697,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                         : { color: "rgba(255,255,255,0.38)" }
                       }
                     >
-                      {tab === "reflection" ? "Reflections" : "Lineage"}
+                      {tab === "reflection" ? <Lightbulb className="w-3.5 h-3.5" /> : <GitBranch className="w-3.5 h-3.5" />}
                     </button>
                   ))}
                 </div>

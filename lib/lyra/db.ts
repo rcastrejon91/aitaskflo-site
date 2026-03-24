@@ -24,6 +24,9 @@ export interface DbFact {
   user_id: string;
   key: string;
   value: string;
+  importance: number;
+  tags: string;
+  access_count: number;
   updated_at: string;
 }
 
@@ -88,11 +91,14 @@ function initSchema(db: BetterSqlite3Db) {
     );
 
     CREATE TABLE IF NOT EXISTS facts (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id    TEXT NOT NULL,
-      key        TEXT NOT NULL,
-      value      TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id      TEXT NOT NULL,
+      key          TEXT NOT NULL,
+      value        TEXT NOT NULL,
+      importance   INTEGER DEFAULT 3,
+      tags         TEXT DEFAULT '',
+      access_count INTEGER DEFAULT 0,
+      updated_at   TEXT NOT NULL,
       UNIQUE(user_id, key),
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
@@ -109,6 +115,7 @@ function initSchema(db: BetterSqlite3Db) {
 
     CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id, timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_facts_user ON facts(user_id);
+    CREATE INDEX IF NOT EXISTS idx_facts_importance ON facts(user_id, importance DESC);
     CREATE INDEX IF NOT EXISTS idx_crm_name ON crm_contacts(name);
 
     CREATE TABLE IF NOT EXISTS auth_users (
@@ -131,7 +138,35 @@ function initSchema(db: BetterSqlite3Db) {
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_tasks_user ON tasks(user_id, completed);
+
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      user_id              TEXT PRIMARY KEY,
+      plan                 TEXT NOT NULL DEFAULT 'free',
+      stripe_customer_id   TEXT,
+      stripe_subscription_id TEXT,
+      status               TEXT NOT NULL DEFAULT 'active',
+      current_period_end   TEXT,
+      updated_at           TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS usage (
+      user_id   TEXT NOT NULL,
+      date      TEXT NOT NULL,
+      count     INTEGER DEFAULT 0,
+      PRIMARY KEY (user_id, date)
+    );
   `);
+
+  // Migrate existing facts table to add new columns if they don't exist
+  try {
+    db.exec(`ALTER TABLE facts ADD COLUMN importance INTEGER DEFAULT 3`);
+  } catch { /* column already exists */ }
+  try {
+    db.exec(`ALTER TABLE facts ADD COLUMN tags TEXT DEFAULT ''`);
+  } catch { /* column already exists */ }
+  try {
+    db.exec(`ALTER TABLE facts ADD COLUMN access_count INTEGER DEFAULT 0`);
+  } catch { /* column already exists */ }
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
@@ -166,27 +201,207 @@ export function getUser(id: string): DbUser | null {
 
 // ── Facts ─────────────────────────────────────────────────────────────────────
 
-export function upsertFact(userId: string, key: string, value: string): void {
+// Score importance 1-5 without an API call — fast keyword heuristic
+function scoreImportance(key: string, value: string): number {
+  const text = `${key} ${value}`.toLowerCase();
+  // Critical: names, clients, projects, preferences that shape every response
+  if (/\b(client|customer|project|business|company|owner|founder|ceo|product|app|startup|partner)\b/.test(text)) return 5;
+  if (/\b(name|called|i am|i'm|my name)\b/.test(text)) return 5;
+  if (/\b(always|never|hate|love|prefer|important|critical|must|need)\b/.test(text)) return 4;
+  if (/\b(like|dislike|enjoy|use|work|build|create|making)\b/.test(text)) return 3;
+  if (/\b(maybe|sometimes|usually|often|think|feel)\b/.test(text)) return 2;
+  if (/\b(lol|ok|yeah|sure|hmm|cool)\b/.test(text)) return 1;
+  return 3;
+}
+
+// Extract semantic tags from a fact for better retrieval
+function extractTags(key: string, value: string): string {
+  const text = `${key} ${value}`.toLowerCase();
+  const tags: string[] = [];
+  if (/\b(client|customer|lead|contact)\b/.test(text)) tags.push("crm");
+  if (/\b(code|build|app|project|software|game|dev)\b/.test(text)) tags.push("tech");
+  if (/\b(email|message|contact|call|meeting)\b/.test(text)) tags.push("communication");
+  if (/\b(like|prefer|love|hate|want|need)\b/.test(text)) tags.push("preference");
+  if (/\b(name|called|i am)\b/.test(text)) tags.push("identity");
+  if (/\b(business|company|startup|product)\b/.test(text)) tags.push("business");
+  return tags.join(",");
+}
+
+export function upsertFact(userId: string, key: string, value: string, importanceOverride?: number): void {
   const db = getDb();
   if (!db) return;
   try {
     const now = new Date().toISOString();
+    const importance = importanceOverride ?? scoreImportance(key, value);
+    if (importance < 1) return; // discard noise
+    const tags = extractTags(key, value);
     db.prepare(
-      `INSERT INTO facts (user_id, key, value, updated_at) VALUES (?, ?, ?, ?)
-       ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
-    ).run(userId, key.toLowerCase().trim(), value, now);
+      `INSERT INTO facts (user_id, key, value, importance, tags, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value, importance = MAX(importance, excluded.importance), tags = excluded.tags, updated_at = excluded.updated_at`
+    ).run(userId, key.toLowerCase().trim(), value, importance, tags, now);
   } catch (err) {
     console.error("[Lyra DB] upsertFact error:", err instanceof Error ? err.message : err);
   }
 }
 
-export function getFacts(userId: string): DbFact[] {
+export function getFacts(userId: string, limit = 30): DbFact[] {
   const db = getDb();
   if (!db) return [];
   try {
-    return db.prepare("SELECT * FROM facts WHERE user_id = ? ORDER BY updated_at DESC").all(userId) as DbFact[];
+    // Return highest importance first, then most recent
+    return db.prepare(
+      "SELECT * FROM facts WHERE user_id = ? ORDER BY importance DESC, updated_at DESC LIMIT ?"
+    ).all(userId, limit) as DbFact[];
   } catch {
     return [];
+  }
+}
+
+// Semantic search — finds facts relevant to a query using word overlap
+export function searchFacts(userId: string, query: string, limit = 10): DbFact[] {
+  const db = getDb();
+  if (!db) return [];
+  try {
+    const all = db.prepare(
+      "SELECT * FROM facts WHERE user_id = ? ORDER BY importance DESC"
+    ).all(userId) as DbFact[];
+
+    if (!query.trim()) return all.slice(0, limit);
+
+    const queryWords = new Set(
+      query.toLowerCase().split(/\W+/).filter((w) => w.length > 2)
+    );
+
+    // Score each fact by word overlap with query
+    const scored = all.map((f) => {
+      const factWords = new Set(
+        `${f.key} ${f.value} ${f.tags ?? ""}`.toLowerCase().split(/\W+/).filter((w) => w.length > 2)
+      );
+      const overlap = [...queryWords].filter((w) => factWords.has(w)).length;
+      const score = overlap * 2 + f.importance;
+      // Bump access count for retrieved facts
+      return { fact: f, score };
+    });
+
+    return scored
+      .filter((s) => s.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map((s) => s.fact);
+  } catch {
+    return [];
+  }
+}
+
+// Compress old low-importance facts when user has too many
+export async function compressMemoriesIfNeeded(userId: string): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+
+  try {
+    const count = (db.prepare("SELECT COUNT(*) as c FROM facts WHERE user_id = ?").get(userId) as { c: number }).c;
+    if (count < 50) return; // only compress when we have a lot
+
+    const lowImportance = db.prepare(
+      "SELECT * FROM facts WHERE user_id = ? AND importance <= 2 ORDER BY updated_at ASC LIMIT 20"
+    ).all(userId) as DbFact[];
+
+    if (lowImportance.length < 10) return;
+
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!groqKey) {
+      // No LLM available — just delete the oldest low-importance facts
+      const ids = lowImportance.map((f) => f.id);
+      db.prepare(`DELETE FROM facts WHERE id IN (${ids.join(",")})`).run();
+      return;
+    }
+
+    // Use Groq to compress multiple facts into fewer dense facts
+    const factsList = lowImportance.map((f) => `${f.key}: ${f.value}`).join("\n");
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        max_tokens: 200,
+        temperature: 0,
+        messages: [{
+          role: "user",
+          content: `Compress these user facts into 2-3 dense summary facts. Keep only what's actually useful to know about this person. Return ONLY a JSON array like [{"key":"summary topic","value":"compressed fact"}].
+
+Facts:
+${factsList}`,
+        }],
+      }),
+      signal: AbortSignal.timeout(8_000),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const text: string = data.choices?.[0]?.message?.content ?? "[]";
+      const compressed = JSON.parse(text.match(/\[[\s\S]*\]/)?.[0] ?? "[]") as Array<{ key: string; value: string }>;
+
+      // Delete old facts, store compressed ones
+      const ids = lowImportance.map((f) => f.id);
+      db.prepare(`DELETE FROM facts WHERE id IN (${ids.join(",")})`).run();
+
+      for (const f of compressed) {
+        if (f.key && f.value) upsertFact(userId, `compressed: ${f.key}`, f.value, 3);
+      }
+    }
+  } catch (err) {
+    console.error("[Lyra DB] compressMemories error:", err instanceof Error ? err.message : err);
+  }
+}
+
+// Extract and store facts from a conversation message automatically
+export async function extractAndStoreFacts(userId: string, userMessage: string, assistantReply: string): Promise<void> {
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!groqKey || !userMessage.trim()) return;
+
+  // Skip short/trivial messages
+  if (userMessage.length < 10) return;
+  const trivial = /^(hi|hey|hello|ok|yes|no|thanks|lol|haha|cool|nice|ok|sure|yep|nope|bye)$/i;
+  if (trivial.test(userMessage.trim())) return;
+
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        max_tokens: 150,
+        temperature: 0,
+        messages: [{
+          role: "user",
+          content: `Extract facts about the user from this message. Only extract real, persistent facts — not temporary things or questions. Return ONLY a JSON array or empty array [].
+
+Format: [{"key":"fact category","value":"the fact","importance":1-5}]
+Importance: 5=critical (name, business, clients), 4=strong preference, 3=general preference, 2=minor, 1=trivial
+
+User message: "${userMessage.slice(0, 400)}"
+
+JSON array only:`,
+        }],
+      }),
+      signal: AbortSignal.timeout(4_000),
+    });
+
+    if (!res.ok) return;
+    const data = await res.json();
+    const text: string = data.choices?.[0]?.message?.content ?? "[]";
+    const facts = JSON.parse(text.match(/\[[\s\S]*\]/)?.[0] ?? "[]") as Array<{ key: string; value: string; importance?: number }>;
+
+    for (const f of facts) {
+      if (f.key && f.value && typeof f.value === "string") {
+        upsertFact(userId, f.key, f.value, f.importance);
+      }
+    }
+
+    // Compress if needed (async, non-blocking)
+    compressMemoriesIfNeeded(userId).catch(() => {});
+  } catch {
+    // Non-critical — fail silently
   }
 }
 
@@ -362,26 +577,109 @@ export function completeTask(userId: string, taskId: number): boolean {
   } catch { return false; }
 }
 
+// ── Subscriptions ─────────────────────────────────────────────────────────────
+
+export interface DbSubscription {
+  user_id: string;
+  plan: string;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  status: string;
+  current_period_end: string | null;
+  updated_at: string;
+}
+
+export function getSubscription(userId: string): DbSubscription {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const free: DbSubscription = { user_id: userId, plan: "free", stripe_customer_id: null, stripe_subscription_id: null, status: "active", current_period_end: null, updated_at: now };
+  if (!db) return free;
+  try {
+    return (db.prepare("SELECT * FROM subscriptions WHERE user_id = ?").get(userId) as DbSubscription) ?? free;
+  } catch { return free; }
+}
+
+export function upsertSubscription(data: Partial<DbSubscription> & { user_id: string }): void {
+  const db = getDb();
+  if (!db) return;
+  try {
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO subscriptions (user_id, plan, stripe_customer_id, stripe_subscription_id, status, current_period_end, updated_at)
+      VALUES (@user_id, @plan, @stripe_customer_id, @stripe_subscription_id, @status, @current_period_end, @updated_at)
+      ON CONFLICT(user_id) DO UPDATE SET
+        plan = COALESCE(@plan, plan),
+        stripe_customer_id = COALESCE(@stripe_customer_id, stripe_customer_id),
+        stripe_subscription_id = COALESCE(@stripe_subscription_id, stripe_subscription_id),
+        status = COALESCE(@status, status),
+        current_period_end = COALESCE(@current_period_end, current_period_end),
+        updated_at = @updated_at
+    `).run({ plan: "free", stripe_customer_id: null, stripe_subscription_id: null, status: "active", current_period_end: null, ...data, updated_at: now });
+  } catch (err) {
+    console.error("[Lyra DB] upsertSubscription error:", err instanceof Error ? err.message : err);
+  }
+}
+
+// ── Usage tracking ─────────────────────────────────────────────────────────────
+
+export function getTodayUsage(userId: string): number {
+  const db = getDb();
+  if (!db) return 0;
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const row = db.prepare("SELECT count FROM usage WHERE user_id = ? AND date = ?").get(userId, today) as { count: number } | undefined;
+    return row?.count ?? 0;
+  } catch { return 0; }
+}
+
+export function incrementUsage(userId: string): number {
+  const db = getDb();
+  if (!db) return 0;
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    db.prepare(`
+      INSERT INTO usage (user_id, date, count) VALUES (?, ?, 1)
+      ON CONFLICT(user_id, date) DO UPDATE SET count = count + 1
+    `).run(userId, today);
+    return getTodayUsage(userId);
+  } catch { return 0; }
+}
+
 // ── Memory context builder ────────────────────────────────────────────────────
 
-export function buildMemoryContext(userId: string): string {
+export function buildMemoryContext(userId: string, currentMessage?: string): string {
   try {
     const user = getUser(userId);
     if (!user) return "";
 
-    const facts = getFacts(userId);
-    const conversations = getRecentConversations(userId, 5);
+    // Use semantic search if we have a current message, else return top by importance
+    const facts = currentMessage
+      ? searchFacts(userId, currentMessage, 15)
+      : getFacts(userId, 15);
+
+    const conversations = getRecentConversations(userId, 3);
 
     const parts: string[] = ["\n\n--- MEMORY CONTEXT ---"];
     if (user.name) parts.push(`User name: ${user.name}`);
     parts.push(`First seen: ${user.first_seen.split("T")[0]} | Last seen: ${user.last_seen.split("T")[0]}`);
 
     if (facts.length > 0) {
-      parts.push("\nKnown facts about this user:");
-      facts.forEach((f) => parts.push(`  • ${f.key}: ${f.value}`));
+      // Group by importance
+      const critical = facts.filter((f) => (f.importance ?? 3) >= 4);
+      const general  = facts.filter((f) => (f.importance ?? 3) < 4);
+
+      if (critical.length > 0) {
+        parts.push("\nKey facts (high importance):");
+        critical.forEach((f) => parts.push(`  • ${f.key}: ${f.value}`));
+      }
+      if (general.length > 0) {
+        parts.push("\nOther known facts:");
+        general.forEach((f) => parts.push(`  • ${f.key}: ${f.value}`));
+      }
     }
+
     if (conversations.length > 0) {
-      parts.push("\nRecent conversation summaries:");
+      parts.push("\nRecent conversations:");
       conversations.forEach((c) => { if (c.summary) parts.push(`  • [${c.timestamp.split("T")[0]}] ${c.summary}`); });
     }
 
