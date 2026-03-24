@@ -108,24 +108,74 @@ function ToolCard({ raw }: { raw: string }) {
 
 function GameBuildCard({ raw }: { raw: string }) {
   const [showFiles, setShowFiles] = useState(false);
+  const [artIdx, setArtIdx] = useState(0);
   let obj: Record<string, string>;
   try { obj = JSON.parse(raw); } catch { return null; }
   if (obj.tool !== "game_build") return null;
 
   const files = obj.files ? obj.files.split(", ").filter(Boolean) : [];
+  const artUrls = obj.art ? obj.art.split(",").filter(Boolean) : [];
+  const exportUrl = obj.export_url && obj.export_url.length > 0 ? obj.export_url : null;
+  const isImprovement = !!obj.improvement;
 
   return (
     <div className="mt-3 rounded-2xl overflow-hidden border border-emerald-500/25 bg-gradient-to-br from-emerald-950/60 to-teal-950/30">
+      {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-emerald-500/20">
         <span className="flex items-center gap-2 text-xs font-semibold tracking-wide text-emerald-300">
           <Gamepad2 className="w-3.5 h-3.5" />
-          Game Built · {obj.file_count ?? files.length} files
+          {isImprovement ? `Improved: ${obj.improvement}` : "Game Built"} · {obj.file_count ?? files.length} files
         </span>
         <span className="text-[10px] text-white/25">{obj.name}</span>
       </div>
 
+      {/* Concept art carousel */}
+      {artUrls.length > 0 && (
+        <div className="relative">
+          <img
+            src={artUrls[artIdx]}
+            alt={`Game art ${artIdx + 1}`}
+            className="w-full object-cover"
+            style={{ maxHeight: "240px", objectPosition: "center" }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          {artUrls.length > 1 && (
+            <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
+              {artUrls.map((_, i) => (
+                <button key={i} onClick={() => setArtIdx(i)}
+                  className="w-1.5 h-1.5 rounded-full transition-all"
+                  style={{ background: i === artIdx ? "rgb(52,211,153)" : "rgba(255,255,255,0.3)" }} />
+              ))}
+            </div>
+          )}
+          <div className="absolute top-2 right-2 flex gap-1">
+            {["Title", "Player", "Enemy", "Level"].slice(0, artUrls.length).map((label, i) => (
+              <button key={i} onClick={() => setArtIdx(i)}
+                className="text-[9px] px-2 py-0.5 rounded-full transition-all"
+                style={{
+                  background: i === artIdx ? "rgba(52,211,153,0.3)" : "rgba(0,0,0,0.4)",
+                  border: `1px solid ${i === artIdx ? "rgba(52,211,153,0.5)" : "rgba(255,255,255,0.15)"}`,
+                  color: i === artIdx ? "rgb(110,231,183)" : "rgba(255,255,255,0.5)",
+                }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="px-4 py-4 space-y-3">
         <p className="text-sm text-white/85 leading-relaxed">{obj.summary}</p>
+
+        {/* Play in browser button */}
+        {exportUrl && (
+          <a href={exportUrl} target="_blank" rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold transition-all"
+            style={{ background: "linear-gradient(135deg, rgb(16,185,129), rgb(5,150,105))", color: "white" }}>
+            <Gamepad2 className="w-4 h-4" />
+            Play in Browser
+          </a>
+        )}
 
         <div className="rounded-xl bg-black/30 border border-white/[0.06] px-3 py-2.5">
           <p className="text-[10px] text-white/35 uppercase tracking-wide mb-1.5">How to play</p>

@@ -10,7 +10,7 @@ import { PLANS } from "@/lib/stripe";
 import { buildLearningContext } from "@/lib/lyra/weblearner";
 import { generateBook } from "@/lib/lyra/bookgen";
 import { buildGameContext } from "@/lib/lyra/gamedev";
-import { buildGame } from "@/lib/lyra/gamebuilder";
+import { buildGame, improveGame } from "@/lib/lyra/gamebuilder";
 import { auth } from "@/auth";
 
 const execAsync = promisify(_exec);
@@ -268,6 +268,19 @@ ACTIONS:
         },
       },
       required: ["action"],
+    },
+  },
+  {
+    name: "improve_game",
+    description:
+      "Add a feature, fix a bug, or improve an existing game that was previously built. Use when user says: add X to the game, make the enemies harder, add a shop, add multiplayer, etc.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        improvement: { type: "string", description: "What to add or change — be specific" },
+        name: { type: "string", description: "Game project slug/folder name (same as when it was built)" },
+      },
+      required: ["improvement", "name"],
     },
   },
   {
@@ -1560,9 +1573,40 @@ async function executeTool(
       play: result.playInstructions,
       file_count: String(result.files.length),
       location: gameDir,
+      art: result.artUrls.join(","),
+      export_url: result.exportUrl ?? "",
     });
     controller.enqueue(encoder.encode(`\n${card}`));
     return `Game "${slug}" built — ${result.files.length} files written.`;
+  }
+
+  if (name === "improve_game") {
+    const improvement = input.improvement ?? "improve the game";
+    const slug = input.name ?? "my-game";
+    const BASE_GAME_DIR = process.env.GAME_DIR ? nodePath.dirname(process.env.GAME_DIR) : "/home/aitaskflo/game";
+    const gameDir = nodePath.join(BASE_GAME_DIR, slug);
+
+    controller.enqueue(encoder.encode(`\n🔧 Improving **${slug}**: ${improvement}…\n`));
+
+    const result = await improveGame(gameDir, improvement, (progress) => {
+      try {
+        if (progress.type === "file") controller.enqueue(encoder.encode(`\n📄 ${progress.message}`));
+        else if (progress.type === "status") controller.enqueue(encoder.encode(`\n⚡ ${progress.message}`));
+      } catch { /* closed */ }
+    });
+
+    const card = JSON.stringify({
+      tool: "game_build",
+      name: slug,
+      summary: result.summary,
+      files: result.files.join(", "),
+      play: result.playInstructions,
+      file_count: String(result.files.length),
+      location: gameDir,
+      improvement: improvement,
+    });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return `Improvement "${improvement}" applied to "${slug}" — ${result.files.length} files modified.`;
   }
 
   if (name === "write_book") {

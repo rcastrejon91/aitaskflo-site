@@ -183,3 +183,115 @@ export function buildGameContext(message: string): string {
   }
   return "";
 }
+
+// ── Genre-specific patterns ───────────────────────────────────────────────────
+
+export function getGenrePatterns(genre: string): string {
+  const g = genre.toLowerCase();
+
+  const patterns: Record<string, string> = {
+    platformer: `
+PLATFORMER PATTERNS:
+- Double jump: var jumps_left = 2 → if Input.is_action_just_pressed("jump") and jumps_left > 0: velocity.y = jump_vel; jumps_left -= 1
+- Wall slide: if is_on_wall() and velocity.y > 0: velocity.y = min(velocity.y, wall_slide_speed)
+- Wall jump: if is_on_wall_only() and jump pressed: velocity = Vector2(-wall_normal.x * wall_jump_h, wall_jump_v)
+- Dash: velocity = direction * dash_speed; dash_timer = dash_duration; set cooldown
+- Moving platforms: use RemoteTransform2D or sync player position in platform _physics_process
+- One-way platforms: CollisionShape with one_way_collision = true; crouch + down to drop through
+- Variable jump height: if !Input.is_action_pressed("jump") and velocity.y < 0: velocity.y += extra_gravity * delta
+- Ledge grab: raycast above and forward, if hits wall → grab, stop gravity, wait for jump input
+`,
+    "sci-fi": `
+PLATFORMER PATTERNS:
+- Double jump: var jumps_left = 2 → if Input.is_action_just_pressed("jump") and jumps_left > 0: velocity.y = jump_vel; jumps_left -= 1
+- Dash: velocity = direction * dash_speed; dash_timer = dash_duration; set cooldown
+- Wall slide and wall jump support
+`,
+    rpg: `
+RPG PATTERNS:
+- Stats system: var stats = { "str": 10, "dex": 10, "int": 10, "hp": 100, "mp": 50 }
+- Damage formula: var dmg = int(base_damage * (1 + (stats.str - 10) * 0.05) * randf_range(0.9, 1.1))
+- XP curve: func xp_for_level(lvl): return int(100 * pow(lvl, 1.5))
+- Inventory: var inventory: Array[ItemResource] = []; max_slots = 20
+- Equipment slots: var equipment = { "weapon": null, "armor": null, "accessory": null }
+- Dialogue system: DialogueManager autoload, Resource-based dialogue trees (.tres files)
+- Shop: show ItemResource list, check gold, transfer to inventory
+- Quest tracker: var active_quests: Array[QuestResource]; var completed_quests: Array[String]
+- Status effects: var status_effects: Dictionary = {} → key: effect name, value: {duration, strength}
+- Turn indicator or action bar for turn-based: use a queue sorted by speed stat
+`,
+    shooter: `
+SHOOTER PATTERNS:
+- Bullet pool: pre-instantiate 50 bullets, hide them; on fire grab inactive one, position + activate
+- Auto-aim assist: find nearest enemy in cone, lerp aim toward them by small amount
+- Weapon switching: var weapons = [pistol, shotgun, rifle]; var current_weapon_idx = 0
+- Reload system: var ammo_in_mag = 0; var reserve_ammo = 0; reload on R or auto when empty
+- Wave spawner: var wave = 0; spawn_count = 3 + wave * 2; timer between waves
+- Enemy variety: basic (walks toward player), shooter (keeps distance, fires), charger (fast dash attack)
+- Screen-space aim: get_global_mouse_position() for top-down; crosshair follows mouse
+- Muzzle flash: brief scale/opacity tween on MuzzleFlash node when shooting
+- Camera follow with slight lag: camera.global_position = camera.global_position.lerp(player.global_position + aim_offset, 5 * delta)
+- Damage numbers: instantiate floating label at hit position, tween up and fade
+`,
+    roguelike: `
+ROGUELIKE PATTERNS:
+- BSP dungeon generation:
+  func bsp_split(rect, min_size):
+    if rect.size.x < min_size * 2 and rect.size.y < min_size * 2: return [rect]
+    var split_h = rect.size.x >= rect.size.y
+    var split_pos = randi_range(min_size, (rect.size.x if split_h else rect.size.y) - min_size)
+    # split into two rects, recurse
+- Permadeath: on death → clear save, return to main menu, show run stats
+- Run upgrades: Array of UpgradeResource offered at end of each room (pick 1 of 3)
+- Room templates: pre-made Room scenes, randomly selected and connected by corridors
+- Procedural enemy placement: spawn 2-5 enemies per room based on depth
+- Rogue stat scaling: each floor multiplies enemy health/damage by 1.15
+- Meta-progression: persistent upgrades unlocked with "essence" currency (survives death)
+- Minimap: RenderingServer or CanvasLayer showing explored rooms as colored rectangles
+- Item discovery: items are unidentified until used/appraised (classic rogue mechanic)
+`,
+    puzzle: `
+PUZZLE PATTERNS:
+- Grid system: var grid: Array = []; for y in height: grid.append([]); for x in width: grid[y].append(null)
+- Cell position to world: Vector2(cell.x * tile_size, cell.y * tile_size) + Vector2(tile_size/2, tile_size/2)
+- Undo stack: var history: Array[Dictionary] = []; push state on each move; pop on undo
+- Move validator: func is_valid_move(from, to): check bounds, check rules, return bool
+- Win detection: func check_win(): iterate grid, verify win condition, emit won signal
+- Tween animations: create_tween().tween_property(piece, "position", target_pos, 0.15)
+- Drag and drop: on_input_event → detect click on piece, track drag delta, snap to grid on release
+- Hint system: pre-solve puzzle with backtracking, store solution, show one step at a time
+`,
+    horror: `
+HORROR PATTERNS:
+- Sanity meter: var sanity = 100.0; decreases near monsters/darkness; triggers hallucinations at low values
+- Darkness/light: PointLight2D follows player; reduce energy slowly in dark areas
+- Heartbeat audio: AudioStreamPlayer with heartbeat sample; pitch_scale = lerp(1.0, 1.5, 1.0 - sanity/100.0)
+- Footstep sounds: play random step sfx every N pixels traveled; pitch varies by surface
+- Monster vision cone: Area2D shaped like a sector; if player enters → monster spots player
+- Chase AI: when spotted → pathfind directly to player; if loses sight → investigate last position
+- Hiding spots: overlapping Area2D; if player inside and crouching → invisible to monsters
+- Jump scare: brief engine slowdown + loud sound + camera shake + screen flash
+- Door/lock puzzles: keys as items, doors check if key in inventory
+- Atmosphere: subtle random ambient sounds (creaking, distant footsteps) via AudioManager timer
+`,
+    racing: `
+RACING PATTERNS:
+- Physics car (top-down): apply forward force, steer by rotating, drift with lateral friction reduction
+  var steer_angle = max_steer_angle * Input.get_axis("steer_left", "steer_right")
+  rotation += steer_angle * (velocity.length() / max_speed) * delta
+  velocity = velocity.rotated(steer_angle * drift_factor * delta)
+  velocity += transform.y * -acceleration * delta  # forward
+  velocity *= pow(friction, delta)  # friction
+- Checkpoints: Area2D nodes in order; must pass in sequence; lap complete when all hit
+- Lap timer: Time.get_ticks_msec() at lap start; calculate delta on finish
+- Drift detection: if lateral_velocity > drift_threshold: is_drifting = true; spawn tire marks
+- Rubber-band AI: AI cars adjust speed based on distance to player (closer when behind)
+- Minimap: small canvas in corner showing track outline + car positions
+`,
+  };
+
+  // Match genre to closest key
+  const keys = Object.keys(patterns);
+  const match = keys.find(k => g.includes(k) || k.includes(g)) ?? "platformer";
+  return patterns[match] ?? patterns["platformer"];
+}
