@@ -1,0 +1,101 @@
+[gd_scene load_steps=2 format=3 uid="uid://hud_13thwitch"]
+
+[ext_resource type="Script" path="res://scripts/HUD.gd" id="1_hud"]
+
+[node name="HUD" type="CanvasLayer"]
+layer = 10
+script = ExtResource("1_hud")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 12.0
+offset_right = -16.0
+offset_bottom = -12.0
+
+[node name="TopBar" type="HBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+size_flags_vertical = 0
+
+[node name="LeftColumn" type="VBoxContainer" parent="MarginContainer/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="HealthLabel" type="Label" parent="MarginContainer/TopBar/LeftColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "HEALTH"
+label_settings = null
+
+[node name="HealthBar" type="ProgressBar" parent="MarginContainer/TopBar/LeftColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(200, 20)
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="WicLabel" type="Label" parent="MarginContainer/TopBar/LeftColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "WIC ENERGY"
+
+[node name="WicBar" type="ProgressBar" parent="MarginContainer/TopBar/LeftColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(200, 16)
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="Spacer" type="Control" parent="MarginContainer/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RightColumn" type="VBoxContainer" parent="MarginContainer/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 8
+
+[node name="RelicLabel" type="Label" parent="MarginContainer/TopBar/RightColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 2
+text = "Relics: 0 / 5"
+
+[node name="SpellLabel" type="Label" parent="MarginContainer/TopBar/RightColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 2
+text = "[ Hex Blast ]"
+
+[node name="BossContainer" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+size_flags_vertical = 8
+alignment = 2
+
+[node name="BossNameLabel" type="Label" parent="MarginContainer/BossContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+text = "THE WITCH"
+visible = false
+
+[node name="BossHealthBar" type="ProgressBar" parent="MarginContainer/BossContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(400, 24)
+size_flags_horizontal = 4
+max_value = 100.0
+value = 100.0
+show_percentage = false
+visible = false
+
+[node name="DamageVignette" type="ColorRect" parent="."]
+unique_name_in_owner = true
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.6, 0, 0, 0.4)
+mouse_filter = 2
