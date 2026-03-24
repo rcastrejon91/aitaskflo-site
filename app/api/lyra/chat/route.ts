@@ -9,6 +9,7 @@ import { upsertUser, upsertCrmContact, searchCrmContacts, buildMemoryContext, ex
 import { PLANS } from "@/lib/stripe";
 import { buildLearningContext } from "@/lib/lyra/weblearner";
 import { generateBook } from "@/lib/lyra/bookgen";
+import { buildGameContext } from "@/lib/lyra/gamedev";
 import { auth } from "@/auth";
 
 const execAsync = promisify(_exec);
@@ -217,29 +218,48 @@ const LYRA_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "godot_builder",
-    description: `Build and ship the 13th Witch Godot 4.4 game. You ARE the developer.
-Use this tool to write GDScript (.gd), scene files (.tscn), project config, resources, and assets.
-When asked to build any game feature — level, enemy, NPC, mechanic, UI — use this tool directly.
-Do not describe what to build. Build it. Write the files. Commit. Ship.
-Actions: write_file, read_file, list_files, delete_file, run_command, git_commit, git_push`,
+    description: `You are the SENIOR GAME DEVELOPER on this project. Use this tool to build real, complete, production-quality Godot 4 games.
+
+MINDSET: Think like an expert — plan the architecture first, write clean modular code, use components. Never write placeholder code. Every function should actually work.
+
+PHYSICS: Use physics-correct formulas. Jump height → velocity.y = -sqrt(2 * gravity * height). Coyote time, jump buffering, acceleration curves, friction — all of it.
+
+AI: State machines for all enemies. NavigationAgent2D for pathfinding. Line-of-sight raycasts. Telegraphed attacks. Flocking for swarms.
+
+GAME FEEL: Screen shake, hitstop (Engine.time_scale), squash/stretch, particle bursts, pitch variation on sounds. Make it feel GREAT.
+
+ARCHITECTURE: HealthComponent.gd + HitboxComponent.gd + HurtboxComponent.gd pattern. Signals for decoupled systems. Autoloads for GameManager/AudioManager/SaveManager. Groups for broadcast.
+
+PROCEDURAL: FastNoiseLite for terrain, BSP/drunk-walk for dungeons, weighted random for loot.
+
+ACTIONS:
+- write_file: Write one file (use for focused edits)
+- write_files: Write MULTIPLE files at once — pass files as JSON array string: [{"path":"...","content":"..."},...]
+- scaffold_project: Generate complete project structure from a game concept (pass concept in path field)
+- read_file: Read a file to understand current code before editing
+- list_files: See all files in the project
+- delete_file: Delete a file
+- run_command: Run shell commands (build, export, git operations)
+- git_commit: Stage all and commit
+- git_push: Push to remote`,
     input_schema: {
       type: "object" as const,
       properties: {
         action: {
           type: "string",
-          description: "write_file | read_file | list_files | delete_file | run_command | git_commit | git_push",
+          description: "write_file | write_files | scaffold_project | read_file | list_files | delete_file | run_command | git_commit | git_push",
         },
         path: {
           type: "string",
-          description: "File path relative to game root, e.g. 'scripts/Enemy.gd' or 'scenes/DarkForest.tscn'",
+          description: "For write_file/read_file/delete_file: file path relative to game root (e.g. 'scripts/Player.gd'). For scaffold_project: the game concept/genre description.",
         },
         content: {
           type: "string",
-          description: "Full file content for write_file (GDScript, .tscn, .tres, etc.)",
+          description: "For write_file: full file content. For write_files: JSON array string of [{path, content},...] objects.",
         },
         command: {
           type: "string",
-          description: "Shell command to run inside the game directory (e.g. 'godot --headless --export-release ...')",
+          description: "Shell command to run inside the game directory",
         },
         message: {
           type: "string",
@@ -778,6 +798,233 @@ async function toolGodotBuilder(
       await fsp.mkdir(nodePath.dirname(full), { recursive: true });
       await fsp.writeFile(full, content, "utf-8");
       return `✓ Wrote ${filePath} (${content.length} chars)`;
+    }
+
+    case "write_files": {
+      if (!content) return "write_files requires content as JSON array of {path, content} objects.";
+      let files: Array<{ path: string; content: string }>;
+      try { files = JSON.parse(content); }
+      catch { return "write_files: content must be valid JSON array [{path, content}, ...]"; }
+      if (!Array.isArray(files)) return "write_files: content must be a JSON array";
+      const results: string[] = [];
+      for (const f of files) {
+        if (!f.path || f.content === undefined) { results.push(`✗ Skipped (missing path or content)`); continue; }
+        const full = safePath(f.path);
+        await fsp.mkdir(nodePath.dirname(full), { recursive: true });
+        await fsp.writeFile(full, f.content, "utf-8");
+        results.push(`✓ ${f.path} (${f.content.length} chars)`);
+      }
+      return results.join("\n");
+    }
+
+    case "scaffold_project": {
+      // filePath holds the game concept/genre for this action
+      const concept = filePath ?? "a 2D platformer game";
+      await fsp.mkdir(GAME_DIR, { recursive: true });
+
+      // Standard Godot 4 directory structure
+      const dirs = [
+        "scenes/world", "scenes/entities", "scenes/ui", "scenes/effects",
+        "scripts/autoloads", "scripts/components", "scripts/utils",
+        "assets/sprites", "assets/audio", "assets/fonts", "assets/shaders",
+        "resources/items", "resources/enemies",
+      ];
+      for (const d of dirs) await fsp.mkdir(nodePath.join(GAME_DIR, d), { recursive: true });
+
+      // project.godot
+      const projectGodot = `; Engine configuration file.
+[gd_resource type="ProjectSettings" format=3]
+
+[configuration]
+config_version=5
+
+[application]
+config/name="My Game"
+config/description="${concept}"
+run/main_scene="res://scenes/world/Main.tscn"
+config/features=PackedStringArray("4.3", "Forward Plus")
+
+[autoload]
+GameManager="*res://scripts/autoloads/GameManager.gd"
+AudioManager="*res://scripts/autoloads/AudioManager.gd"
+SaveManager="*res://scripts/autoloads/SaveManager.gd"
+
+[display]
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[physics]
+common/enable_pause_aware_picking=true
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+`;
+
+      // GameManager autoload
+      const gameManager = `extends Node
+
+signal game_paused(is_paused)
+signal score_changed(new_score)
+
+var score: int = 0
+var is_paused: bool = false
+var current_level: int = 1
+
+func _ready():
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
+func add_score(amount: int) -> void:
+	score += amount
+	score_changed.emit(score)
+
+func pause_game() -> void:
+	is_paused = !is_paused
+	get_tree().paused = is_paused
+	game_paused.emit(is_paused)
+
+func restart_level() -> void:
+	get_tree().reload_current_scene()
+
+func go_to_scene(path: String) -> void:
+	get_tree().change_scene_to_file(path)
+`;
+
+      // AudioManager autoload
+      const audioManager = `extends Node
+
+var music_bus := AudioServer.get_bus_index("Music")
+var sfx_bus := AudioServer.get_bus_index("SFX")
+
+func play_sfx(stream: AudioStream, pitch_variation: float = 0.1) -> void:
+	var player := AudioStreamPlayer.new()
+	add_child(player)
+	player.stream = stream
+	player.pitch_scale = randf_range(1.0 - pitch_variation, 1.0 + pitch_variation)
+	player.bus = "SFX"
+	player.play()
+	player.finished.connect(player.queue_free)
+
+func play_music(stream: AudioStream, fade_in: float = 1.0) -> void:
+	# TODO: add fade logic
+	var player := AudioStreamPlayer.new()
+	add_child(player)
+	player.stream = stream
+	player.bus = "Music"
+	player.play()
+`;
+
+      // SaveManager autoload
+      const saveManager = `extends Node
+
+const SAVE_PATH = "user://save.json"
+
+func save(data: Dictionary) -> void:
+	var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if file:
+		file.store_string(JSON.stringify(data))
+
+func load_save() -> Dictionary:
+	if not FileAccess.file_exists(SAVE_PATH):
+		return {}
+	var file = FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if not file:
+		return {}
+	return JSON.parse_string(file.get_as_text()) as Dictionary
+
+func has_save() -> bool:
+	return FileAccess.file_exists(SAVE_PATH)
+
+func delete_save() -> void:
+	if FileAccess.file_exists(SAVE_PATH):
+		DirAccess.remove_absolute(SAVE_PATH)
+`;
+
+      // HealthComponent
+      const healthComponent = `extends Node
+class_name HealthComponent
+
+signal health_changed(new_hp: int, max_hp: int)
+signal died
+
+@export var max_health: int = 100
+var health: int
+
+func _ready() -> void:
+	health = max_health
+
+func take_damage(amount: int) -> void:
+	health = max(0, health - amount)
+	health_changed.emit(health, max_health)
+	if health == 0:
+		died.emit()
+
+func heal(amount: int) -> void:
+	health = min(max_health, health + amount)
+	health_changed.emit(health, max_health)
+
+func is_alive() -> bool:
+	return health > 0
+`;
+
+      // HitboxComponent (deals damage)
+      const hitboxComponent = `extends Area2D
+class_name HitboxComponent
+
+@export var damage: int = 10
+@export var knockback_force: float = 300.0
+
+func _ready() -> void:
+	area_entered.connect(_on_area_entered)
+
+func _on_area_entered(area: Area2D) -> void:
+	if area is HurtboxComponent:
+		var direction = (area.global_position - global_position).normalized()
+		area.take_hit(damage, direction * knockback_force)
+`;
+
+      // HurtboxComponent (receives damage)
+      const hurtboxComponent = `extends Area2D
+class_name HurtboxComponent
+
+signal hit_taken(damage: int, knockback: Vector2)
+
+@export var invincibility_duration: float = 0.5
+var _invincible: bool = false
+
+func take_hit(damage: int, knockback: Vector2) -> void:
+	if _invincible:
+		return
+	hit_taken.emit(damage, knockback)
+	_start_invincibility()
+
+func _start_invincibility() -> void:
+	_invincible = true
+	await get_tree().create_timer(invincibility_duration).timeout
+	_invincible = false
+`;
+
+      const filesToWrite: Record<string, string> = {
+        "project.godot": projectGodot,
+        "scripts/autoloads/GameManager.gd": gameManager,
+        "scripts/autoloads/AudioManager.gd": audioManager,
+        "scripts/autoloads/SaveManager.gd": saveManager,
+        "scripts/components/HealthComponent.gd": healthComponent,
+        "scripts/components/HitboxComponent.gd": hitboxComponent,
+        "scripts/components/HurtboxComponent.gd": hurtboxComponent,
+      };
+
+      const written: string[] = [];
+      for (const [fp, fc] of Object.entries(filesToWrite)) {
+        const full = nodePath.join(GAME_DIR, fp);
+        await fsp.mkdir(nodePath.dirname(full), { recursive: true });
+        await fsp.writeFile(full, fc, "utf-8");
+        written.push(`✓ ${fp}`);
+      }
+
+      return `Project scaffolded for: "${concept}"\n\nFiles created:\n${written.join("\n")}\n\nDirectory structure:\n${dirs.map(d => `  ${d}/`).join("\n")}\n\nNext steps:\n1. Write your Player.gd in scenes/entities/\n2. Create Main.tscn as your first scene\n3. Build your first level in scenes/world/\n4. Add enemy state machines in scenes/entities/`;
     }
 
     case "read_file": {
@@ -1375,7 +1622,7 @@ export async function POST(req: NextRequest) {
       memoryContext = buildMemoryContext(userId, message);
     }
 
-    const systemPrompt = agent.systemPrompt + orchestratorAddendum + memoryContext + buildLearningContext() + getLunarPersonalityNote();
+    const systemPrompt = agent.systemPrompt + orchestratorAddendum + memoryContext + buildLearningContext() + getLunarPersonalityNote() + buildGameContext(message);
 
     // ── 3. Build user content (text + optional images) ────────────────────
     type ImageBlock = { type: "image"; source: { type: "base64"; media_type: string; data: string } };
