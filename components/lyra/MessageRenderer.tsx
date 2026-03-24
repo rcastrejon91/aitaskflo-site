@@ -49,7 +49,8 @@ const TOOL_CONFIG: Record<string, {
   calendar:  { label: "Calendar Event",  icon: Calendar,  gradient: "from-emerald-950/80 to-emerald-900/30", border: "border-emerald-500/30", accent: "text-emerald-300" },
   godot:     { label: "Game Build",      icon: Gamepad2,  gradient: "from-rose-950/80 to-purple-900/30",      border: "border-rose-500/30",    accent: "text-rose-300" },
   task:      { label: "Task",            icon: Calendar,  gradient: "from-sky-950/80 to-sky-900/30",           border: "border-sky-500/30",     accent: "text-sky-300" },
-  book:      { label: "Book Generated",  icon: BookOpen,  gradient: "from-violet-950/80 to-fuchsia-900/30",   border: "border-violet-500/30",  accent: "text-violet-300" },
+  book:       { label: "Book Generated",  icon: BookOpen,  gradient: "from-violet-950/80 to-fuchsia-900/30",   border: "border-violet-500/30",  accent: "text-violet-300" },
+  game_build: { label: "Game Built",      icon: Gamepad2,  gradient: "from-emerald-950/80 to-teal-900/30",      border: "border-emerald-500/30", accent: "text-emerald-300" },
 };
 
 function ToolCard({ raw }: { raw: string }) {
@@ -58,8 +59,9 @@ function ToolCard({ raw }: { raw: string }) {
     const obj = JSON.parse(raw) as Record<string, unknown>;
     const tool = obj.tool as string;
 
-    // Book tool gets its own full-featured card
+    // Specialized cards
     if (tool === "book") return <BookCard raw={raw} />;
+    if (tool === "game_build") return <GameBuildCard raw={raw} />;
     const cfg = TOOL_CONFIG[tool] ?? {
       label: tool, icon: Globe,
       gradient: "from-white/5 to-transparent", border: "border-white/15", accent: "text-white/60",
@@ -100,6 +102,54 @@ function ToolCard({ raw }: { raw: string }) {
   } catch {
     return null;
   }
+}
+
+// ── Game Build Card ───────────────────────────────────────────────────────────
+
+function GameBuildCard({ raw }: { raw: string }) {
+  const [showFiles, setShowFiles] = useState(false);
+  let obj: Record<string, string>;
+  try { obj = JSON.parse(raw); } catch { return null; }
+  if (obj.tool !== "game_build") return null;
+
+  const files = obj.files ? obj.files.split(", ").filter(Boolean) : [];
+
+  return (
+    <div className="mt-3 rounded-2xl overflow-hidden border border-emerald-500/25 bg-gradient-to-br from-emerald-950/60 to-teal-950/30">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-emerald-500/20">
+        <span className="flex items-center gap-2 text-xs font-semibold tracking-wide text-emerald-300">
+          <Gamepad2 className="w-3.5 h-3.5" />
+          Game Built · {obj.file_count ?? files.length} files
+        </span>
+        <span className="text-[10px] text-white/25">{obj.name}</span>
+      </div>
+
+      <div className="px-4 py-4 space-y-3">
+        <p className="text-sm text-white/85 leading-relaxed">{obj.summary}</p>
+
+        <div className="rounded-xl bg-black/30 border border-white/[0.06] px-3 py-2.5">
+          <p className="text-[10px] text-white/35 uppercase tracking-wide mb-1.5">How to play</p>
+          <p className="text-xs text-white/65 leading-relaxed whitespace-pre-wrap">{obj.play}</p>
+        </div>
+
+        {files.length > 0 && (
+          <div>
+            <button onClick={() => setShowFiles(!showFiles)}
+              className="text-xs text-emerald-400/70 hover:text-emerald-300 transition-colors">
+              {showFiles ? "▾ Hide" : "▸ Show"} {files.length} files
+            </button>
+            {showFiles && (
+              <div className="mt-2 max-h-48 overflow-y-auto space-y-0.5">
+                {files.map((f, i) => (
+                  <p key={i} className="text-[10px] text-white/40 font-mono leading-relaxed">{f}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ── Book Card ─────────────────────────────────────────────────────────────────

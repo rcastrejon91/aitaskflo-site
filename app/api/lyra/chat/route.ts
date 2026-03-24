@@ -10,6 +10,7 @@ import { PLANS } from "@/lib/stripe";
 import { buildLearningContext } from "@/lib/lyra/weblearner";
 import { generateBook } from "@/lib/lyra/bookgen";
 import { buildGameContext } from "@/lib/lyra/gamedev";
+import { buildGame } from "@/lib/lyra/gamebuilder";
 import { auth } from "@/auth";
 
 const execAsync = promisify(_exec);
@@ -279,6 +280,20 @@ ACTIONS:
         concept: { type: "string", description: "The story concept or premise" },
         genre: { type: "string", description: "Genre: fantasy, sci-fi, romance, thriller, mystery, adventure, horror, children's" },
         chapters: { type: "string", description: "Number of chapters (3, 5, 7, or 10)" },
+      },
+      required: ["concept"],
+    },
+  },
+  {
+    name: "build_game",
+    description:
+      "Autonomously build a complete, playable Godot 4 game from scratch — player, enemies, levels, UI, menus, save system, all of it. Use when the user asks to build, create, make, or ship a full game. This runs an agentic loop that writes all the code until the game is done.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        concept: { type: "string", description: "Game concept, story, and main mechanic" },
+        genre: { type: "string", description: "Game genre: platformer, rpg, shooter, puzzle, roguelike, adventure, horror, racing" },
+        name: { type: "string", description: "Name/slug for the game project folder (lowercase, hyphens)" },
       },
       required: ["concept"],
     },
@@ -1516,6 +1531,38 @@ async function executeTool(
     });
     controller.enqueue(encoder.encode(`\n${card}`));
     return result;
+  }
+
+  if (name === "build_game") {
+    const concept = input.concept ?? "a 2D platformer";
+    const genre = input.genre ?? "platformer";
+    const slug = (input.name ?? concept).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40) || "my-game";
+    const BASE_GAME_DIR = process.env.GAME_DIR ? nodePath.dirname(process.env.GAME_DIR) : "/home/aitaskflo/game";
+    const gameDir = nodePath.join(BASE_GAME_DIR, slug);
+
+    controller.enqueue(encoder.encode(`\n🎮 Starting game build for **${concept}** (${genre})…\n`));
+
+    const result = await buildGame(concept, genre, gameDir, (progress) => {
+      try {
+        if (progress.type === "file") {
+          controller.enqueue(encoder.encode(`\n📄 ${progress.message}`));
+        } else if (progress.type === "status") {
+          controller.enqueue(encoder.encode(`\n⚡ ${progress.message}`));
+        }
+      } catch { /* stream closed */ }
+    });
+
+    const card = JSON.stringify({
+      tool: "game_build",
+      name: slug,
+      summary: result.summary,
+      files: result.files.join(", "),
+      play: result.playInstructions,
+      file_count: String(result.files.length),
+      location: gameDir,
+    });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return `Game "${slug}" built — ${result.files.length} files written.`;
   }
 
   if (name === "write_book") {
