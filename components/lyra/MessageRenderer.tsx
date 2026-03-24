@@ -273,6 +273,35 @@ function buildMdComponents(CodeBlock: any) {
   };
 }
 
+// ── URL auto-linker (used in plain-text fallback) ────────────────────────────
+
+const URL_RE = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/g;
+
+function TextWithLinks({ text }: { text: string }) {
+  const parts = text.split(URL_RE);
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.startsWith("http://") || part.startsWith("https://") ? (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 inline-flex items-center gap-0.5 break-all transition-opacity hover:opacity-75"
+            style={{ color: "rgb(167,139,250)" }}
+          >
+            {part}
+            <ExternalLink className="w-2.5 h-2.5 flex-shrink-0 ml-0.5" />
+          </a>
+        ) : (
+          part
+        )
+      )}
+    </>
+  );
+}
+
 // ── Main renderer ─────────────────────────────────────────────────────────────
 
 export function MessageRenderer({ content }: { content: string }) {
@@ -292,10 +321,10 @@ export function MessageRenderer({ content }: { content: string }) {
         if (!seg.value.trim()) return null;
 
         if (!md) {
-          // Plain text fallback until react-markdown loads on the client
+          // Plain text fallback with URL detection until react-markdown loads
           return (
             <p key={i} className="text-sm leading-relaxed mb-2 last:mb-0 text-white/90 whitespace-pre-wrap">
-              {seg.value}
+              <TextWithLinks text={seg.value} />
             </p>
           );
         }

@@ -840,7 +840,8 @@ async function streamGroqFallback(
 ): Promise<void> {
   const groqKey = process.env.GROQ_API_KEY;
   if (!groqKey) {
-    controller.enqueue(encoder.encode("⚠️ AI service unavailable — no API keys configured."));
+    // No Groq key — try local Ollama
+    await streamOllamaFallback(systemPrompt, messages, encoder, controller);
     return;
   }
 
@@ -878,8 +879,8 @@ async function streamGroqFallback(
   });
 
   if (!res.ok) {
-    const errText = await res.text().catch(() => res.status.toString());
-    controller.enqueue(encoder.encode(`⚠️ Groq error: ${errText}`));
+    // Groq failed — fall through to local Ollama
+    await streamOllamaFallback(systemPrompt, messages, encoder, controller);
     return;
   }
 
@@ -901,6 +902,65 @@ async function streamGroqFallback(
         const delta = json.choices?.[0]?.delta?.content;
         if (delta) controller.enqueue(encoder.encode(delta));
       } catch { /* skip malformed SSE line */ }
+    }
+  }
+}
+
+// ── Ollama fallback (local, unfiltered) ───────────────────────────────────────
+async function streamOllamaFallback(
+  systemPrompt: string,
+  messages: Array<{ role: string; content: string }>,
+  encoder: TextEncoder,
+  controller: ReadableStreamDefaultController
+): Promise<void> {
+  const ollamaUrl = process.env.OLLAMA_URL ?? "http://localhost:11434";
+  const ollamaModel = process.env.OLLAMA_MODEL ?? "llama3";
+
+  const flattenContent = (c: unknown): string => {
+    if (typeof c === "string") return c;
+    if (Array.isArray(c)) {
+      return (c as Array<{ type?: string; text?: string }>)
+        .map((b) => (b.type === "text" && b.text ? b.text : ""))
+        .join(" ").trim() || "[image]";
+    }
+    return String(c);
+  };
+
+  const res = await fetch(`${ollamaUrl}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: ollamaModel,
+      stream: true,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...messages.map((m) => ({ role: m.role, content: flattenContent(m.content) })),
+      ],
+    }),
+    signal: AbortSignal.timeout(120_000),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => res.status.toString());
+    controller.enqueue(encoder.encode(`⚠️ Ollama error: ${errText}`));
+    return;
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) return;
+  const dec = new TextDecoder();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const lines = dec.decode(value, { stream: true }).split("\n").filter(Boolean);
+    for (const line of lines) {
+      try {
+        const json = JSON.parse(line);
+        const chunk = json.message?.content;
+        if (chunk) controller.enqueue(encoder.encode(chunk));
+        if (json.done) return;
+      } catch { /* skip malformed line */ }
     }
   }
 }
