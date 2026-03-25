@@ -21,8 +21,9 @@ const nextConfig = {
       { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
     ];
     return [
-      { source: "/play",       headers: godotHeaders },
-      { source: "/game/:path*", headers: godotHeaders },
+      { source: "/play",         headers: godotHeaders },
+      { source: "/game/:path*",  headers: godotHeaders },
+      { source: "/games/:path*", headers: godotHeaders },
     ];
   },
 

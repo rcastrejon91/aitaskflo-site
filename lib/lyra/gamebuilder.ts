@@ -332,6 +332,47 @@ async function runCommand(gameDir: string, command: string): Promise<string> {
 
 // ── HTML5 export ──────────────────────────────────────────────────────────────
 
+function buildExportPresets(exportPath: string): string {
+  return `[preset.0]
+
+name="Web"
+platform="Web"
+runnable=true
+dedicated_server=false
+custom_features=""
+export_filter="all_resources"
+include_filter="*.png, *.wav, *.ogg, *.ttf, *.tres, *.theme"
+exclude_filter=""
+export_path="${exportPath}"
+encryption_include_filters=""
+encryption_exclude_filters=""
+encrypt_pck=false
+encrypt_directory=false
+
+[preset.0.options]
+
+custom_template/debug=""
+custom_template/release=""
+variant/extensions_support=false
+vram_texture_compression/for_desktop=true
+vram_texture_compression/for_mobile=false
+html/export_icon=true
+html/custom_html_shell=""
+html/head_include=""
+html/canvas_resize_policy=2
+html/focus_canvas_on_start=true
+html/experimental_virtual_keyboard=false
+progressive_web_app/enabled=false
+progressive_web_app/offline_page=""
+progressive_web_app/display=1
+progressive_web_app/orientation=0
+progressive_web_app/icon_144x144=""
+progressive_web_app/icon_180x180=""
+progressive_web_app/icon_512x512=""
+progressive_web_app/background_color=Color(0, 0, 0, 1)
+`;
+}
+
 async function tryHtml5Export(gameDir: string, slug: string): Promise<string | undefined> {
   const publicDir = process.env.NEXT_PUBLIC_GAME_HOST_DIR ?? "/var/www/aitaskflo/public/games";
   const exportDir = nodePath.join(publicDir, slug);
@@ -339,15 +380,21 @@ async function tryHtml5Export(gameDir: string, slug: string): Promise<string | u
 
   try {
     await fsp.mkdir(exportDir, { recursive: true });
+
     // Check if Godot CLI exists
     const { stdout: godotPath } = await execAsync("which godot4 || which godot || echo ''", { timeout: 5_000 });
     const godotBin = godotPath.trim().split("\n")[0];
     if (!godotBin) return undefined;
 
+    // Write export_presets.cfg with correct output path
+    const presetsPath = nodePath.join(gameDir, "export_presets.cfg");
+    await fsp.writeFile(presetsPath, buildExportPresets(exportPath), "utf-8");
+
     await execAsync(
       `${godotBin} --headless --path . --export-release "Web" "${exportPath}"`,
       { cwd: gameDir, timeout: 120_000 }
     );
+
     // Check export succeeded
     await fsp.access(exportPath);
     const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
