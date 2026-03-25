@@ -166,18 +166,16 @@ CODE RULES:
       return `${base}
 
 PHASE 1 — DESIGN
-Your job: create a complete game design document and file plan.
+Write DESIGN.md in ONE write_file call. Then immediately call done().
+Do NOT describe the plan in text. Do NOT explain what you're about to do.
+Just write the file and call done(). 2 tool calls maximum.
 
-Call write_file once to create "DESIGN.md" with:
-1. Core game loop (what player does every 30 seconds)
-2. Complete file list (every .gd and .tscn you will create)
-3. Player stats and controls
-4. Enemy types (2-3) with behavior descriptions
-5. Level design for first 2 levels
-6. Win/lose conditions
-7. UI screens needed
-
-Then call done() with the design summary. Keep this phase to 1-2 tool calls.`;
+DESIGN.md must contain:
+- Core game loop
+- Complete file list (every .gd and .tscn)
+- Player stats and controls
+- Enemy types with behaviors
+- Win/lose conditions`;
 
     case "build": {
       const g = genre.toLowerCase();
@@ -376,10 +374,10 @@ async function runPhase(
   onProgress({ type: "phase", message: phaseNames[phase] });
 
   const initMessages: Record<string, string> = {
-    design: `Design the game now. Concept: "${concept}", Genre: ${genre}. Create DESIGN.md then call done().`,
-    build: `Build the complete game now. Start with write_files for project.godot + autoloads. Write every file. Do not stop until all required files are done, then call done().`,
-    polish: `Polish the game now. List files first, then read Player.gd and Enemy.gd, then add juice and fix any missing connections. Call done() when complete.`,
-    verify: `Verify the game now. Read the key scripts, fix any issues, commit, then call done().`,
+    design: `Write DESIGN.md now. Concept: "${concept}", Genre: ${genre}. ONE write_file call, then done(). No text output — just the two tool calls.`,
+    build: `START WRITING FILES NOW. First tool call: write_files with project.godot + all autoloads. Do not output any text — go straight to tool calls. Keep writing files until everything is done, then call done(). Every turn must have at least one write_file or write_files call.`,
+    polish: `List files, read Player.gd, then write improvements. No text narration — straight to tool calls.`,
+    verify: `Read key scripts, fix issues, run git commit, call done(). No narration — tool calls only.`,
   };
 
   const messages: Anthropic.MessageParam[] = [
@@ -401,8 +399,11 @@ async function runPhase(
 
     const toolUses: Anthropic.ToolUseBlock[] = [];
     for (const block of response.content) {
-      if (block.type === "text" && block.text.trim()) {
-        onProgress({ type: "status", message: block.text.trim().slice(0, 140) });
+      // Suppress text narration — only show actual tool calls as progress
+      if (block.type === "text" && block.text.trim() && toolUses.length === 0) {
+        // Only show brief status if no tool calls came with this response
+        const txt = block.text.trim().slice(0, 80);
+        if (txt.length > 10) onProgress({ type: "status", message: txt });
       }
       if (block.type === "tool_use") toolUses.push(block);
     }
@@ -576,8 +577,11 @@ RULES:
 
     const toolUses: Anthropic.ToolUseBlock[] = [];
     for (const block of response.content) {
-      if (block.type === "text" && block.text.trim()) {
-        onProgress({ type: "status", message: block.text.trim().slice(0, 140) });
+      // Suppress text narration — only show actual tool calls as progress
+      if (block.type === "text" && block.text.trim() && toolUses.length === 0) {
+        // Only show brief status if no tool calls came with this response
+        const txt = block.text.trim().slice(0, 80);
+        if (txt.length > 10) onProgress({ type: "status", message: txt });
       }
       if (block.type === "tool_use") toolUses.push(block);
     }
