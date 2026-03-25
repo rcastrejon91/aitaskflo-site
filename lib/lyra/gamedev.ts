@@ -13,6 +13,7 @@ const GAME_KEYWORDS = [
   "jump", "gravity", "score", "mechanic", "platformer", "rpg", "shooter",
   "roguelike", "dungeon", "npc", "dialogue", "quest", "boss", "loot",
   "particle", "sound", "music", "ui", "hud", "menu", "save", "load",
+  "3d", "fps", "first person", "third person", "open world", "phaser", "threejs", "browser game",
 ];
 
 export function isGameTopic(text: string): boolean {
@@ -892,4 +893,726 @@ func on_generator_progress(gen_id: int, progress: float):
 
   const match = keys.find(k => g.includes(k) || k.includes(g)) ?? "platformer";
   return patterns[match] ?? patterns["platformer"];
+}
+
+// ── 3D genre patterns (Godot 4 GDScript) ─────────────────────────────────────
+
+export function get3DGenrePatterns(genre: string): string {
+  const g = genre.toLowerCase();
+
+  const patterns: Record<string, string> = {
+    fps: `
+FIRST-PERSON SHOOTER 3D PATTERNS (Godot 4):
+
+# CharacterBody3D player with Camera3D mouselook
+extends CharacterBody3D
+class_name FPSPlayer
+
+@onready var camera: Camera3D = $Camera3D
+@onready var gun_bob_pivot: Node3D = $Camera3D/GunBobPivot
+@onready var arms_mesh: MeshInstance3D = $Camera3D/GunBobPivot/ArmsModel
+
+@export var mouse_sensitivity: float = 0.003
+@export var speed: float = 5.0
+@export var jump_velocity: float = 4.5
+@export var gravity: float = 9.8
+
+var pitch: float = 0.0
+var bob_time: float = 0.0
+const BOB_FREQ = 2.4; const BOB_AMP = 0.06
+
+func _ready() -> void:
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventMouseMotion:
+        rotate_y(-event.relative.x * mouse_sensitivity)
+        pitch = clamp(pitch - event.relative.y * mouse_sensitivity, -1.5, 1.5)
+        camera.rotation.x = pitch
+
+func _physics_process(delta: float) -> void:
+    if not is_on_floor():
+        velocity.y -= gravity * delta
+    if Input.is_action_just_pressed("jump") and is_on_floor():
+        velocity.y = jump_velocity
+    var input_dir = Input.get_vector("move_left","move_right","move_forward","move_back")
+    var direction = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
+    velocity.x = direction.x * speed
+    velocity.z = direction.z * speed
+    move_and_slide()
+    _headbob(delta)
+
+func _headbob(delta: float) -> void:
+    if velocity.length() > 0.5 and is_on_floor():
+        bob_time += delta * BOB_FREQ
+        camera.transform.origin.y = sin(bob_time) * BOB_AMP
+        camera.transform.origin.x = cos(bob_time * 0.5) * BOB_AMP * 0.5
+    else:
+        bob_time = 0.0
+        camera.transform.origin = camera.transform.origin.lerp(Vector3.ZERO, delta * 8.0)
+
+# Shooting raycast
+func shoot() -> void:
+    var space_state = get_world_3d().direct_space_state
+    var query = PhysicsRayQueryParameters3D.create(
+        camera.global_position,
+        camera.global_position + (-camera.global_basis.z * 100.0)
+    )
+    query.exclude = [self]
+    var result = space_state.intersect_ray(query)
+    if result:
+        if result.collider.has_method("take_damage"):
+            result.collider.take_damage(25)
+        # Spawn hit decal/particles at result.position
+
+# Gun bob on fire
+func _gun_bob() -> void:
+    var tween = create_tween()
+    tween.tween_property(gun_bob_pivot, "position", Vector3(0.02, -0.03, 0.0), 0.04)
+    tween.tween_property(gun_bob_pivot, "position", Vector3.ZERO, 0.1)
+`,
+
+    tps: `
+THIRD-PERSON SHOOTER 3D PATTERNS (Godot 4):
+
+# SpringArm3D camera orbit + CharacterBody3D 3D movement
+extends CharacterBody3D
+class_name TPSPlayer
+
+@onready var spring_arm: SpringArm3D = $SpringArm3D
+@onready var camera: Camera3D = $SpringArm3D/Camera3D
+@onready var mesh: Node3D = $MeshRoot
+
+@export var mouse_sensitivity: float = 0.003
+@export var speed: float = 5.0
+@export var jump_velocity: float = 4.5
+@export var gravity: float = 9.8
+@export var spring_length: float = 4.0
+
+var cam_pitch: float = 0.0
+var cam_yaw: float = 0.0
+
+func _ready() -> void:
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+    spring_arm.spring_length = spring_length
+
+func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventMouseMotion:
+        cam_yaw -= event.relative.x * mouse_sensitivity
+        cam_pitch = clamp(cam_pitch - event.relative.y * mouse_sensitivity, -0.8, 0.6)
+        spring_arm.rotation.x = cam_pitch
+        rotation.y = cam_yaw
+
+func _physics_process(delta: float) -> void:
+    if not is_on_floor():
+        velocity.y -= gravity * delta
+    if Input.is_action_just_pressed("jump") and is_on_floor():
+        velocity.y = jump_velocity
+    var input_dir = Input.get_vector("move_left","move_right","move_forward","move_back")
+    var direction = (basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
+    if direction.length() > 0:
+        velocity.x = direction.x * speed
+        velocity.z = direction.z * speed
+        mesh.rotation.y = lerp_angle(mesh.rotation.y, atan2(direction.x, direction.z), delta * 10.0)
+    else:
+        velocity.x = move_toward(velocity.x, 0, speed)
+        velocity.z = move_toward(velocity.z, 0, speed)
+    move_and_slide()
+
+# Third-person aim: lock camera behind player + raycast from camera center
+func aim_raycast() -> Dictionary:
+    var space = get_world_3d().direct_space_state
+    var from_pos = camera.global_position
+    var to_pos = from_pos + (-camera.global_basis.z * 50.0)
+    var query = PhysicsRayQueryParameters3D.create(from_pos, to_pos)
+    return space.intersect_ray(query)
+`,
+
+    open_world_3d: `
+OPEN WORLD 3D PATTERNS (Godot 4):
+
+# WorldEnvironment + DirectionalLight3D day/night cycle
+@onready var sun: DirectionalLight3D = $Sun
+@onready var env: WorldEnvironment = $WorldEnvironment
+var time_of_day: float = 0.25  # 0..1, 0.25 = 6AM
+
+func _process(delta: float) -> void:
+    time_of_day = fmod(time_of_day + delta * (1.0 / 600.0), 1.0)  # 10-min day
+    var angle = time_of_day * TAU
+    sun.rotation.x = -PI * 0.5 + angle
+    sun.light_energy = clamp(sin(angle), 0.0, 1.0) * 2.0
+    # Sky color: lerp between dawn/noon/dusk/night
+    var sky_color = _sky_color_for_time(time_of_day)
+    env.environment.sky.set("sky_top_color", sky_color)
+
+func _sky_color_for_time(t: float) -> Color:
+    if t < 0.25:  # night → dawn
+        return Color(0.05,0.05,0.15).lerp(Color(1.0,0.5,0.2), t * 4.0)
+    elif t < 0.5:  # dawn → noon
+        return Color(1.0,0.5,0.2).lerp(Color(0.4,0.6,1.0), (t - 0.25) * 4.0)
+    elif t < 0.75:  # noon → dusk
+        return Color(0.4,0.6,1.0).lerp(Color(1.0,0.3,0.1), (t - 0.5) * 4.0)
+    else:  # dusk → night
+        return Color(1.0,0.3,0.1).lerp(Color(0.05,0.05,0.15), (t - 0.75) * 4.0)
+
+# LOD via VisibleOnScreenNotifier3D
+# Attach to each LOD group root; connect screen_entered/exited
+func _on_lod_high_entered() -> void:
+    $HighDetail.visible = true
+    $LowDetail.visible = false
+func _on_lod_high_exited() -> void:
+    $HighDetail.visible = false
+    $LowDetail.visible = true
+
+# Chunk streaming concept
+const CHUNK_SIZE = 128
+var loaded_chunks: Dictionary = {}
+func _update_chunks(player_pos: Vector3) -> void:
+    var cx = int(player_pos.x / CHUNK_SIZE)
+    var cz = int(player_pos.z / CHUNK_SIZE)
+    for dx in range(-2, 3):
+        for dz in range(-2, 3):
+            var key = Vector2i(cx + dx, cz + dz)
+            if key not in loaded_chunks:
+                _load_chunk(key)
+    # Unload far chunks
+    for key in loaded_chunks.keys():
+        if abs(key.x - cx) > 3 or abs(key.y - cz) > 3:
+            _unload_chunk(key)
+
+# Minimap via SubViewport
+# SubViewport with orthogonal Camera3D looking straight down
+# MeshInstance2D on CanvasLayer reads SubViewport texture
+`,
+
+    racing_3d: `
+RACING GAME 3D PATTERNS (Godot 4):
+
+# VehicleBody3D setup with 4 VehicleWheel3D
+extends VehicleBody3D
+class_name RacingCar
+
+@export var engine_force_value: float = 200.0
+@export var brake_force: float = 40.0
+@export var max_steer: float = 0.4
+@onready var speedometer: Label = $HUD/Speedometer
+
+func _physics_process(_delta: float) -> void:
+    engine_force = Input.get_axis("brake","accelerate") * engine_force_value
+    brake = Input.get_action_strength("brake") * brake_force
+    steering = lerp(steering, Input.get_axis("steer_right","steer_left") * max_steer, 0.2)
+    # Speedometer in km/h
+    var speed_kmh = linear_velocity.length() * 3.6
+    speedometer.text = "%d km/h" % int(speed_kmh)
+
+# VehicleWheel3D configuration (add 4 as children):
+# wheel_roll_influence = 0.1   (lower = less roll)
+# wheel_radius = 0.4
+# wheel_friction_slip = 2.5     (higher = more grip)
+# suspension_rest_length = 0.15
+# suspension_stiffness = 30.0
+# suspension_max_force = 5000
+
+# Drift physics: reduce friction on rear wheels when drifting
+var is_drifting: bool = false
+func _check_drift() -> void:
+    var lateral = transform.basis.x.dot(linear_velocity)
+    is_drifting = abs(lateral) > 3.0
+    if is_drifting:
+        $WheelRL.wheel_friction_slip = 1.0
+        $WheelRR.wheel_friction_slip = 1.0
+    else:
+        $WheelRL.wheel_friction_slip = 2.5
+        $WheelRR.wheel_friction_slip = 2.5
+
+# Checkpoint system
+var checkpoints: Array[Area3D] = []
+var current_checkpoint: int = 0
+var lap: int = 0
+func _on_checkpoint_entered(area: Area3D) -> void:
+    var idx = checkpoints.find(area)
+    if idx == current_checkpoint:
+        current_checkpoint = (current_checkpoint + 1) % checkpoints.size()
+        if current_checkpoint == 0:
+            lap += 1
+            lap_completed.emit(lap)
+`,
+
+    platformer_3d: `
+PLATFORMER 3D PATTERNS (Godot 4):
+
+extends CharacterBody3D
+class_name Platformer3DPlayer
+
+@export var speed: float = 6.0
+@export var jump_height: float = 2.0
+@export var gravity: float = 20.0
+@export var coyote_time: float = 0.12
+@export var jump_buffer_time: float = 0.1
+@onready var camera_rig: Node3D = $CameraRig
+@onready var camera: Camera3D = $CameraRig/Camera3D
+
+var jump_velocity: float
+var coyote_timer: float = 0.0
+var jump_buffer: float = 0.0
+var jumps_left: int = 2
+var last_on_floor: bool = false
+
+func _ready() -> void:
+    jump_velocity = sqrt(2.0 * gravity * jump_height)
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventMouseMotion:
+        camera_rig.rotate_y(-event.relative.x * 0.003)
+
+func _physics_process(delta: float) -> void:
+    # Coyote time
+    if is_on_floor():
+        coyote_timer = coyote_time
+        jumps_left = 2
+    else:
+        coyote_timer -= delta
+
+    # Jump buffer
+    if Input.is_action_just_pressed("jump"):
+        jump_buffer = jump_buffer_time
+    jump_buffer -= delta
+
+    # Jump logic (coyote + double jump)
+    if jump_buffer > 0 and (coyote_timer > 0 or jumps_left > 0):
+        velocity.y = jump_velocity
+        jumps_left -= 1
+        coyote_timer = 0.0
+        jump_buffer = 0.0
+
+    velocity.y -= gravity * delta
+
+    # 3D movement relative to camera
+    var input_dir = Input.get_vector("move_left","move_right","move_forward","move_back")
+    var cam_basis = camera_rig.global_transform.basis
+    var direction = (cam_basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
+    direction.y = 0
+    velocity.x = direction.x * speed
+    velocity.z = direction.z * speed
+
+    last_on_floor = is_on_floor()
+    move_and_slide()
+
+    # 3D camera follow (smooth lerp to player)
+    camera_rig.global_position = camera_rig.global_position.lerp(
+        global_position + Vector3(0, 1.5, 0), delta * 8.0
+    )
+
+# Moving platforms: use AnimatableBody3D with AnimationPlayer for the platform path
+# Player inherits platform velocity via move_and_slide() floor_snap_length
+`,
+  };
+
+  if (g.includes("fps") || g.includes("first person")) return patterns["fps"];
+  if (g.includes("tps") || g.includes("third person")) return patterns["tps"];
+  if (g.includes("open_world") || g.includes("open world")) return patterns["open_world_3d"];
+  if (g.includes("racing")) return patterns["racing_3d"];
+  if (g.includes("platformer")) return patterns["platformer_3d"];
+  return patterns["fps"];
+}
+
+// ── Phaser 3 browser game patterns ───────────────────────────────────────────
+
+export function getPhaserPatterns(genre: string): string {
+  const g = genre.toLowerCase();
+
+  const minimalTemplate = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Game</title>
+<style>* { margin: 0; padding: 0; background: #000; } canvas { display: block; margin: auto; }</style>
+</head>
+<body>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const config = {
+    type: Phaser.AUTO,
+    width: 800, height: 600,
+    backgroundColor: '#1a1a2e',
+    physics: { default: 'arcade', arcade: { gravity: { y: 600 }, debug: false } },
+    scene: [BootScene, GameScene, UIScene, GameOverScene]
+};
+
+// ── BOOT SCENE ────────────────────────────────────────────────────────────────
+class BootScene extends Phaser.Scene {
+    constructor() { super('Boot'); }
+    preload() {
+        // Load assets here — or generate programmatically
+        this.load.image('sky', 'assets/sky.png');
+    }
+    create() { this.scene.start('Game'); }
+}
+
+// ── GAME SCENE ────────────────────────────────────────────────────────────────
+class GameScene extends Phaser.Scene {
+    constructor() { super('Game'); }
+    create() {
+        // Add game objects, physics groups, input, etc.
+        this.score = 0;
+        this.lives = 3;
+        // Start the UI scene in parallel
+        this.scene.launch('UI');
+    }
+    update() {
+        // Game loop
+    }
+}
+
+// ── UI SCENE (runs on top of Game) ───────────────────────────────────────────
+class UIScene extends Phaser.Scene {
+    constructor() { super('UI'); }
+    create() {
+        this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '20px', fill: '#fff' });
+        this.livesText = this.add.text(16, 40, 'Lives: 3', { fontSize: '20px', fill: '#fff' });
+    }
+    update() {
+        const game = this.scene.get('Game');
+        if (game) {
+            this.scoreText.setText('Score: ' + game.score);
+            this.livesText.setText('Lives: ' + game.lives);
+        }
+    }
+}
+
+// ── GAME OVER SCENE ───────────────────────────────────────────────────────────
+class GameOverScene extends Phaser.Scene {
+    constructor() { super('GameOver'); }
+    create(data) {
+        this.add.text(400, 250, 'GAME OVER', { fontSize: '48px', fill: '#e63946' }).setOrigin(0.5);
+        this.add.text(400, 320, 'Score: ' + (data.score || 0), { fontSize: '28px', fill: '#fff' }).setOrigin(0.5);
+        const restart = this.add.text(400, 400, '[ PLAY AGAIN ]', { fontSize: '24px', fill: '#a8dadc' })
+            .setOrigin(0.5).setInteractive();
+        restart.on('pointerover', () => restart.setStyle({ fill: '#fff' }));
+        restart.on('pointerout', () => restart.setStyle({ fill: '#a8dadc' }));
+        restart.on('pointerdown', () => {
+            this.scene.stop('GameOver');
+            this.scene.stop('UI');
+            this.scene.start('Game');
+        });
+    }
+}
+
+const game = new Phaser.Game(config);
+</script>
+</body>
+</html>`;
+
+  const patterns: Record<string, string> = {
+    platformer: `
+PHASER 3 PLATFORMER PATTERN:
+CDN: https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js
+
+Key objects:
+- this.physics.add.staticGroup() for platforms
+- this.physics.add.sprite(x, y, 'player').setCollideWorldBounds(true)
+- this.load.tilemapTiledJSON('map', 'tilemap.json') for tilemap support
+- this.anims.create({ key:'run', frames: this.anims.generateFrameNumbers('player',{start:0,end:7}), frameRate:10, repeat:-1 })
+- Cursor keys: this.cursors = this.input.keyboard.createCursorKeys()
+- if (this.cursors.left.isDown) { player.setVelocityX(-160); player.anims.play('run',true); }
+- if (this.cursors.up.isDown && player.body.onFloor()) { player.setVelocityY(-500); }
+- Coins: this.physics.add.staticGroup() + this.physics.add.overlap(player, coins, collectCoin)
+- Enemies: this.physics.add.group() + custom patrol/chase logic in update()
+- Score: this.score = 0; scoreText = this.add.text(16,16,'Score: 0',{fontSize:'24px'})
+
+Complete minimal working template:
+${minimalTemplate}
+`,
+
+    shooter: `
+PHASER 3 TOP-DOWN SHOOTER PATTERN:
+CDN: https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js
+
+- Player: this.physics.add.sprite(400,300,'player').setCollideWorldBounds(true)
+- Movement: 8-directional via WASD, normalize diagonal velocity
+- Bullet pool: this.bullets = this.physics.add.group({ classType: Bullet, maxSize: 50, runChildUpdate: true })
+- Fire on click: this.input.on('pointerdown', shootBullet)
+- shootBullet: get angle from player to pointer, set bullet velocity
+- Enemy waves: spawnWave() called by timer, enemies walk toward player
+- Health bar: graphics + rectangle, update on damage
+- Score: add on enemy kill
+- Game over when health = 0 or wave timer expires
+- this.physics.add.overlap(bullets, enemies, hitEnemy)
+- this.physics.add.overlap(enemies, player, damagePlayer)
+`,
+
+    rpg: `
+PHASER 3 TOP-DOWN RPG PATTERN:
+CDN: https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js
+
+- Tilemap: this.make.tilemap({ key:'map' }) + tileset.addTilesetImage + layer.setCollisionByProperty({collides:true})
+- Player movement: WASD + this.physics.add.collider(player, worldLayer)
+- NPC dialogue: approach NPC, press E, show dialogue box with tween
+  - dialogueBox = this.add.rectangle(400,500,700,120,0x000000,0.85)
+  - dialogueText = this.add.text(80,460,'',{fontSize:'18px',fill:'#fff',wordWrap:{width:640}})
+- Inventory: array of item objects, render as grid in UI scene
+- Combat: turn-based or real-time hitbox overlap
+- Quest tracker: questState object, update on condition
+- Camera follow: this.cameras.main.startFollow(player,true,0.08,0.08)
+`,
+
+    puzzle: `
+PHASER 3 PUZZLE PATTERN:
+CDN: https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js
+
+- Grid: 2D array, e.g. grid[row][col] = piece value
+- Tiles as GameObjects: this.add.image(x, y, 'tile_' + value).setInteractive()
+- Drag: this.input.setDraggable(tile); tile.on('drag', (ptr,dx,dy)=>{ tile.x=dx; tile.y=dy; })
+- Snap on drop: tile.on('dragend', () => { snapToGrid(tile); checkMatches(); })
+- Match detection: scan rows/cols for N matching values → remove + score
+- Tween removal: this.tweens.add({ targets: match, alpha: 0, scaleX: 0, scaleY: 0, duration: 200, onComplete: () => match.destroy() })
+- Win: this.add.text(400,300,'PUZZLE SOLVED!',{fontSize:'40px'}).setOrigin(0.5)
+`,
+
+    tower_defense: `
+PHASER 3 TOWER DEFENSE PATTERN:
+CDN: https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js
+
+- Path: array of {x,y} waypoints
+- Enemy follows path via tweens:
+  const timeline = this.tweens.createTimeline();
+  waypoints.forEach(wp => timeline.add({ targets: enemy, x: wp.x, y: wp.y, duration: 800, ease: 'Linear' }));
+  timeline.play();
+- Tower placement: snap click to grid, check tile is buildable
+- Tower shoots nearest enemy in range:
+  const enemy = findNearest(tower, enemies); if (dist < range) fireBullet(tower, enemy);
+- Wave system: this.time.addEvent({ delay: 30000, callback: startNextWave, loop: true })
+- Economy: gold on kill, spend gold to place towers
+`,
+  };
+
+  if (g.includes("platformer")) return patterns["platformer"];
+  if (g.includes("shooter") || g.includes("shoot")) return patterns["shooter"];
+  if (g.includes("rpg")) return patterns["rpg"];
+  if (g.includes("puzzle")) return patterns["puzzle"];
+  if (g.includes("tower") || g.includes("defense")) return patterns["tower_defense"];
+  return patterns["platformer"];
+}
+
+// ── Three.js browser 3D game patterns ────────────────────────────────────────
+
+export function getThreeJsPatterns(genre: string): string {
+  const g = genre.toLowerCase();
+
+  const patterns: Record<string, string> = {
+    fps_browser: `
+THREE.JS FPS BROWSER GAME PATTERN:
+CDN: https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js
+
+// PointerLockControls FPS setup
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// PointerLockControls (include separately or inline the class)
+const controls = new THREE.PointerLockControls(camera, document.body);
+document.addEventListener('click', () => controls.lock());
+
+// WASD movement
+const velocity = new THREE.Vector3();
+const direction = new THREE.Vector3();
+const keys = {};
+document.addEventListener('keydown', e => keys[e.code] = true);
+document.addEventListener('keyup', e => keys[e.code] = false);
+
+function updateMovement(delta) {
+    const speed = 50;
+    direction.z = (keys['KeyW'] ? 1 : 0) - (keys['KeyS'] ? 1 : 0);
+    direction.x = (keys['KeyD'] ? 1 : 0) - (keys['KeyA'] ? 1 : 0);
+    direction.normalize();
+    velocity.z -= velocity.z * 10.0 * delta;
+    velocity.x -= velocity.x * 10.0 * delta;
+    if (direction.z !== 0) velocity.z -= direction.z * speed * delta;
+    if (direction.x !== 0) velocity.x -= direction.x * speed * delta;
+    controls.moveRight(-velocity.x * delta);
+    controls.moveForward(-velocity.z * delta);
+}
+
+// Raycasting shooting
+function shoot() {
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+    const hits = raycaster.intersectObjects(enemies);
+    if (hits.length > 0) {
+        const enemy = hits[0].object;
+        scene.remove(enemy);
+        score++;
+    }
+}
+document.addEventListener('mousedown', shoot);
+
+// Simple box enemies
+const enemies = [];
+function spawnEnemy() {
+    const geo = new THREE.BoxGeometry(1, 2, 1);
+    const mat = new THREE.MeshLambertMaterial({ color: 0xe63946 });
+    const enemy = new THREE.Mesh(geo, mat);
+    enemy.position.set((Math.random()-0.5)*40, 1, (Math.random()-0.5)*40);
+    scene.add(enemy);
+    enemies.push(enemy);
+}
+
+// Health system
+let health = 100;
+function takeDamage(amount) {
+    health = Math.max(0, health - amount);
+    document.getElementById('health').textContent = 'HP: ' + health;
+    if (health <= 0) gameOver();
+}
+
+// Animate loop
+const clock = new THREE.Clock();
+function animate() {
+    requestAnimationFrame(animate);
+    const delta = clock.getDelta();
+    if (controls.isLocked) updateMovement(delta);
+    renderer.render(scene, camera);
+}
+animate();
+`,
+
+    racing_browser: `
+THREE.JS RACING BROWSER GAME PATTERN:
+CDN: https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js
+
+// Simple car physics with Three.js
+const car = {
+    mesh: null,
+    speed: 0, maxSpeed: 30,
+    steer: 0, maxSteer: 0.05,
+    acceleration: 0.4, friction: 0.95,
+    position: new THREE.Vector3(0,0,0),
+    direction: new THREE.Vector3(0,0,-1)
+};
+
+function updateCar(delta, keys) {
+    if (keys['ArrowUp'])   car.speed = Math.min(car.maxSpeed, car.speed + car.acceleration);
+    if (keys['ArrowDown']) car.speed = Math.max(-car.maxSpeed*0.4, car.speed - car.acceleration);
+    car.speed *= car.friction;
+
+    if (Math.abs(car.speed) > 0.1) {
+        const turnAmount = car.steer * Math.sign(car.speed) * 0.03;
+        car.mesh.rotation.y -= turnAmount;
+        car.direction.set(
+            Math.sin(car.mesh.rotation.y),
+            0,
+            Math.cos(car.mesh.rotation.y)
+        );
+    }
+    if (keys['ArrowLeft'])  car.steer = Math.min(car.maxSteer, car.steer + 0.005);
+    if (keys['ArrowRight']) car.steer = Math.max(-car.maxSteer, car.steer - 0.005);
+    if (!keys['ArrowLeft'] && !keys['ArrowRight']) car.steer *= 0.8;
+
+    car.position.addScaledVector(car.direction, -car.speed * delta * 60);
+    car.mesh.position.copy(car.position);
+
+    // Camera follow from behind
+    const camOffset = car.direction.clone().multiplyScalar(-8).add(new THREE.Vector3(0,3,0));
+    camera.position.lerp(car.position.clone().add(camOffset), 0.1);
+    camera.lookAt(car.position);
+}
+
+// Track mesh: flat PlaneGeometry with texture or color
+const trackGeo = new THREE.PlaneGeometry(100, 100);
+const trackMat = new THREE.MeshLambertMaterial({ color: 0x444444 });
+const track = new THREE.Mesh(trackGeo, trackMat);
+track.rotation.x = -Math.PI / 2;
+scene.add(track);
+
+// Lap timer
+let lapStart = Date.now();
+function checkLap(carPos, lapLine) {
+    if (carPos.distanceTo(lapLine) < 3) {
+        const lapTime = ((Date.now() - lapStart) / 1000).toFixed(2);
+        lapStart = Date.now();
+        document.getElementById('lap').textContent = 'Last Lap: ' + lapTime + 's';
+    }
+}
+`,
+
+    open_world_browser: `
+THREE.JS OPEN WORLD BROWSER GAME PATTERN:
+CDN: https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js
+
+// Terrain generation with PlaneGeometry + simplex noise (inline or CDN)
+const TERRAIN_SIZE = 200;
+const TERRAIN_SEGS = 64;
+const geo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, TERRAIN_SEGS, TERRAIN_SEGS);
+geo.rotateX(-Math.PI / 2);
+
+// Apply heightmap (use simplex noise or Math.sin for basic wave terrain)
+const positions = geo.attributes.position.array;
+for (let i = 0; i < positions.length; i += 3) {
+    const x = positions[i], z = positions[i+2];
+    positions[i+1] = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 8 +
+                     Math.sin(x * 0.1 + 1.5) * Math.cos(z * 0.1) * 4;
+}
+geo.computeVertexNormals();
+const terrainMat = new THREE.MeshLambertMaterial({ color: 0x4a7c59 });
+const terrain = new THREE.Mesh(geo, terrainMat);
+scene.add(terrain);
+
+// Fog for distance culling
+scene.fog = new THREE.FogExp2(0x87ceeb, 0.015);
+renderer.setClearColor(0x87ceeb);
+
+// Day/night cycle
+let timeOfDay = 0;
+function updateDayNight(delta) {
+    timeOfDay = (timeOfDay + delta * 0.05) % 1;
+    const angle = timeOfDay * Math.PI * 2;
+    directionalLight.position.set(Math.cos(angle) * 100, Math.sin(angle) * 100, 50);
+    const brightness = Math.max(0, Math.sin(angle));
+    directionalLight.intensity = brightness;
+    const skyColor = new THREE.Color().lerpColors(
+        new THREE.Color(0x0a0a1a), new THREE.Color(0x87ceeb), brightness
+    );
+    renderer.setClearColor(skyColor);
+}
+
+// Player terrain height sampling
+function getTerrainHeight(x, z) {
+    return Math.sin(x * 0.05) * Math.cos(z * 0.05) * 8 +
+           Math.sin(x * 0.1 + 1.5) * Math.cos(z * 0.1) * 4;
+}
+function updatePlayerHeight(player) {
+    player.position.y = getTerrainHeight(player.position.x, player.position.z) + 1.0;
+}
+`,
+  };
+
+  if (g.includes("fps") || g.includes("first person")) return patterns["fps_browser"];
+  if (g.includes("racing") || g.includes("race") || g.includes("car")) return patterns["racing_browser"];
+  if (g.includes("open world") || g.includes("openworld") || g.includes("exploration")) return patterns["open_world_browser"];
+  return patterns["fps_browser"];
+}
+
+// ── Engine detector ───────────────────────────────────────────────────────────
+
+export function detectEngine(text: string): "godot2d" | "godot3d" | "phaser" | "threejs" {
+  const lower = text.toLowerCase();
+
+  if (lower.includes("three.js") || lower.includes("threejs") || lower.includes("three js")) {
+    return "threejs";
+  }
+  if (lower.includes("phaser")) {
+    return "phaser";
+  }
+  if (lower.includes("browser game") || lower.includes("html game") || lower.includes("html5 game")) {
+    return "phaser";
+  }
+  if (lower.includes("fps") || lower.includes("first person shooter") || lower.includes("first-person")) {
+    return "godot3d";
+  }
+  if (lower.includes("3d") && !lower.includes("html") && !lower.includes("browser")) {
+    return "godot3d";
+  }
+  return "godot2d";
 }

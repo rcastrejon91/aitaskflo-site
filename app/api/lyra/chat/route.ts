@@ -9,7 +9,7 @@ import { upsertUser, upsertCrmContact, searchCrmContacts, buildMemoryContext, ex
 import { PLANS } from "@/lib/stripe";
 import { buildLearningContext } from "@/lib/lyra/weblearner";
 import { generateBook } from "@/lib/lyra/bookgen";
-import { buildGameContext } from "@/lib/lyra/gamedev";
+import { buildGameContext, detectEngine } from "@/lib/lyra/gamedev";
 import { buildGame, improveGame } from "@/lib/lyra/gamebuilder";
 import { auth } from "@/auth";
 
@@ -315,12 +315,12 @@ ACTIONS:
   {
     name: "build_game",
     description:
-      "Autonomously build a complete, playable Godot 4 game from scratch. ALWAYS use this tool immediately — without asking questions — when the user mentions building, making, creating, or shipping any game. Do not describe what you will build. Do not ask for more details. Just call this tool right now with whatever concept the user gave you.",
+      "Autonomously build a complete, playable game from scratch. Supports Godot 2D, Godot 3D (FPS/open world), Phaser.js browser games, and Three.js 3D browser games. ALWAYS use this tool immediately — without asking questions — when the user mentions building, making, creating, or shipping any game. Do not describe what you will build. Do not ask for more details. Just call this tool right now with whatever concept the user gave you.",
     input_schema: {
       type: "object" as const,
       properties: {
         concept: { type: "string", description: "Game concept, story, and main mechanic" },
-        genre: { type: "string", description: "Game genre: platformer, rpg, shooter, puzzle, roguelike, adventure, horror, racing, simulation, life sim, tycoon" },
+        genre: { type: "string", description: "Game genre: platformer, rpg, shooter, puzzle, roguelike, adventure, horror, racing, simulation, life sim, tycoon, fps, open world" },
         name: { type: "string", description: "Name/slug for the game project folder (lowercase, hyphens)" },
       },
       required: ["concept"],
@@ -1571,16 +1571,20 @@ async function executeTool(
     const concept = inspiration ? `${rawConcept} — inspired by: ${inspiration.concept}. Key features: ${inspiration.keyFeatures}` : rawConcept;
     const genre = inspiration ? inspiration.genre : rawGenre;
 
+    // Detect target engine from the original user message
+    const engine = detectEngine(rawConcept + " " + rawGenre);
+
     const slug = (input.name ?? rawConcept).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40) || "my-game";
     const BASE_GAME_DIR = process.env.GAME_DIR ? nodePath.dirname(process.env.GAME_DIR) : "/home/aitaskflo/game";
     const gameDir = nodePath.join(BASE_GAME_DIR, slug);
 
-    // Complex genres need more turns
+    // Complex genres need more turns (browser games are single-call, so maxTurns is irrelevant)
     const g = genre.toLowerCase();
     const isComplex = g.includes("sim") || g.includes("tycoon") || g.includes("life") || g.includes("management") || g.includes("rpg") || g.includes("asymmetric") || g.includes("open world");
     const maxTurns = isComplex ? 45 : 30;
 
-    controller.enqueue(encoder.encode(`\n🎮 Starting ${isComplex ? "complex " : ""}game build for **${rawConcept}** (${genre})…\n`));
+    const engineLabel = engine === "phaser" ? "Phaser 3 browser" : engine === "threejs" ? "Three.js browser" : engine === "godot3d" ? "Godot 4 3D" : "Godot 4 2D";
+    controller.enqueue(encoder.encode(`\n🎮 Starting ${isComplex ? "complex " : ""}${engineLabel} game build for **${rawConcept}** (${genre})…\n`));
 
     const result = await buildGame(concept, genre, gameDir, (progress) => {
       try {
@@ -1594,7 +1598,7 @@ async function executeTool(
           controller.enqueue(encoder.encode(`\n🎨 Concept art generated`));
         }
       } catch { /* stream closed */ }
-    }, maxTurns);
+    }, maxTurns, engine);
 
     const card = JSON.stringify({
       tool: "game_build",

@@ -11,7 +11,7 @@ import fsp from "fs/promises";
 import nodePath from "path";
 import { exec as _exec } from "child_process";
 import { promisify } from "util";
-import { getGenrePatterns } from "./gamedev";
+import { getGenrePatterns, get3DGenrePatterns } from "./gamedev";
 
 const execAsync = promisify(_exec);
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -129,10 +129,11 @@ const BUILDER_TOOLS: Anthropic.Tool[] = [
 
 // ── Phase system prompts ──────────────────────────────────────────────────────
 
-function buildPhasePrompt(phase: "design" | "build" | "polish" | "verify", concept: string, genre: string, gameDir: string): string {
-  const genrePatterns = getGenrePatterns(genre);
+function buildPhasePrompt(phase: "design" | "build" | "polish" | "verify", concept: string, genre: string, gameDir: string, engine: "godot2d" | "godot3d" | "phaser" | "threejs" = "godot2d"): string {
+  const genrePatterns = engine === "godot3d" ? get3DGenrePatterns(genre) : getGenrePatterns(genre);
+  const is3D = engine === "godot3d";
 
-  const base = `You are Lyra, a world-class senior game developer building a ${genre} game.
+  const base = `You are Lyra, a world-class senior game developer building a ${genre} game${is3D ? " (Godot 4 3D)" : " (Godot 4 2D)"}.
 Concept: "${concept}"
 Directory: ${gameDir}
 
@@ -146,10 +147,10 @@ PHYSICS STANDARDS:
 - Screen shake: camera.offset = randf_range(-s,s) per axis, decay with lerp
 - Hitstop on hit: Engine.time_scale = 0.05, await 0.08s
 
-ARCHITECTURE:
+ARCHITECTURE${is3D ? " (3D)" : ""}:
 - HealthComponent.gd: signals health_changed(hp, max) + died
-- HitboxComponent.gd (Area2D): deals damage on area_entered
-- HurtboxComponent.gd (Area2D): receives hits, invincibility frames
+- HitboxComponent.gd (${is3D ? "Area3D" : "Area2D"}): deals damage on area_entered
+- HurtboxComponent.gd (${is3D ? "Area3D" : "Area2D"}): receives hits, invincibility frames
 - Autoloads: GameManager, AudioManager, SaveManager
 - Groups: "player", "enemies", "pickups"
 - Signals for ALL cross-node communication
@@ -180,6 +181,25 @@ DESIGN.md must contain:
     case "build": {
       const g = genre.toLowerCase();
       const isSimulation = g.includes("sim") || g.includes("tycoon") || g.includes("life") || g.includes("management");
+
+      const actionRequirements3D = `
+REQUIRED FILES FOR 3D GAME (must write all of these):
+✓ project.godot (with autoloads configured, Forward+ renderer)
+✓ scripts/autoloads/GameManager.gd
+✓ scripts/autoloads/AudioManager.gd
+✓ scripts/autoloads/SaveManager.gd
+✓ scripts/components/HealthComponent.gd
+✓ scripts/components/HitboxComponent.gd (Area3D)
+✓ scripts/components/HurtboxComponent.gd (Area3D)
+✓ scenes/entities/Player.gd + Player.tscn (CharacterBody3D, Camera3D/SpringArm3D)
+✓ scenes/entities/Enemy.gd + Enemy.tscn (CharacterBody3D, MeshInstance3D, state machine: IDLE/PATROL/CHASE/ATTACK/HIT/DEAD)
+✓ scenes/entities/Enemy2.gd + Enemy2.tscn (different 3D behavior)
+✓ scenes/world/Level1.tscn (3D level: GridMap or CSGBox terrain, enemies placed, lights, WorldEnvironment)
+✓ scenes/world/Level2.tscn (harder second level)
+✓ scenes/ui/HUD.gd + HUD.tscn (health bar, score, crosshair for 3D)
+✓ scenes/ui/MainMenu.gd + MainMenu.tscn
+✓ scenes/ui/GameOver.gd + GameOver.tscn
+✓ scenes/ui/PauseMenu.gd + PauseMenu.tscn`;
 
       const simRequirements = `
 SIMULATION GAME — REQUIRED SYSTEMS (write all of these):
@@ -232,16 +252,19 @@ REQUIRED FILES (must write all of these):
 ✓ scenes/ui/GameOver.gd + GameOver.tscn (score, retry, menu buttons)
 ✓ scenes/ui/PauseMenu.gd + PauseMenu.tscn`;
 
+      const buildRequirements = isSimulation ? simRequirements : (is3D ? actionRequirements3D : actionRequirements);
       return `${base}
 
 PHASE 2 — BUILD
 Your job: write ALL the game code. Build the complete game.
 
-${isSimulation ? simRequirements : actionRequirements}
+${buildRequirements}
 
 USE write_files for batches of related files (faster).
 ${isSimulation
   ? "Start with project.godot + all autoloads, then NeedsComponent + ActionQueue + InteractableObject + SimCharacter, then all room objects, then House scene, then UI panels."
+  : is3D
+  ? "Start with project.godot + autoloads, then 3D player (CharacterBody3D), then 3D enemies (CharacterBody3D + MeshInstance3D), then 3D levels, then UI."
   : "Start with project.godot + autoloads, then player, then enemies, then levels, then UI."}
 Do not call done() until ALL files are written.`;
     }
@@ -413,9 +436,10 @@ async function runPhase(
   gameDir: string,
   onProgress: (p: BuildProgress) => void,
   maxTurns: number,
-  allFilesWritten: string[]
+  allFilesWritten: string[],
+  engine: "godot2d" | "godot3d" | "phaser" | "threejs" = "godot2d"
 ): Promise<{ summary?: string; files?: string[]; playInstructions?: string }> {
-  const systemPrompt = buildPhasePrompt(phase, concept, genre, gameDir);
+  const systemPrompt = buildPhasePrompt(phase, concept, genre, gameDir, engine);
 
   const phaseNames = { design: "Designing game architecture", build: "Building the game", polish: "Polishing and adding juice", verify: "Verifying and committing" };
   onProgress({ type: "phase", message: phaseNames[phase] });
@@ -532,6 +556,84 @@ async function runPhase(
   return {};
 }
 
+// ── Browser game builder (Phaser / Three.js) ─────────────────────────────────
+
+async function buildBrowserGame(
+  concept: string,
+  genre: string,
+  engine: "phaser" | "threejs",
+  gameDir: string,
+  onProgress: (p: BuildProgress) => void
+): Promise<BuildResult> {
+  const engineName = engine === "phaser" ? "Phaser 3" : "Three.js";
+  const cdnUrl = engine === "phaser"
+    ? "https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"
+    : "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+
+  onProgress({ type: "phase", message: `Building ${engineName} browser game…` });
+
+  const artUrls = generateGameArt(concept, genre);
+  onProgress({ type: "art", message: "Concept art ready", artUrls });
+
+  const prompt = `Write a complete, playable ${genre} game using ${engineName}. Single HTML file, all code inline, CDN script tag included. Concept: ${concept}. Make it fun, polished, with score/lives/game-over screen. Return ONLY the complete HTML file content, nothing else.
+
+Requirements:
+- CDN: <script src="${cdnUrl}"></script>
+- All game logic inline in the HTML file
+- Score system clearly visible
+- Lives or health system
+- Game Over screen with final score + restart button
+- Win condition or endless play with increasing difficulty
+- Smooth gameplay, responsive controls
+- No external assets required — generate all graphics programmatically`;
+
+  const response = await client.messages.create({
+    model: "claude-opus-4-6",
+    max_tokens: 8000,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const htmlContent = response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map(b => b.text)
+    .join("");
+
+  // Extract just the HTML if Claude added explanation text
+  const htmlMatch = htmlContent.match(/<!DOCTYPE html>[\s\S]*/i) ?? [htmlContent];
+  const html = htmlMatch[0];
+
+  // Write to gameDir/index.html
+  await fsp.mkdir(gameDir, { recursive: true });
+  const localPath = nodePath.join(gameDir, "index.html");
+  await fsp.writeFile(localPath, html, "utf-8");
+  onProgress({ type: "file", message: "index.html" });
+
+  // Copy to public/games/<slug>/index.html for immediate serving
+  const slug = nodePath.basename(gameDir);
+  const publicDir = process.env.NEXT_PUBLIC_GAME_HOST_DIR ?? "/var/www/aitaskflo/public/games";
+  const exportDir = nodePath.join(publicDir, slug);
+  let exportUrl: string | undefined;
+  try {
+    await fsp.mkdir(exportDir, { recursive: true });
+    await fsp.writeFile(nodePath.join(exportDir, "index.html"), html, "utf-8");
+    const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+    exportUrl = `${baseUrl}/games/${slug}/`;
+    onProgress({ type: "status", message: `Game ready! Play at: ${exportUrl}` });
+  } catch {
+    // Public dir may not exist in dev — that's fine
+  }
+
+  const files = ["index.html"];
+  const summary = `Complete ${genre} browser game built with ${engineName} from concept: "${concept}". Single HTML file with all game code inline.`;
+  const playInstructions = exportUrl
+    ? `Open ${exportUrl} in your browser to play.`
+    : `Open ${localPath} in your browser to play. No server required.`;
+
+  onProgress({ type: "complete", message: "Browser game complete!", files, artUrls, exportUrl });
+
+  return { summary, files, playInstructions, artUrls, exportUrl };
+}
+
 // ── Main builder ──────────────────────────────────────────────────────────────
 
 export async function buildGame(
@@ -539,8 +641,14 @@ export async function buildGame(
   genre: string = "platformer",
   gameDir: string,
   onProgress: (p: BuildProgress) => void,
-  maxTurns: number = 30
+  maxTurns: number = 30,
+  engine: "godot2d" | "godot3d" | "phaser" | "threejs" = "godot2d"
 ): Promise<BuildResult> {
+  // Browser games (Phaser / Three.js) — fast single-call path
+  if (engine === "phaser" || engine === "threejs") {
+    return buildBrowserGame(concept, genre, engine, gameDir, onProgress);
+  }
+
   await fsp.mkdir(gameDir, { recursive: true });
 
   // Generate concept art (non-blocking — fire and forget until needed)
@@ -551,16 +659,16 @@ export async function buildGame(
   const allFilesWritten: string[] = [];
 
   // Phase 1: Design (fast — just creates DESIGN.md)
-  await runPhase("design", concept, genre, gameDir, onProgress, 4, allFilesWritten);
+  await runPhase("design", concept, genre, gameDir, onProgress, 4, allFilesWritten, engine);
 
   // Phase 2: Build (the main event — writes all code)
-  const buildResult = await runPhase("build", concept, genre, gameDir, onProgress, Math.floor(maxTurns * 0.6), allFilesWritten);
+  const buildResult = await runPhase("build", concept, genre, gameDir, onProgress, Math.floor(maxTurns * 0.6), allFilesWritten, engine);
 
   // Phase 3: Polish (add juice, fix connections)
-  const polishResult = await runPhase("polish", concept, genre, gameDir, onProgress, Math.floor(maxTurns * 0.25), allFilesWritten);
+  const polishResult = await runPhase("polish", concept, genre, gameDir, onProgress, Math.floor(maxTurns * 0.25), allFilesWritten, engine);
 
   // Phase 4: Verify + commit
-  const verifyResult = await runPhase("verify", concept, genre, gameDir, onProgress, Math.floor(maxTurns * 0.15), allFilesWritten);
+  const verifyResult = await runPhase("verify", concept, genre, gameDir, onProgress, Math.floor(maxTurns * 0.15), allFilesWritten, engine);
 
   // Attempt HTML5 export
   onProgress({ type: "status", message: "Attempting HTML5 export…" });
