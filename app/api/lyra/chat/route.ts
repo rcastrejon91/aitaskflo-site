@@ -284,6 +284,21 @@ ACTIONS:
     },
   },
   {
+    name: "game_multiplayer",
+    description: "Add multiplayer networking OR an AI-controlled opponent/ally to an existing game. Use when user asks for: multiplayer, AI opponent, play against AI, AI player, co-op, versus mode, AI that plays with me.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        name: { type: "string", description: "Game project slug/folder name" },
+        mode: { type: "string", description: "multiplayer | ai_opponent | ai_ally | ai_boss | both" },
+        max_players: { type: "string", description: "Max players for multiplayer (2-8)" },
+        ai_difficulty: { type: "string", description: "easy | medium | hard | nightmare" },
+        ai_personality: { type: "string", description: "aggressive | defensive | adaptive | cunning" },
+      },
+      required: ["name", "mode"],
+    },
+  },
+  {
     name: "write_book",
     description:
       "Write a complete book with chapters and AI-generated illustrations. Use whenever the user asks to write, create, or generate a book, story, or novel.",
@@ -1625,6 +1640,44 @@ async function executeTool(
     return `Improvement "${improvement}" applied to "${slug}" — ${result.files.length} files modified.`;
   }
 
+  if (name === "game_multiplayer") {
+    const slug = input.name ?? "my-game";
+    const mode = input.mode ?? "ai_opponent";
+    const BASE_GAME_DIR = process.env.GAME_DIR ? nodePath.dirname(process.env.GAME_DIR) : "/home/aitaskflo/game";
+    const gameDir = nodePath.join(BASE_GAME_DIR, slug);
+
+    const needsMulti = mode.includes("multiplayer") || mode === "both";
+    const needsAI = mode.includes("ai") || mode === "both";
+
+    controller.enqueue(encoder.encode(`\n🎮 Adding ${needsMulti ? "multiplayer" : ""}${needsMulti && needsAI ? " + " : ""}${needsAI ? "AI player" : ""} to **${slug}**…\n`));
+
+    const { buildMultiplayerContext } = await import("@/lib/lyra/gamemulti");
+    const multiContext = buildMultiplayerContext(needsMulti, needsAI);
+
+    const improvement = `${needsMulti ? `Add full Godot 4 ENet multiplayer (up to ${input.max_players ?? "4"} players): NetworkManager autoload, lobby, player spawning with MultiplayerSpawner, position sync with MultiplayerSynchronizer, server-authoritative damage RPCs, chat system. ` : ""}${needsAI ? `Add an AI-controlled ${mode.replace("ai_", "")} character (AIPlayer.gd) that calls the game-ai endpoint every 0.15s for decisions. Difficulty: ${input.ai_difficulty ?? "medium"}, Personality: ${input.ai_personality ?? "adaptive"}. Also add GameGuide.gd so Lyra watches and advises the player in real time. Server URL: ${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}.` : ""}\n\nGDScript patterns to use:\n${multiContext}`;
+
+    const result = await improveGame(gameDir, improvement, (progress) => {
+      try {
+        if (progress.type === "file") controller.enqueue(encoder.encode(`\n📄 ${progress.message}`));
+        else if (progress.type === "status") controller.enqueue(encoder.encode(`\n⚡ ${progress.message}`));
+      } catch { /* closed */ }
+    });
+
+    const card = JSON.stringify({
+      tool: "game_build",
+      name: slug,
+      summary: result.summary,
+      files: result.files.join(", "),
+      play: needsMulti
+        ? `Host: call NetworkManager.host_game() on start\nJoin: call NetworkManager.join_game("server-ip")\nAI endpoint: ${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/api/lyra/game-ai`
+        : `AI endpoint running at: ${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/api/lyra/game-ai\nGame Guide endpoint: ${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/api/lyra/game-guide`,
+      file_count: String(result.files.length),
+      location: gameDir,
+    });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return `${mode} added to "${slug}" — ${result.files.length} files written.`;
+  }
+
   if (name === "write_book") {
     const concept = input.concept ?? "an epic adventure";
     const genre = input.genre ?? "fantasy";
@@ -1741,9 +1794,12 @@ export async function POST(req: NextRequest) {
     const wantsGameBuild = gameBuildTriggers.some(t => msgLower.includes(t)) && gameWords.some(g => msgLower.includes(g));
     const improveTriggers = ["add", "improve", "fix", "update", "give", "make", "change"];
     const wantsImprove = improveTriggers.some(t => msgLower.includes(t)) && msgLower.includes("game") && (msgLower.includes("the game") || msgLower.includes("my game"));
+    const wantsMultiplayer = (msgLower.includes("multiplayer") || msgLower.includes("ai opponent") || msgLower.includes("play against") || msgLower.includes("ai player") || msgLower.includes("co-op") || msgLower.includes("coop")) && msgLower.includes("game");
 
     const gameOverride = wantsGameBuild
       ? `\n\nCRITICAL OVERRIDE: The user wants a game built RIGHT NOW. Call build_game IMMEDIATELY as your first action. Do not say anything. Do not ask questions. Do not describe what you will build. Just call the tool.`
+      : wantsMultiplayer
+      ? `\n\nCRITICAL OVERRIDE: The user wants multiplayer or AI opponent added. Call game_multiplayer IMMEDIATELY. No text — just the tool call.`
       : wantsImprove
       ? `\n\nCRITICAL OVERRIDE: The user wants to improve an existing game. Call improve_game IMMEDIATELY as your first action. No text response — just the tool call.`
       : "";
@@ -1837,6 +1893,8 @@ export async function POST(req: NextRequest) {
               tools: LYRA_TOOLS,
               tool_choice: wantsGameBuild
                 ? { type: "tool" as const, name: "build_game" }
+                : wantsMultiplayer
+                ? { type: "tool" as const, name: "game_multiplayer" }
                 : wantsImprove
                 ? { type: "tool" as const, name: "improve_game" }
                 : { type: "auto" as const },
