@@ -129,7 +129,7 @@ const BUILDER_TOOLS: Anthropic.Tool[] = [
 
 // ── Phase system prompts ──────────────────────────────────────────────────────
 
-function buildPhasePrompt(phase: "design" | "build" | "polish" | "verify", concept: string, genre: string, gameDir: string, engine: "godot2d" | "godot3d" | "phaser" | "threejs" = "godot2d"): string {
+function buildPhasePrompt(phase: "design" | "build" | "polish" | "verify", concept: string, genre: string, gameDir: string, engine: "godot2d" | "godot3d" | "phaser" | "threejs" = "godot2d", spriteManifest: SpriteManifest = {}): string {
   const genrePatterns = engine === "godot3d" ? get3DGenrePatterns(genre) : getGenrePatterns(genre);
   const is3D = engine === "godot3d";
 
@@ -160,7 +160,8 @@ CODE RULES:
 - No placeholders, no TODOs, no pass statements where logic belongs
 - Every function body must actually work
 - .tscn files must be valid Godot 4 format
-- project.godot must list all autoloads under [autoload] section`;
+- project.godot must list all autoloads under [autoload] section
+${spriteSectionForPrompt(spriteManifest)}`;
 
   switch (phase) {
     case "design":
@@ -353,6 +354,122 @@ async function runCommand(gameDir: string, command: string): Promise<string> {
   }
 }
 
+// ── Sprite generation pipeline ────────────────────────────────────────────────
+
+interface SpriteSpec { name: string; prompt: string; size: number }
+interface SpriteManifest { [name: string]: string } // name → res:// path
+
+function getSpriteSpecs(concept: string, genre: string): SpriteSpec[] {
+  const g = genre.toLowerCase();
+  const style = `pixel art sprite, white background, clean edges, game asset, 16bit style, no text, centered`;
+
+  const base: SpriteSpec[] = [
+    { name: "player_idle",   prompt: `${concept} main character standing idle, ${style}`,          size: 128 },
+    { name: "player_run",    prompt: `${concept} main character running, ${style}`,                 size: 128 },
+    { name: "player_attack", prompt: `${concept} main character attacking, ${style}`,               size: 128 },
+    { name: "enemy_idle",    prompt: `${concept} enemy creature standing, ${style}, menacing`,      size: 128 },
+    { name: "enemy_walk",    prompt: `${concept} enemy creature walking, ${style}, menacing`,       size: 128 },
+    { name: "collectible",   prompt: `${concept} collectible item glowing, ${style}, small`,        size: 64  },
+  ];
+
+  const extras: Record<string, SpriteSpec[]> = {
+    platformer: [
+      { name: "platform_tile", prompt: `${concept} platform tile, ${style}, tileable`,             size: 64 },
+      { name: "coin",          prompt: `golden coin collectible, ${style}, shiny`,                  size: 48 },
+      { name: "background",    prompt: `${concept} game background scenery, pixel art, wide shot`,  size: 512 },
+    ],
+    rpg: [
+      { name: "npc",           prompt: `${concept} friendly NPC character, ${style}`,               size: 128 },
+      { name: "boss",          prompt: `${concept} final boss monster, ${style}, large, imposing`,  size: 192 },
+      { name: "chest",         prompt: `treasure chest, ${style}, wooden with gold trim`,           size: 64 },
+      { name: "potion",        prompt: `health potion red bottle, ${style}, glowing`,               size: 48 },
+    ],
+    shooter: [
+      { name: "bullet",        prompt: `laser bullet projectile, ${style}, glowing, small`,         size: 32 },
+      { name: "explosion",     prompt: `explosion blast pixel art, ${style}, orange yellow`,        size: 96 },
+      { name: "shield",        prompt: `energy shield bubble, ${style}, blue glow`,                 size: 64 },
+    ],
+    horror: [
+      { name: "monster",       prompt: `${concept} horror monster creature, ${style}, terrifying`,  size: 192 },
+      { name: "flashlight",    prompt: `flashlight beam light cone, pixel art, dark, white glow`,   size: 128 },
+      { name: "health_item",   prompt: `first aid kit medkit, ${style}, red cross`,                 size: 64 },
+    ],
+    simulation: [
+      { name: "character_f",   prompt: `${concept} sim character female, ${style}, casual clothes`, size: 128 },
+      { name: "character_m",   prompt: `${concept} sim character male, ${style}, casual clothes`,   size: 128 },
+      { name: "furniture_bed", prompt: `single bed top-down view, ${style}, cozy`,                  size: 128 },
+      { name: "furniture_sofa",prompt: `sofa couch top-down view, ${style}`,                        size: 128 },
+    ],
+  };
+
+  const matched = Object.entries(extras).find(([key]) => g.includes(key));
+  return [...base, ...(matched?.[1] ?? [])];
+}
+
+async function downloadSprite(url: string, dest: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(35_000) });
+    if (!res.ok) return false;
+    const buf = await res.arrayBuffer();
+    await fsp.writeFile(dest, Buffer.from(buf));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function generateAndDownloadSprites(
+  concept: string,
+  genre: string,
+  gameDir: string,
+  onProgress: (p: BuildProgress) => void
+): Promise<SpriteManifest> {
+  const spritesDir = nodePath.join(gameDir, "assets", "sprites");
+  await fsp.mkdir(spritesDir, { recursive: true });
+
+  const specs = getSpriteSpecs(concept, genre);
+  onProgress({ type: "status", message: `Generating ${specs.length} sprites…` });
+
+  const results = await Promise.allSettled(
+    specs.map(async (spec) => {
+      const filename = `${spec.name}.png`;
+      const dest = nodePath.join(spritesDir, filename);
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(spec.prompt)}?width=${spec.size}&height=${spec.size}&nologo=true&model=flux&seed=${Math.floor(Math.random() * 999999)}`;
+      const ok = await downloadSprite(url, dest);
+      return { name: spec.name, filename, ok };
+    })
+  );
+
+  const manifest: SpriteManifest = {};
+  let downloaded = 0;
+  for (const r of results) {
+    if (r.status === "fulfilled" && r.value.ok) {
+      manifest[r.value.name] = `res://assets/sprites/${r.value.filename}`;
+      downloaded++;
+    }
+  }
+
+  onProgress({ type: "status", message: `${downloaded}/${specs.length} sprites downloaded` });
+  return manifest;
+}
+
+function spriteSectionForPrompt(manifest: SpriteManifest): string {
+  if (Object.keys(manifest).length === 0) return "";
+  const lines = Object.entries(manifest)
+    .map(([name, path]) => `  load("${path}")  # ${name}`)
+    .join("\n");
+  return `
+AVAILABLE SPRITES — USE THESE INSTEAD OF ColorRect/placeholder shapes:
+${lines}
+
+• Use Sprite2D nodes with these textures (set texture = load("res://assets/sprites/player_idle.png"))
+• For animation use AnimatedSprite2D — add each frame as separate Image from the sprite files
+• Set centered = true, flip_h based on movement direction
+• Scale sprites to fit gameplay (e.g. scale = Vector2(2, 2) for 64px sprites in a 128px world)
+• Background sprite: use TextureRect or a Sprite2D on a CanvasLayer behind everything
+`;
+}
+
 // ── HTML5 export ──────────────────────────────────────────────────────────────
 
 function buildExportPresets(exportPath: string): string {
@@ -437,9 +554,10 @@ async function runPhase(
   onProgress: (p: BuildProgress) => void,
   maxTurns: number,
   allFilesWritten: string[],
-  engine: "godot2d" | "godot3d" | "phaser" | "threejs" = "godot2d"
+  engine: "godot2d" | "godot3d" | "phaser" | "threejs" = "godot2d",
+  spriteManifest: SpriteManifest = {}
 ): Promise<{ summary?: string; files?: string[]; playInstructions?: string }> {
-  const systemPrompt = buildPhasePrompt(phase, concept, genre, gameDir, engine);
+  const systemPrompt = buildPhasePrompt(phase, concept, genre, gameDir, engine, spriteManifest);
 
   const phaseNames = { design: "Designing game architecture", build: "Building the game", polish: "Polishing and adding juice", verify: "Verifying and committing" };
   onProgress({ type: "phase", message: phaseNames[phase] });
@@ -651,24 +769,29 @@ export async function buildGame(
 
   await fsp.mkdir(gameDir, { recursive: true });
 
-  // Generate concept art (non-blocking — fire and forget until needed)
-  onProgress({ type: "status", message: "Generating concept art…" });
-  const artUrls = generateGameArt(concept, genre);
+  // Generate concept art + sprites in parallel
+  onProgress({ type: "status", message: "Generating concept art and sprites…" });
+  const [artUrls, spriteManifest] = await Promise.all([
+    Promise.resolve(generateGameArt(concept, genre)),
+    generateAndDownloadSprites(concept, genre, gameDir, onProgress),
+  ]);
   onProgress({ type: "art", message: "Concept art ready", artUrls });
 
   const allFilesWritten: string[] = [];
+  // Add downloaded sprites to file list
+  allFilesWritten.push(...Object.values(spriteManifest).map(p => p.replace("res://", "")));
 
   // Phase 1: Design (fast — just creates DESIGN.md)
-  await runPhase("design", concept, genre, gameDir, onProgress, 4, allFilesWritten, engine);
+  await runPhase("design", concept, genre, gameDir, onProgress, 4, allFilesWritten, engine, spriteManifest);
 
   // Phase 2: Build (the main event — writes all code)
-  const buildResult = await runPhase("build", concept, genre, gameDir, onProgress, Math.floor(maxTurns * 0.6), allFilesWritten, engine);
+  const buildResult = await runPhase("build", concept, genre, gameDir, onProgress, Math.floor(maxTurns * 0.6), allFilesWritten, engine, spriteManifest);
 
   // Phase 3: Polish (add juice, fix connections)
-  const polishResult = await runPhase("polish", concept, genre, gameDir, onProgress, Math.floor(maxTurns * 0.25), allFilesWritten, engine);
+  const polishResult = await runPhase("polish", concept, genre, gameDir, onProgress, Math.floor(maxTurns * 0.25), allFilesWritten, engine, spriteManifest);
 
   // Phase 4: Verify + commit
-  const verifyResult = await runPhase("verify", concept, genre, gameDir, onProgress, Math.floor(maxTurns * 0.15), allFilesWritten, engine);
+  const verifyResult = await runPhase("verify", concept, genre, gameDir, onProgress, Math.floor(maxTurns * 0.15), allFilesWritten, engine, spriteManifest);
 
   // Attempt HTML5 export
   onProgress({ type: "status", message: "Attempting HTML5 export…" });
