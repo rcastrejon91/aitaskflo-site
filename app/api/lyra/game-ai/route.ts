@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { complete, getRealtimeProvider } from "@/lib/lyra/providers";
 
 // Rolling behavior history per session (in-memory, keyed by sessionId)
 const behaviorHistory = new Map<string, string[]>();
@@ -38,7 +36,7 @@ export async function POST(req: NextRequest) {
     boss: "You are a powerful boss. Have phases. Telegraphed attacks. Dramatic behavior. Make the fight feel epic and fair but very hard.",
   };
 
-  const systemPrompt = `You are the AI brain for a video game character. You receive game state and output the next action.
+  const system = `You are the AI brain for a video game character. You receive game state and output the next action.
 
 ROLE: ${roleInstructions[aiRole] ?? roleInstructions.opponent}
 DIFFICULTY: ${difficultyInstructions[difficulty] ?? difficultyInstructions.medium}
@@ -62,21 +60,22 @@ Respond with ONLY valid JSON — no markdown, no explanation:
   "counter_strategy": "your counter to their pattern"
 }`;
 
+  const config = getRealtimeProvider();
+
   try {
-    const msg = await client.messages.create({
-      model: "claude-haiku-4-5-20251001", // Fast model for real-time decisions
-      max_tokens: 256,
-      messages: [{ role: "user", content: `Game state received. Decide action now.` }],
-      system: systemPrompt,
+    const text = await complete({
+      config,
+      system,
+      messages: [{ role: "user", content: "Game state received. Decide action now." }],
+      maxTokens: 256,
+      temperature: 0.3,
     });
 
-    const text = msg.content[0].type === "text" ? msg.content[0].text : "{}";
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     const action = JSON.parse(jsonMatch?.[0] ?? "{}");
 
-    return NextResponse.json({ action, sessionId });
+    return NextResponse.json({ action, sessionId, provider: config.provider });
   } catch (err) {
-    // Fallback: basic chase behavior
     return NextResponse.json({
       action: {
         move: { x: 0, y: 0 },
@@ -89,6 +88,7 @@ Respond with ONLY valid JSON — no markdown, no explanation:
         counter_strategy: "none",
       },
       sessionId,
+      provider: config.provider,
       error: err instanceof Error ? err.message : "AI error",
     });
   }
