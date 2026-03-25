@@ -300,7 +300,7 @@ ACTIONS:
   {
     name: "build_game",
     description:
-      "Autonomously build a complete, playable Godot 4 game from scratch — player, enemies, levels, UI, menus, save system, all of it. Use when the user asks to build, create, make, or ship a full game. This runs an agentic loop that writes all the code until the game is done.",
+      "Autonomously build a complete, playable Godot 4 game from scratch. ALWAYS use this tool immediately — without asking questions — when the user mentions building, making, creating, or shipping any game. Do not describe what you will build. Do not ask for more details. Just call this tool right now with whatever concept the user gave you.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -1729,7 +1729,26 @@ export async function POST(req: NextRequest) {
       memoryContext = buildMemoryContext(userId, message);
     }
 
-    const systemPrompt = agent.systemPrompt + orchestratorAddendum + memoryContext + buildLearningContext() + getLunarPersonalityNote() + buildGameContext(message);
+    // ── Game intent detection — force immediate build ──────────────────────
+    const msgLower = message.toLowerCase();
+    const gameBuildTriggers = [
+      "build", "make", "create", "ship", "generate", "write", "start", "begin", "let's", "lets"
+    ];
+    const gameWords = [
+      "game", "platformer", "rpg", "shooter", "horror", "roguelike", "sim", "puzzle",
+      "adventure", "fighting", "open world", "survival"
+    ];
+    const wantsGameBuild = gameBuildTriggers.some(t => msgLower.includes(t)) && gameWords.some(g => msgLower.includes(g));
+    const improveTriggers = ["add", "improve", "fix", "update", "give", "make", "change"];
+    const wantsImprove = improveTriggers.some(t => msgLower.includes(t)) && msgLower.includes("game") && (msgLower.includes("the game") || msgLower.includes("my game"));
+
+    const gameOverride = wantsGameBuild
+      ? `\n\nCRITICAL OVERRIDE: The user wants a game built RIGHT NOW. Call build_game IMMEDIATELY as your first action. Do not say anything. Do not ask questions. Do not describe what you will build. Just call the tool.`
+      : wantsImprove
+      ? `\n\nCRITICAL OVERRIDE: The user wants to improve an existing game. Call improve_game IMMEDIATELY as your first action. No text response — just the tool call.`
+      : "";
+
+    const systemPrompt = agent.systemPrompt + orchestratorAddendum + memoryContext + buildLearningContext() + getLunarPersonalityNote() + buildGameContext(message) + gameOverride;
 
     // ── 3. Build user content (text + optional images) ────────────────────
     type ImageBlock = { type: "image"; source: { type: "base64"; media_type: string; data: string } };
@@ -1816,7 +1835,11 @@ export async function POST(req: NextRequest) {
               system: systemPrompt,
               messages: loopMessages,
               tools: LYRA_TOOLS,
-              tool_choice: { type: "auto" },
+              tool_choice: wantsGameBuild
+                ? { type: "tool" as const, name: "build_game" }
+                : wantsImprove
+                ? { type: "tool" as const, name: "improve_game" }
+                : { type: "auto" as const },
             });
 
             let textSoFar = "";
