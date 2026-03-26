@@ -115,7 +115,6 @@ function initSchema(db: BetterSqlite3Db) {
 
     CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id, timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_facts_user ON facts(user_id);
-    CREATE INDEX IF NOT EXISTS idx_facts_importance ON facts(user_id, importance DESC);
     CREATE INDEX IF NOT EXISTS idx_crm_name ON crm_contacts(name);
 
     CREATE TABLE IF NOT EXISTS auth_users (
@@ -167,6 +166,10 @@ function initSchema(db: BetterSqlite3Db) {
   try {
     db.exec(`ALTER TABLE facts ADD COLUMN access_count INTEGER DEFAULT 0`);
   } catch { /* column already exists */ }
+  // Create index after migration so importance column is guaranteed to exist
+  try {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_importance ON facts(user_id, importance DESC)`);
+  } catch { /* ignore */ }
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
