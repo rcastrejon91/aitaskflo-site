@@ -6,6 +6,8 @@ const nextConfig = {
   serverExternalPackages: [
     "better-sqlite3",
     "@anthropic-ai/sdk",
+    "groq-sdk",
+    "openai",
     "bcryptjs",
     "jose",
     "@panva/hkdf",
