@@ -1286,7 +1286,7 @@ async function routeTask(
   const DEFAULT: RouterDecision = { route: "claude", taskType: "analysis", useParallel: false };
 
   // Tool-use requests always go to Claude (only model with tools)
-  const toolKeywords = /send email|search(?: the web| for)?|weather|translate|qr code|calculate|generat(?:e|ing) image|draw|create image|news|what(?:'s| is) the time|moon phase|sunrise|sunset/i;
+  const toolKeywords = /send email|search(?: the web| for)?|weather|translate|qr code|calculate|generat(?:e|ing) image|draw|create image|make.*(?:image|picture|photo|illustration)|(?:picture|photo|image) of|show me.*(?:image|picture)|news|what(?:'s| is) the time|moon phase|sunrise|sunset/i;
   if (toolKeywords.test(message)) return { ...DEFAULT, taskType: "tool" };
 
   const groqKey = process.env.GROQ_API_KEY;
@@ -1972,16 +1972,31 @@ export async function POST(req: NextRequest) {
             } catch {
               safeEnqueue("⚠️ AI service unavailable. Please try again.");
             }
-          } else if (err instanceof Anthropic.RateLimitError) {
-            safeEnqueue("⚠️ Rate limited — please wait a moment and try again.");
+          } else if (err instanceof Anthropic.RateLimitError || err instanceof Anthropic.InternalServerError) {
+            // Rate limited or Claude server error → fall back to Groq
+            try {
+              await streamGroqFallback(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller);
+            } catch {
+              safeEnqueue("⚠️ All AI services are busy. Please try again in a moment.");
+            }
           } else if (err instanceof Anthropic.BadRequestError) {
             const msg = (err as { message?: string }).message ?? "Bad request";
             console.error("[Lyra] Anthropic 400 BadRequest:", msg, err.error);
-            safeEnqueue(`⚠️ Request error: ${msg}`);
+            // Content policy or bad request → try Groq
+            try {
+              await streamGroqFallback(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller);
+            } catch {
+              safeEnqueue(`⚠️ Request error: ${msg}`);
+            }
           } else {
             const msg = err instanceof Error ? err.message : String(err);
             console.error("[Lyra] Unexpected API error:", err);
-            safeEnqueue(`⚠️ Something went wrong: ${msg}`);
+            // Unknown error → try Groq before giving up
+            try {
+              await streamGroqFallback(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller);
+            } catch {
+              safeEnqueue(`⚠️ Something went wrong: ${msg}`);
+            }
           }
         } finally {
           try { controller.close(); } catch { /* already closed */ }
