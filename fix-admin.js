@@ -1,6 +1,7 @@
 const b=require('bcryptjs');
 const db=require('better-sqlite3')('./data/lyra.db');
-db.prepare("DELETE FROM auth_users WHERE email='adminricky@aitaskflo.local'").run();
-const h=b.hashSync('lyra13witch',12);
-db.prepare("INSERT INTO auth_users(id,email,name,password_hash,created_at) VALUES(?,?,?,?,?)").run('admin-1','adminricky@aitaskflo.local','adminricky',h,new Date().toISOString());
-console.log('done, hash length:',h.length);
+const u=db.prepare("SELECT password_hash FROM auth_users WHERE email='adminricky@aitaskflo.local'").get();
+if(!u){console.log('USER NOT FOUND');process.exit(1);}
+console.log('hash length:',u.password_hash.length);
+console.log('hash:',u.password_hash);
+console.log('match:',b.compareSync('lyra13witch',u.password_hash));
