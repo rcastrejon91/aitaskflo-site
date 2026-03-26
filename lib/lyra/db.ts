@@ -508,12 +508,17 @@ export function getAuthUserByEmail(email: string): AuthUser | null {
 
 export function getAuthUserByUsernameOrEmail(login: string): AuthUser | null {
   const db = getDb();
+  console.log("[db] getDb returned:", !!db, "_dbFailed:", _dbFailed);
   if (!db) return null;
   try {
-    return db.prepare(
+    const all = db.prepare("SELECT id,email,name FROM auth_users").all();
+    console.log("[db] all auth_users:", JSON.stringify(all));
+    const result = db.prepare(
       "SELECT * FROM auth_users WHERE LOWER(email) = LOWER(?) OR LOWER(name) = LOWER(?)"
     ).get(login, login) as AuthUser | null;
-  } catch { return null; }
+    console.log("[db] lookup result:", !!result);
+    return result;
+  } catch (e) { console.log("[db] error:", e); return null; }
 }
 
 export function getAuthUserById(id: string): AuthUser | null {
