@@ -313,6 +313,20 @@ ACTIONS:
     },
   },
   {
+    name: "call_api",
+    description: "Make an HTTP request to any URL or API on the internet. Use when the user wants to fetch data from an API, check a website, post to a service, or interact with any online resource.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        url: { type: "string", description: "Full URL including https://" },
+        method: { type: "string", description: "HTTP method: GET, POST, PUT, DELETE, PATCH. Default: GET" },
+        headers: { type: "string", description: "JSON object of request headers, e.g. {\"Authorization\":\"Bearer token\",\"Content-Type\":\"application/json\"}" },
+        body: { type: "string", description: "Request body as string (for POST/PUT/PATCH)" },
+      },
+      required: ["url"],
+    },
+  },
+  {
     name: "build_game",
     description:
       "Autonomously build a complete, playable game from scratch. Supports Godot 2D, Godot 3D (FPS/open world), Phaser.js browser games, and Three.js 3D browser games. ALWAYS use this tool immediately — without asking questions — when the user mentions building, making, creating, or shipping any game. Do not describe what you will build. Do not ask for more details. Just call this tool right now with whatever concept the user gave you.",
@@ -1286,7 +1300,7 @@ async function routeTask(
   const DEFAULT: RouterDecision = { route: "claude", taskType: "analysis", useParallel: false };
 
   // Tool-use requests always go to Claude (only model with tools)
-  const toolKeywords = /send email|search(?: the web| for)?|weather|translate|qr code|calculate|generat(?:e|ing) image|draw|create image|make.*(?:image|picture|photo|illustration)|(?:picture|photo|image) of|show me.*(?:image|picture)|news|what(?:'s| is) the time|moon phase|sunrise|sunset/i;
+  const toolKeywords = /send email|search(?: the web| for)?|weather|translate|qr code|calculate|generat(?:e|ing) image|draw|create image|make.*(?:image|picture|photo|illustration)|(?:picture|photo|image) of|show me.*(?:image|picture)|news|what(?:'s| is) the time|moon phase|sunrise|sunset|fetch|call.*api|http[s]?:\/\/|look up|find me|get.*from|post to|check.*(?:site|url|link|website)|what.*(?:price|stock|rate|score)|how much|current.*(?:price|value|rate)/i;
   if (toolKeywords.test(message)) return { ...DEFAULT, taskType: "tool" };
 
   const groqKey = process.env.GROQ_API_KEY;
@@ -1458,6 +1472,25 @@ async function executeTool(
 
   if (name === "read_url") {
     return await toolReadUrl(input.url ?? "");
+  }
+
+  if (name === "call_api") {
+    try {
+      const method = (input.method ?? "GET").toUpperCase();
+      let headers: Record<string, string> = { "User-Agent": "Lyra-AI/1.0" };
+      if (input.headers) {
+        try { Object.assign(headers, JSON.parse(input.headers)); } catch { /* ignore bad headers */ }
+      }
+      const opts: RequestInit = { method, headers, signal: AbortSignal.timeout(15_000) };
+      if (input.body && ["POST","PUT","PATCH"].includes(method)) opts.body = input.body;
+      const res = await fetch(input.url, opts);
+      const contentType = res.headers.get("content-type") ?? "";
+      const text = await res.text();
+      const trimmed = text.slice(0, 4000);
+      return `HTTP ${res.status} ${res.statusText}\nContent-Type: ${contentType}\n\n${trimmed}${text.length > 4000 ? "\n...(truncated)" : ""}`;
+    } catch (e) {
+      return `Error: ${e instanceof Error ? e.message : String(e)}`;
+    }
   }
 
   if (name === "get_datetime") {
