@@ -15,8 +15,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       authorize: async (credentials) => {
         if (!credentials?.email || !credentials?.password) return null;
         const user = getAuthUserByUsernameOrEmail(credentials.email as string);
+        console.log("[auth] lookup:", credentials.email, "found:", !!user, "hash_len:", user?.password_hash?.length);
         if (!user || !user.password_hash) return null;
         const valid = await bcrypt.compare(credentials.password as string, user.password_hash);
+        console.log("[auth] bcrypt match:", valid);
         if (!valid) return null;
         return { id: user.id, email: user.email, name: user.name ?? undefined };
       },
