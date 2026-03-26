@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllAgents, getLyraState, setActiveAgent, computeLineageGraph } from "@/lib/lyra/agents";
+import { getAllAgents, getLyraState, setActiveAgent, computeLineageGraph, getGameStudioAgents } from "@/lib/lyra/agents";
 
 export async function GET() {
   try {
     const agents = getAllAgents();
+    const studioAgents = getGameStudioAgents();
+    const allAgents = [...agents, ...studioAgents];
     const state = getLyraState();
     const lineage = computeLineageGraph(agents);
 
     return NextResponse.json({
-      agents,
+      agents: allAgents,
+      studioAgents,
       lineage,
       activeAgentId: state.activeAgentId,
     });

@@ -533,6 +533,18 @@ export function createAuthUser(email: string, name: string | null, passwordHash:
   return db.prepare("SELECT * FROM auth_users WHERE id = ?").get(id) as AuthUser;
 }
 
+export function updateAuthUserPassword(userId: string, newPasswordHash: string): boolean {
+  const db = getDb();
+  if (!db) return false;
+  try {
+    const r = db.prepare("UPDATE auth_users SET password_hash = ? WHERE id = ?").run(newPasswordHash, userId);
+    return r.changes > 0;
+  } catch (err) {
+    console.error("[Lyra DB] updateAuthUserPassword error:", err instanceof Error ? err.message : err);
+    return false;
+  }
+}
+
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 
 export interface DbTask {
