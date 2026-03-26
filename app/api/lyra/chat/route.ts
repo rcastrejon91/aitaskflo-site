@@ -1300,7 +1300,8 @@ async function routeTask(
   const DEFAULT: RouterDecision = { route: "claude", taskType: "analysis", useParallel: false };
 
   // Tool-use requests always go to Claude (only model with tools)
-  const toolKeywords = /send email|search(?: the web| for)?|weather|translate|qr code|calculate|generat(?:e|ing) image|draw|create image|make.*(?:image|picture|photo|illustration)|(?:picture|photo|image) of|show me.*(?:image|picture)|news|what(?:'s| is) the time|moon phase|sunrise|sunset|fetch|call.*api|http[s]?:\/\/|look up|find me|get.*from|post to|check.*(?:site|url|link|website)|what.*(?:price|stock|rate|score)|how much|current.*(?:price|value|rate)/i;
+  // Only route to Claude when a real tool call is needed — keep Groq for everything else
+  const toolKeywords = /send(?: an?)? email|search the web|search for .{3,}|current weather|what(?:'s| is) the weather|generat(?:e|ing) (?:an? )?image|draw (?:me |a |an )?|create (?:an? )?image|make (?:a |an )?(?:image|picture|photo|illustration)|(?:picture|photo|image) of |show me (?:a |an )?(?:image|picture|photo)|qr code|translate .{3,} (?:to|into)|moon phase|sunrise|sunset|https?:\/\/\S|call (?:the )?api|fetch (?:from )?https?|post to https?/i;
   if (toolKeywords.test(message)) return { ...DEFAULT, taskType: "tool" };
 
   const groqKey = process.env.GROQ_API_KEY;
@@ -1924,7 +1925,7 @@ export async function POST(req: NextRequest) {
             iterations++;
 
             const stream = client.messages.stream({
-              model: "claude-opus-4-6",
+              model: "claude-sonnet-4-6",
               max_tokens: 4096,
               system: systemPrompt,
               messages: loopMessages,
