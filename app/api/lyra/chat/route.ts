@@ -1796,8 +1796,9 @@ export async function POST(req: NextRequest) {
       "adventure", "fighting", "open world", "survival"
     ];
     const wantsGameBuild = gameBuildTriggers.some(t => msgLower.includes(t)) && gameWords.some(g => msgLower.includes(g));
-    const improveTriggers = ["add", "improve", "fix", "update", "give", "make", "change"];
-    const wantsImprove = improveTriggers.some(t => msgLower.includes(t)) && msgLower.includes("game") && (msgLower.includes("the game") || msgLower.includes("my game"));
+    const improveTriggers = ["add", "improve", "fix", "update", "give", "make", "change", "upgrade", "rebuild", "overhaul", "convert", "turn", "switch"];
+    const improveContextWords = ["the game", "my game", "it more", "it 3d", "it better", "placeholder", "placeholders", "missing", "3d", "enemies", "levels", "boss", "spells", "multiplayer", "the graphics", "the controls", "the ui", "the hud", "the combat", "the movement"];
+    const wantsImprove = improveTriggers.some(t => msgLower.includes(t)) && improveContextWords.some(c => msgLower.includes(c));
     const wantsMultiplayer = (msgLower.includes("multiplayer") || msgLower.includes("ai opponent") || msgLower.includes("play against") || msgLower.includes("ai player") || msgLower.includes("co-op") || msgLower.includes("coop")) && msgLower.includes("game");
 
     const gameOverride = wantsGameBuild
@@ -1805,7 +1806,7 @@ export async function POST(req: NextRequest) {
       : wantsMultiplayer
       ? `\n\nCRITICAL OVERRIDE: The user wants multiplayer or AI opponent added. Call game_multiplayer IMMEDIATELY. No text — just the tool call.`
       : wantsImprove
-      ? `\n\nCRITICAL OVERRIDE: The user wants to improve an existing game. Call improve_game IMMEDIATELY as your first action. No text response — just the tool call.`
+      ? `\n\nCRITICAL OVERRIDE: The user wants to improve an existing game. Call improve_game IMMEDIATELY as your first action. DO NOT write any text. DO NOT narrate a plan. DO NOT show code snippets in chat. JUST CALL THE TOOL — it will write the actual files. Writing code in chat does nothing.`
       : "";
 
     const systemPrompt = agent.systemPrompt + orchestratorAddendum + memoryContext + buildLearningContext() + getLunarPersonalityNote() + buildGameContext(message) + gameOverride;
