@@ -329,12 +329,13 @@ ACTIONS:
   },
   {
     name: "find_jobs",
-    description: "Search for remote job listings matching the user's background and skills. Use when the user asks to find jobs, look for work, job hunt, find remote work, or anything related to finding employment.",
+    description: "Search for remote job listings matching the user's background and skills. Use when the user asks to find jobs, look for work, job hunt, find remote work, or anything related to finding employment. IMPORTANT: Before calling this tool, if you don't already know the user's current role, background, or what kind of job they want — ask them first. Say something like: 'Before I search, what's your current role and what kind of remote work are you looking for? You can also paste your resume and I'll tailor everything to it.' Only skip this if you already know their background from the conversation.",
     input_schema: {
       type: "object" as const,
       properties: {
-        keywords: { type: "string", description: "Comma-separated keywords to prioritize, e.g. 'healthcare, robotics, implementation'" },
+        keywords: { type: "string", description: "Comma-separated keywords based on user's background, e.g. 'healthcare, robotics, implementation, remote'" },
         max_results: { type: "string", description: "Max number of results to return (default: 8)" },
+        user_background: { type: "string", description: "Brief summary of user's background to personalize results" },
       },
       required: [],
     },
