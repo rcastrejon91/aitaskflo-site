@@ -1,6 +1,9 @@
 import nodePath from "path";
 import { upsertCrmContact, searchCrmContacts, createTask, listTasks } from "@/lib/lyra/db";
 import { buildGame, improveGame } from "@/lib/lyra/gamebuilder";
+import { scanJobs, formatJobsForChat, buildCoverLetterPrompt } from "@/lib/lyra/jobscan";
+import { scoreAts, formatAtsScore, buildTailorPrompt } from "@/lib/lyra/resume";
+import { executeHsAction } from "@/lib/lyra/hubspot";
 import { detectEngine } from "@/lib/lyra/gamedev";
 import { generateBook } from "@/lib/lyra/bookgen";
 import {
@@ -53,6 +56,109 @@ export async function executeTool(
 
   if (name === "read_url") {
     return await toolReadUrl(input.url ?? "");
+  }
+
+  if (name === "hubspot") {
+    if (!process.env.HUBSPOT_API_KEY) return "HubSpot is not connected. Add HUBSPOT_API_KEY to your environment.";
+    const result = await executeHsAction({
+      action: input.action as never,
+      contactName: input.contact_name,
+      contactId: input.contact_id,
+      email: input.email,
+      phone: input.phone,
+      company: input.company,
+      note: input.note,
+      dealName: input.deal_name,
+      dealAmount: input.deal_amount,
+      dealStage: input.deal_stage,
+      taskTitle: input.task_title,
+      taskDue: input.task_due,
+      field: input.field,
+      value: input.value,
+      query: input.query,
+    });
+    const card = JSON.stringify({ tool: "hubspot", action: input.action });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return result;
+  }
+
+  if (name === "find_jobs") {
+    controller.enqueue(encoder.encode("\n🔍 Scanning remote job boards…\n"));
+    const keywords = (input.keywords ?? "").split(",").map((k) => k.trim()).filter(Boolean);
+    const maxResults = parseInt(input.max_results ?? "8", 10) || 8;
+    const jobs = await scanJobs({ keywords, maxResults });
+    const formatted = formatJobsForChat(jobs);
+    const card = JSON.stringify({ tool: "jobs", count: String(jobs.length), keywords: input.keywords ?? "" });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return formatted;
+  }
+
+  if (name === "draft_application") {
+    const background = input.user_background ||
+      "Experienced in healthcare robotics, working with autonomous robots in clinical environments. Strong knowledge of hospital workflows, patient care environments, and technology implementation. Building AI tools on the side.";
+    const prompt = buildCoverLetterPrompt(
+      {
+        id: "",
+        title: input.job_title ?? "",
+        company: input.company ?? "",
+        location: "Remote",
+        url: "",
+        description: input.job_description ?? "",
+        tags: [],
+        source: "",
+        postedAt: new Date().toISOString(),
+      },
+      background
+    );
+    // Use Claude to actually write the cover letter
+    try {
+      const Anthropic = (await import("@anthropic-ai/sdk")).default;
+      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      const msg = await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 800,
+        messages: [{ role: "user", content: prompt }],
+      });
+      const letter = msg.content[0]?.type === "text" ? msg.content[0].text : "Could not generate cover letter.";
+      const card = JSON.stringify({ tool: "application", job: input.job_title, company: input.company });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return `Here's your cover letter for **${input.job_title}** at **${input.company}**:\n\n---\n\n${letter}\n\n---\n\nWant me to adjust the tone, add anything, or help you find where to submit this?`;
+    } catch {
+      return `Here's a cover letter draft for ${input.job_title} at ${input.company} — I'll write it based on your healthcare robotics background:\n\n${buildCoverLetterPrompt({ id:"",title:input.job_title??"",company:input.company??"",location:"Remote",url:"",description:input.job_description??"",tags:[],source:"",postedAt:""}, background)}`;
+    }
+  }
+
+  if (name === "ats_score") {
+    const result = scoreAts(input.resume ?? "", input.job_description ?? "");
+    const formatted = formatAtsScore(result, input.job_title ?? "this job");
+    const card = JSON.stringify({ tool: "ats", score: String(result.score), grade: result.grade });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return formatted;
+  }
+
+  if (name === "tailor_resume") {
+    controller.enqueue(encoder.encode("\n✍️ Tailoring your resume…\n"));
+    try {
+      const Anthropic = (await import("@anthropic-ai/sdk")).default;
+      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      const prompt = buildTailorPrompt(
+        input.resume ?? "",
+        input.job_description ?? "",
+        input.job_title ?? "",
+        input.company ?? ""
+      );
+      const msg = await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 2000,
+        messages: [{ role: "user", content: prompt }],
+      });
+      const tailored = msg.content[0]?.type === "text" ? msg.content[0].text : "Could not tailor resume.";
+      const card = JSON.stringify({ tool: "resume", job: input.job_title, company: input.company });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return tailored;
+    } catch (e) {
+      return `Resume tailoring failed: ${e instanceof Error ? e.message : String(e)}`;
+    }
   }
 
   if (name === "call_api") {

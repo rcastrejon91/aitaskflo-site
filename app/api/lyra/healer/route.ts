@@ -3,6 +3,7 @@ import fsp from "fs/promises";
 import { exec as _exec } from "child_process";
 import { promisify } from "util";
 import nodePath from "path";
+import { checkAndUpdateMilestones, getMilestonesData, MILESTONE_THRESHOLDS } from "@/lib/lyra/milestones";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -340,6 +341,50 @@ export async function GET(req: NextRequest) {
     ]);
 
     return NextResponse.json({ memories, learnings });
+  }
+
+  if (action === "milestones") {
+    // Get current PM2 restart count
+    let restartCount = 0;
+    let appName = "unknown";
+    let uptime = 0;
+    let status = "unknown";
+
+    try {
+      const pm2 = await runCmd("pm2 jlist");
+      if (pm2.ok && pm2.stdout.trim()) {
+        const list = JSON.parse(pm2.stdout);
+        // Find aitaskflo app (or the first online app)
+        const app = list.find((p: { name?: string }) =>
+          (p.name ?? "").toLowerCase().includes("aitaskflo")
+        ) ?? list[0];
+        if (app) {
+          restartCount = app.pm2_env?.restart_time ?? 0;
+          appName = app.name ?? "app";
+          uptime = app.pm2_env?.pm_uptime ?? 0;
+          status = app.pm2_env?.status ?? "unknown";
+        }
+      }
+    } catch { /* pm2 not available in dev */ }
+
+    // Check and store any new milestones
+    const newMilestone = await checkAndUpdateMilestones(restartCount);
+    const data = await getMilestonesData();
+
+    // Next milestone
+    const achieved = new Set((data?.achieved ?? []).map((m) => m.threshold));
+    const nextMilestone = MILESTONE_THRESHOLDS.find((t) => !achieved.has(t) && t > restartCount) ?? null;
+
+    return NextResponse.json({
+      restartCount,
+      appName,
+      uptime,
+      status,
+      newMilestone,
+      nextMilestone,
+      achieved: (data?.achieved ?? []).sort((a, b) => a.threshold - b.threshold),
+      lastChecked: data?.lastChecked ?? null,
+    });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });

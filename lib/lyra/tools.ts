@@ -303,6 +303,84 @@ ACTIONS:
     },
   },
   {
+    name: "hubspot",
+    description: "Interact with HubSpot CRM. Search contacts, log notes, create deals, schedule tasks, get contact summaries. Use when the user wants to manage their CRM, log a call, follow up with someone, or check on a deal.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        action: { type: "string", description: "Action: search, create_contact, log_note, create_deal, create_task, get_summary, update_contact" },
+        query: { type: "string", description: "Search query for finding contacts" },
+        contact_name: { type: "string", description: "Full name of the contact" },
+        contact_id: { type: "string", description: "HubSpot contact ID" },
+        email: { type: "string", description: "Contact email address" },
+        phone: { type: "string", description: "Contact phone number" },
+        company: { type: "string", description: "Company name" },
+        note: { type: "string", description: "Note content to log" },
+        deal_name: { type: "string", description: "Name of the deal" },
+        deal_amount: { type: "string", description: "Deal value in dollars" },
+        deal_stage: { type: "string", description: "Deal stage: appointmentscheduled, qualifiedtobuy, presentationscheduled, decisionmakerboughtin, contractsent, closedwon, closedlost" },
+        task_title: { type: "string", description: "Task title/subject" },
+        task_due: { type: "string", description: "Due date as ISO date string e.g. 2025-04-01" },
+        field: { type: "string", description: "Contact field name to update" },
+        value: { type: "string", description: "New value for the field" },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "find_jobs",
+    description: "Search for remote job listings matching the user's background and skills. Use when the user asks to find jobs, look for work, job hunt, find remote work, or anything related to finding employment.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        keywords: { type: "string", description: "Comma-separated keywords to prioritize, e.g. 'healthcare, robotics, implementation'" },
+        max_results: { type: "string", description: "Max number of results to return (default: 8)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "draft_application",
+    description: "Write a tailored cover letter and application for a specific job. Use after the user picks a job from find_jobs results, or when they share a job posting and want help applying.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        job_title: { type: "string", description: "The job title they are applying for" },
+        company: { type: "string", description: "Company name" },
+        job_description: { type: "string", description: "Job description or key requirements" },
+        user_background: { type: "string", description: "Summary of the user's relevant experience and skills" },
+      },
+      required: ["job_title", "company"],
+    },
+  },
+  {
+    name: "ats_score",
+    description: "Score a resume against a job description for ATS (Applicant Tracking System) compatibility. Use when the user wants to know how well their resume matches a job, or before applying anywhere.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        resume: { type: "string", description: "The resume text to score" },
+        job_description: { type: "string", description: "The job description to score against" },
+        job_title: { type: "string", description: "Job title for display" },
+      },
+      required: ["resume", "job_description"],
+    },
+  },
+  {
+    name: "tailor_resume",
+    description: "Rewrite and tailor a resume to match a specific job description, optimizing keywords and framing for ATS and hiring managers.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        resume: { type: "string", description: "Current resume text" },
+        job_description: { type: "string", description: "Target job description" },
+        job_title: { type: "string", description: "Job title" },
+        company: { type: "string", description: "Company name" },
+      },
+      required: ["resume", "job_description", "job_title", "company"],
+    },
+  },
+  {
     name: "call_api",
     description: "Make an HTTP request to any URL or API on the internet. Use when the user wants to fetch data from an API, check a website, post to a service, or interact with any online resource.",
     input_schema: {

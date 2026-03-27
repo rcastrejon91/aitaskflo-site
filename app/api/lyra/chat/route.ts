@@ -11,6 +11,7 @@ import { streamGroqFallback, routeTask, streamParallelJudge } from "@/lib/lyra/s
 import { executeTool } from "@/lib/lyra/execute-tool";
 import { buildMindContext } from "@/lib/lyra/mind";
 import { detectPersona, getPersonaAddendum } from "@/lib/lyra/persona";
+import { getRecentMilestoneAnnouncement } from "@/lib/lyra/milestones";
 
 export async function POST(req: NextRequest) {
   try {
@@ -120,7 +121,8 @@ export async function POST(req: NextRequest) {
       : "";
 
     const mindContext = await buildMindContext().catch(() => "");
-    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + buildLearningContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + gameOverride;
+    const milestoneNote = await getRecentMilestoneAnnouncement().catch(() => "");
+    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + buildLearningContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + gameOverride + milestoneNote;
 
     // ── 3. Build user content (text + optional images) ────────────────────
     type ImageBlock = { type: "image"; source: { type: "base64"; media_type: string; data: string } };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface Pattern {
   id: string;
@@ -36,6 +36,23 @@ interface HealEvent {
   log: string;
 }
 
+interface MilestoneRecord {
+  threshold: number;
+  restartCount: number;
+  ts: string;
+}
+
+interface MilestonesResult {
+  restartCount: number;
+  appName: string;
+  uptime: number;
+  status: string;
+  newMilestone: MilestoneRecord | null;
+  nextMilestone: number | null;
+  achieved: MilestoneRecord[];
+  lastChecked: string | null;
+}
+
 interface ScanResult {
   patterns: Pattern[];
   logTail: string;
@@ -66,6 +83,7 @@ export default function HealerPage() {
   const [history, setHistory]       = useState<HealEvent[] | null>(null);
   const [error, setError]           = useState("");
   const [cleanResult, setCleanResult] = useState<{ memories: { removed: number; kept: number }; learnings: { removed: number; kept: number } } | null>(null);
+  const [milestones, setMilestones] = useState<MilestonesResult | null>(null);
 
   async function callHealer(act: string) {
     if (!key) return;
@@ -80,12 +98,19 @@ export default function HealerPage() {
       if (act === "heal")     { setHealEvent(data as HealEvent); }
       if (act === "history")       { setHistory((data as { history: HealEvent[] }).history); }
       if (act === "clean_memories") { setCleanResult(data); }
+      if (act === "milestones")    { setMilestones(data as MilestonesResult); }
       setStatus("done");
     } catch (e) {
       setError(String(e));
       setStatus("error");
     }
   }
+
+  // Refresh milestones whenever key is entered for the first time
+  useEffect(() => {
+    if (key && !milestones) callHealer("milestones");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
   const loading = status === "loading";
 
@@ -147,6 +172,14 @@ export default function HealerPage() {
           className="px-5 py-2.5 rounded-xl font-semibold text-sm bg-white/5 hover:bg-white/10 text-white/60 transition-colors disabled:opacity-40"
         >
           History
+        </button>
+
+        <button
+          onClick={() => callHealer("milestones")}
+          disabled={loading || !key}
+          className="px-5 py-2.5 rounded-xl font-semibold text-sm bg-indigo-800/60 hover:bg-indigo-700/60 text-indigo-200 transition-colors disabled:opacity-40"
+        >
+          ⚔️ Battle Record
         </button>
       </div>
 
@@ -254,6 +287,9 @@ export default function HealerPage() {
         </section>
       )}
 
+      {/* Battle Record */}
+      {milestones && <BattleRecord data={milestones} />}
+
       {/* History */}
       {history !== null && (
         <section className="mb-8 space-y-3">
@@ -268,6 +304,89 @@ export default function HealerPage() {
         </section>
       )}
     </div>
+  );
+}
+
+function BattleRecord({ data }: { data: MilestonesResult }) {
+  const uptimeSecs = data.uptime ? Math.floor((Date.now() - data.uptime) / 1000) : null;
+  const uptimeStr = uptimeSecs !== null
+    ? uptimeSecs < 60
+      ? `${uptimeSecs}s`
+      : uptimeSecs < 3600
+      ? `${Math.floor(uptimeSecs / 60)}m ${uptimeSecs % 60}s`
+      : `${Math.floor(uptimeSecs / 3600)}h ${Math.floor((uptimeSecs % 3600) / 60)}m`
+    : null;
+
+  const statusColor =
+    data.status === "online" ? "text-emerald-400" :
+    data.status === "stopped" ? "text-red-400" : "text-yellow-400";
+
+  const medals = ["🥉", "🥈", "🥇", "🏆", "👑", "⚡", "🌟"];
+
+  return (
+    <section className="mb-8 space-y-4">
+      <h2 className="text-sm font-semibold text-white/50 uppercase tracking-wider">⚔️ Battle Record</h2>
+
+      {/* Main stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="rounded-xl border border-indigo-500/20 bg-indigo-950/20 p-4 text-center">
+          <p className="text-3xl font-bold text-indigo-300">{data.restartCount}</p>
+          <p className="text-xs text-white/40 mt-1">Restarts</p>
+        </div>
+        <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 text-center">
+          <p className={`text-lg font-semibold ${statusColor}`}>{data.status}</p>
+          <p className="text-xs text-white/40 mt-1">{data.appName}</p>
+        </div>
+        {uptimeStr && (
+          <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 text-center">
+            <p className="text-lg font-semibold text-white/70">{uptimeStr}</p>
+            <p className="text-xs text-white/40 mt-1">Uptime</p>
+          </div>
+        )}
+        {data.nextMilestone && (
+          <div className="rounded-xl border border-amber-500/20 bg-amber-950/10 p-4 text-center">
+            <p className="text-lg font-semibold text-amber-400">{data.nextMilestone}</p>
+            <p className="text-xs text-white/40 mt-1">Next milestone</p>
+            <div className="mt-2 h-1 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className="h-full bg-amber-500/60 rounded-full transition-all"
+                style={{ width: `${Math.min(100, (data.restartCount / data.nextMilestone) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Tagline */}
+      <p className="text-xs text-white/25 italic text-center">
+        {data.restartCount} restarts. Still standing.
+      </p>
+
+      {/* Milestones achieved */}
+      {data.achieved.length > 0 && (
+        <div>
+          <p className="text-xs text-white/35 mb-2 uppercase tracking-wider">Milestones Unlocked</p>
+          <div className="flex flex-wrap gap-2">
+            {[...data.achieved].reverse().map((m, i) => (
+              <div
+                key={m.threshold}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-indigo-500/25 bg-indigo-950/30 text-xs"
+              >
+                <span>{medals[Math.min(i, medals.length - 1)]}</span>
+                <span className="text-indigo-300 font-semibold">{m.threshold}</span>
+                <span className="text-white/30">restarts</span>
+                <span className="text-white/20">·</span>
+                <span className="text-white/30">{new Date(m.ts).toLocaleDateString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.achieved.length === 0 && (
+        <p className="text-xs text-white/30 text-center py-2">No milestones yet. Keep grinding.</p>
+      )}
+    </section>
   );
 }
 
