@@ -9,6 +9,7 @@ import { auth } from "@/auth";
 import { LYRA_TOOLS, getLunarPersonalityNote } from "@/lib/lyra/tools";
 import { streamGroqFallback, routeTask, streamParallelJudge } from "@/lib/lyra/streaming";
 import { executeTool } from "@/lib/lyra/execute-tool";
+import { buildMindContext } from "@/lib/lyra/mind";
 
 export async function POST(req: NextRequest) {
   try {
@@ -114,7 +115,8 @@ export async function POST(req: NextRequest) {
       ? `\n\nCRITICAL OVERRIDE: The user wants to improve an existing game. Call improve_game IMMEDIATELY as your first action. DO NOT write any text. DO NOT narrate a plan. DO NOT show code snippets in chat. JUST CALL THE TOOL — it will write the actual files. Writing code in chat does nothing.`
       : "";
 
-    const systemPrompt = agent.systemPrompt + orchestratorAddendum + memoryContext + buildLearningContext() + getLunarPersonalityNote() + buildGameContext(message) + gameOverride;
+    const mindContext = await buildMindContext().catch(() => "");
+    const systemPrompt = agent.systemPrompt + orchestratorAddendum + memoryContext + buildLearningContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + gameOverride;
 
     // ── 3. Build user content (text + optional images) ────────────────────
     type ImageBlock = { type: "image"; source: { type: "base64"; media_type: string; data: string } };
