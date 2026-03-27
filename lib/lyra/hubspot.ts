@@ -158,7 +158,11 @@ export async function createDeal(props: {
 
   // Associate with contact if provided
   if (props.contactId) {
-    await hsPost(`/crm/v3/objects/deals/${deal.id}/associations/contacts/${props.contactId}/3`, {});
+    try {
+      await hsPost(`/crm/v4/objects/deals/${deal.id}/associations/contacts/${props.contactId}`, [
+        { associationCategory: "HUBSPOT_DEFINED", associationTypeId: 3 }
+      ]);
+    } catch { /* association failure is non-fatal */ }
   }
 
   return deal;
