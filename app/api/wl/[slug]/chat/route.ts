@@ -13,8 +13,9 @@ import { LYRA_TOOLS } from "@/lib/lyra/tools";
 import { streamGroqFallback } from "@/lib/lyra/streaming";
 import { executeTool } from "@/lib/lyra/execute-tool";
 
-export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
-  const config = await getWhiteLabel(params.slug);
+export async function POST(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const config = await getWhiteLabel(slug);
   if (!config) {
     return new Response(JSON.stringify({ error: "White-label not found" }), { status: 404 });
   }
