@@ -112,6 +112,22 @@ export async function POST(req: NextRequest) {
     const wantsImprove = improveTriggers.some(t => msgLower.includes(t)) && improveContextWords.some(c => msgLower.includes(c));
     const wantsMultiplayer = (msgLower.includes("multiplayer") || msgLower.includes("ai opponent") || msgLower.includes("play against") || msgLower.includes("ai player") || msgLower.includes("co-op") || msgLower.includes("coop")) && msgLower.includes("game");
 
+    // ── Tool intent detection ──────────────────────────────────────────────────
+    const wantsHubspot = ["hubspot", "crm", "contacts", "my contacts", "check contacts", "log a note", "create a deal", "new deal", "follow up"].some(t => msgLower.includes(t));
+    const wantsJobs = ["find me", "find jobs", "remote jobs", "job search", "looking for work", "find work", "job hunt", "find a job"].some(t => msgLower.includes(t));
+    const wantsAts = ["ats score", "score my resume", "resume score", "check my resume", "resume match"].some(t => msgLower.includes(t));
+    const wantsTailor = ["tailor my resume", "tailor resume", "rewrite my resume", "optimize my resume"].some(t => msgLower.includes(t));
+
+    const toolOverride = wantsHubspot
+      ? `\n\nCRITICAL: User wants HubSpot CRM action. Call the hubspot tool IMMEDIATELY. Do not explain, do not ask for an API key, just call it — the key is already configured server-side.`
+      : wantsJobs
+      ? `\n\nCRITICAL: User wants to find remote jobs. Call find_jobs IMMEDIATELY with relevant keywords.`
+      : wantsAts
+      ? `\n\nCRITICAL: User wants ATS scoring. Call ats_score IMMEDIATELY.`
+      : wantsTailor
+      ? `\n\nCRITICAL: User wants resume tailoring. Call tailor_resume IMMEDIATELY.`
+      : "";
+
     const gameOverride = wantsGameBuild
       ? `\n\nCRITICAL OVERRIDE: The user wants a game built RIGHT NOW. Call build_game IMMEDIATELY as your first action. Do not say anything. Do not ask questions. Do not describe what you will build. Just call the tool.`
       : wantsMultiplayer
@@ -122,7 +138,7 @@ export async function POST(req: NextRequest) {
 
     const mindContext = await buildMindContext().catch(() => "");
     const milestoneNote = await getRecentMilestoneAnnouncement().catch(() => "");
-    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + buildLearningContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + gameOverride + milestoneNote;
+    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + buildLearningContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + gameOverride + toolOverride + milestoneNote;
 
     // ── 3. Build user content (text + optional images) ────────────────────
     type ImageBlock = { type: "image"; source: { type: "base64"; media_type: string; data: string } };
