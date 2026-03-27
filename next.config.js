@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "image.pollinations.ai" },
+    ],
+  },
   // better-sqlite3: native addon, must be loaded by Node directly.
   // @anthropic-ai/sdk: large SDK with circular CJS deps that overflow
   // Turbopack's SSR module registry when bundled (digest 2627331426).
