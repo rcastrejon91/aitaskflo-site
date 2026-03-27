@@ -24,6 +24,27 @@ export const PLANS = {
     stripePriceId: process.env.STRIPE_BUSINESS_PRICE_ID ?? null,
     features: ["Everything in Pro", "API access", "Multiple users", "Analytics", "Priority support"],
   },
+  agency_starter: {
+    name: "Starter",
+    price: 497,
+    messagesPerDay: Infinity,
+    stripePriceId: process.env.STRIPE_AGENCY_STARTER_PRICE_ID ?? null,
+    features: ["Up to 5 automations", "Email + calendar automation", "Weekly reporting", "Lyra AI assistant", "Onboarding call"],
+  },
+  agency_growth: {
+    name: "Growth",
+    price: 997,
+    messagesPerDay: Infinity,
+    stripePriceId: process.env.STRIPE_AGENCY_GROWTH_PRICE_ID ?? null,
+    features: ["Up to 15 automations", "CRM + pipeline automation", "Custom integrations (2)", "Dedicated Lyra instance", "Bi-weekly strategy calls", "Slack access"],
+  },
+  agency_full: {
+    name: "Agency",
+    price: 2497,
+    messagesPerDay: Infinity,
+    stripePriceId: process.env.STRIPE_AGENCY_FULL_PRICE_ID ?? null,
+    features: ["Unlimited automations", "Full business OS build-out", "Custom AI agents", "White-label option", "Weekly strategy sessions", "Priority build queue", "SLA guarantee"],
+  },
 } as const;
 
 export type PlanKey = keyof typeof PLANS;

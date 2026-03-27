@@ -91,7 +91,7 @@ function ChatBubble({ msg, isStreaming }: { msg: Message; isStreaming: boolean }
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function LyraChat() {
+export default function LyraChat({ persona, referrer }: { persona?: string; referrer?: string } = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -148,6 +148,8 @@ export default function LyraChat() {
           history,
           conversationId,
           images: filesToSend.map((f) => ({ data: f.base64, mimeType: f.mimeType })),
+          ...(persona ? { persona } : {}),
+          ...(referrer ? { referrer } : {}),
         }),
       });
       if (!res.ok) throw new Error(await res.text());

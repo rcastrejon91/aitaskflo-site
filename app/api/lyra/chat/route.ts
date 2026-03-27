@@ -10,13 +10,17 @@ import { LYRA_TOOLS, getLunarPersonalityNote } from "@/lib/lyra/tools";
 import { streamGroqFallback, routeTask, streamParallelJudge } from "@/lib/lyra/streaming";
 import { executeTool } from "@/lib/lyra/execute-tool";
 import { buildMindContext } from "@/lib/lyra/mind";
+import { detectPersona, getPersonaAddendum } from "@/lib/lyra/persona";
 
 export async function POST(req: NextRequest) {
   try {
-    const { message, history, conversationId, agentId, images } = await req.json();
+    const { message, history, conversationId, agentId, images, persona, referrer } = await req.json();
 
     const session = await auth();
     const userId = (session?.user as { id?: string } | undefined)?.id;
+    const userEmail = (session?.user as { email?: string } | undefined)?.email ?? null;
+    const resolvedPersona = persona ?? detectPersona({ email: userEmail, referrer: referrer ?? null, conversationText: message });
+    const personaAddendum = getPersonaAddendum(resolvedPersona);
 
     // Client IP for user_location tool
     const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
@@ -116,7 +120,7 @@ export async function POST(req: NextRequest) {
       : "";
 
     const mindContext = await buildMindContext().catch(() => "");
-    const systemPrompt = agent.systemPrompt + orchestratorAddendum + memoryContext + buildLearningContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + gameOverride;
+    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + buildLearningContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + gameOverride;
 
     // ── 3. Build user content (text + optional images) ────────────────────
     type ImageBlock = { type: "image"; source: { type: "base64"; media_type: string; data: string } };
