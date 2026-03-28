@@ -122,7 +122,7 @@ export default function PricingPage() {
 
                 {key === "free" ? (
                   <button
-                    onClick={() => router.push("/lyra")}
+                    onClick={() => router.push("/login")}
                     className={`w-full py-3 rounded-xl text-sm font-medium transition-all ${BUTTON_STYLES[key]}`}
                   >
                     Start free
@@ -144,6 +144,36 @@ export default function PricingPage() {
         <p className="text-center text-white/25 text-xs mt-10">
           Cancel anytime · Secure payments via Stripe · No hidden fees
         </p>
+
+        {/* FAQ */}
+        <div className="mt-20 max-w-2xl mx-auto">
+          <h2 className="text-2xl font-bold text-white text-center mb-10">Frequently asked questions</h2>
+          <div className="space-y-6">
+            {[
+              {
+                q: "What counts as a message?",
+                a: "Every time you send a message to Lyra and receive a response counts as one message. Free accounts get 10 per day. Pro and Business are unlimited.",
+              },
+              {
+                q: "Can I cancel anytime?",
+                a: "Yes. Cancel from your account settings at any time. You keep access until the end of your billing period — no partial refunds, no surprises.",
+              },
+              {
+                q: "What payment methods do you accept?",
+                a: "All major credit and debit cards (Visa, Mastercard, Amex) via Stripe. Your payment info is never stored on our servers.",
+              },
+              {
+                q: "Can I upgrade or downgrade later?",
+                a: "Yes. You can switch plans at any time. Upgrades take effect immediately, downgrades at the next billing cycle.",
+              },
+            ].map(({ q, a }) => (
+              <div key={q} className="rounded-xl p-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <h3 className="text-sm font-semibold text-white mb-2">{q}</h3>
+                <p className="text-sm text-white/45 leading-relaxed">{a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
