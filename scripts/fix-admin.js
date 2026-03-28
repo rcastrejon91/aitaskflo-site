@@ -1,9 +1,6 @@
 const Database = require("better-sqlite3");
 const db = new Database("/home/aitaskflo/data/lyra.db");
-
-// Check schema
-console.log("Users columns:", db.prepare("PRAGMA table_info(users)").all());
-console.log("Users rows:", db.prepare("SELECT * FROM users LIMIT 5").all());
-console.log("Subscriptions:", db.prepare("SELECT * FROM subscriptions LIMIT 5").all());
-
+db.prepare("UPDATE subscriptions SET plan='pro', status='active' WHERE user_id='admin-1'").run();
+const row = db.prepare("SELECT plan, status FROM subscriptions WHERE user_id='admin-1'").get();
+console.log("Result:", row);
 db.close();
