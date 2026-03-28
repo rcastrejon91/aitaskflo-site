@@ -15,7 +15,7 @@ const IMPORTANCE_WEIGHT: Record<MemoryImportance, number> = {
 export function getAllMemories(userId?: string): Memory[] {
   const memories = readStore<Memory[]>(MEMORIES_FILE, []);
   if (!userId) return memories;
-  return memories.filter((m) => !m.userId || m.userId === userId);
+  return memories.filter((m) => m.userId === userId);
 }
 
 export async function storeMemory(
