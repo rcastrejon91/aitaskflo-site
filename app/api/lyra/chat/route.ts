@@ -7,7 +7,7 @@ import { buildLearningContext } from "@/lib/lyra/weblearner";
 import { buildGameContext, detectEngine } from "@/lib/lyra/gamedev";
 import { auth } from "@/auth";
 import { LYRA_TOOLS, getLunarPersonalityNote } from "@/lib/lyra/tools";
-import { streamGroqFallback, routeTask, streamParallelJudge } from "@/lib/lyra/streaming";
+import { streamGroqFallback, streamGrokFallback, streamOllamaFallback, streamOpenAIFallback, routeTask, streamParallelJudge } from "@/lib/lyra/streaming";
 import { executeTool } from "@/lib/lyra/execute-tool";
 import { buildMindContext } from "@/lib/lyra/mind";
 import { detectPersona, getPersonaAddendum } from "@/lib/lyra/persona";
@@ -192,22 +192,102 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         try {
           const anthropicKey = process.env.ANTHROPIC_API_KEY;
+          const flatMessages = messages as Array<{ role: string; content: string }>;
 
-          // No Anthropic key — fall back to Groq immediately
+          // Route: Groq — primary, free, fast
+          if (decision.route === "groq") {
+            await streamGroqFallback(systemPrompt, flatMessages, encoder, controller);
+            return;
+          }
+
+          // Route: Grok — complex/creative, fewer restrictions
+          if (decision.route === "grok") {
+            await streamGrokFallback(systemPrompt, flatMessages, encoder, controller);
+            return;
+          }
+
+          // Route: Ollama — local, unrestricted chat
+          if (decision.route === "ollama") {
+            await streamOllamaFallback(systemPrompt, flatMessages, encoder, controller);
+            return;
+          }
+
+          // Route: OpenAI — tool calls (image gen, email, web search, etc.)
+          if (decision.route === "openai") {
+            const openaiKey = process.env.OPENAI_API_KEY;
+            if (!openaiKey) {
+              // No OpenAI key — fall through to Claude for tools
+            } else {
+              // Convert LYRA_TOOLS to OpenAI function format
+              const openaiTools = LYRA_TOOLS.map((t) => ({
+                type: "function" as const,
+                function: {
+                  name: t.name,
+                  description: t.description,
+                  parameters: (t as { input_schema: object }).input_schema,
+                },
+              }));
+
+              let oaiMessages: Array<{ role: string; content: string; tool_call_id?: string; name?: string }> = [
+                { role: "system", content: systemPrompt },
+                ...flatMessages,
+              ];
+              let oaiIterations = 0;
+              const OAI_MAX = 5;
+
+              while (oaiIterations < OAI_MAX) {
+                oaiIterations++;
+                const oaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "Authorization": `Bearer ${openaiKey}` },
+                  body: JSON.stringify({
+                    model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+                    messages: oaiMessages,
+                    tools: openaiTools,
+                    tool_choice: "auto",
+                    max_tokens: 4096,
+                  }),
+                  signal: AbortSignal.timeout(60_000),
+                });
+
+                if (!oaiRes.ok) {
+                  // OpenAI failed — fall through to Claude
+                  break;
+                }
+
+                const oaiData = await oaiRes.json();
+                const choice = oaiData.choices?.[0];
+                const assistantMsg = choice?.message;
+
+                if (assistantMsg?.content) {
+                  controller.enqueue(encoder.encode(assistantMsg.content));
+                }
+
+                const toolCalls = assistantMsg?.tool_calls;
+                if (!toolCalls || toolCalls.length === 0 || choice?.finish_reason === "stop") break;
+
+                oaiMessages.push({ role: "assistant", content: assistantMsg.content ?? "", ...assistantMsg });
+
+                for (const tc of toolCalls) {
+                  let input: Record<string, string> = {};
+                  try { input = JSON.parse(tc.function.arguments || "{}"); } catch { input = {}; }
+                  const result = await executeTool(tc.function.name, input, encoder, controller, userId, clientIp);
+                  oaiMessages.push({ role: "tool", content: result, tool_call_id: tc.id, name: tc.function.name });
+                }
+              }
+              return;
+            }
+          }
+
+          // Route: Claude — code tasks + tool fallback when OpenAI unavailable
           if (!anthropicKey) {
-            await streamGroqFallback(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller);
+            await streamGroqFallback(systemPrompt, flatMessages, encoder, controller);
             return;
           }
 
-          // Route: simple/fast tasks go directly to Groq
-          if (decision.route === "groq" && !decision.useParallel) {
-            await streamGroqFallback(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller);
-            return;
-          }
-
-          // Parallel mode: fan out to multiple models, judge picks best
+          // Parallel mode
           if (decision.useParallel) {
-            await streamParallelJudge(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller, anthropicKey);
+            await streamParallelJudge(systemPrompt, flatMessages, encoder, controller, anthropicKey);
             return;
           }
 
@@ -318,9 +398,9 @@ export async function POST(req: NextRequest) {
           } else if (err instanceof Anthropic.BadRequestError) {
             const msg = (err as { message?: string }).message ?? "Bad request";
             console.error("[Lyra] Anthropic 400 BadRequest:", msg, err.error);
-            // Content policy or bad request → try Groq
+            // Content policy rejection → hand off to Grok (fewer restrictions)
             try {
-              await streamGroqFallback(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller);
+              await streamGrokFallback(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller);
             } catch {
               safeEnqueue(`⚠️ Request error: ${msg}`);
             }
