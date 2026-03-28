@@ -12,6 +12,7 @@ import { executeTool } from "@/lib/lyra/execute-tool";
 import { buildMindContext } from "@/lib/lyra/mind";
 import { detectPersona, getPersonaAddendum } from "@/lib/lyra/persona";
 import { getRecentMilestoneAnnouncement } from "@/lib/lyra/milestones";
+import { detectComposeIntent, designCompositeTool, saveCompositeTool, streamBuildSequence, executeCompositeTool, listCompositeTools } from "@/lib/lyra/composer";
 
 export async function POST(req: NextRequest) {
   try {
@@ -50,6 +51,90 @@ export async function POST(req: NextRequest) {
 
     const agent = agentId ? getAgent(agentId) : getActiveAgent();
     if (!agent) return new Response("Agent not found", { status: 404 });
+
+    // ── Composer: detect "I wish I could..." / "combine X and Y" intents ──
+    const composeIntent = userId ? detectComposeIntent(message) : null;
+    if (composeIntent && userId) {
+      const encoder = new TextEncoder();
+      const readable = new ReadableStream({
+        async start(controller) {
+          try {
+            const design = await designCompositeTool(composeIntent);
+            if (!design) {
+              controller.enqueue(encoder.encode("I couldn't figure out how to build that — try describing it differently."));
+              controller.close();
+              return;
+            }
+
+            await streamBuildSequence(controller, encoder, design.label, design.steps);
+
+            const tool = {
+              id: `${userId}-${design.name}`,
+              user_id: userId,
+              created_at: new Date().toISOString(),
+              use_count: 0,
+              ...design,
+            };
+            saveCompositeTool(tool);
+
+            controller.enqueue(encoder.encode(`🧩 **${design.label}** is ready and saved to your toolbox.\n\n`));
+            controller.enqueue(encoder.encode(`${design.description}\n\n`));
+            controller.enqueue(encoder.encode(`You can use it anytime by saying **"use ${design.name}"**.\n\n`));
+            controller.enqueue(encoder.encode(`Let me run it now...\n\n`));
+
+            await executeCompositeTool(tool, {}, encoder, controller, userId, clientIp);
+          } catch (err) {
+            try { controller.enqueue(encoder.encode(`⚠️ Build failed: ${err instanceof Error ? err.message : String(err)}`)); } catch { /* closed */ }
+          } finally {
+            try { controller.close(); } catch { /* closed */ }
+          }
+        },
+      });
+      return new Response(readable, { headers: { "Content-Type": "text/plain; charset=utf-8", "X-Accel-Buffering": "no" } });
+    }
+
+    // ── Check if user is invoking a saved composite tool ──────────────────
+    const useToolMatch = userId ? message.match(/^use\s+([\w-]+)$/i) : null;
+    if (useToolMatch && userId) {
+      const { getCompositeTool } = await import("@/lib/lyra/composer");
+      const saved = getCompositeTool(userId, useToolMatch[1].toLowerCase());
+      if (saved) {
+        const encoder = new TextEncoder();
+        const readable = new ReadableStream({
+          async start(controller) {
+            try {
+              controller.enqueue(encoder.encode(`🧩 Running **${saved.label}**...\n\n`));
+              await executeCompositeTool(saved, {}, encoder, controller, userId, clientIp);
+            } catch (err) {
+              try { controller.enqueue(encoder.encode(`⚠️ ${err instanceof Error ? err.message : String(err)}`)); } catch { /* closed */ }
+            } finally {
+              try { controller.close(); } catch { /* closed */ }
+            }
+          },
+        });
+        return new Response(readable, { headers: { "Content-Type": "text/plain; charset=utf-8", "X-Accel-Buffering": "no" } });
+      }
+    }
+
+    // ── List saved tools ──────────────────────────────────────────────────
+    if (userId && /\b(my tools|list tools|show tools|what tools|saved tools)\b/i.test(message)) {
+      const tools = listCompositeTools(userId);
+      const encoder = new TextEncoder();
+      const readable = new ReadableStream({
+        async start(controller) {
+          if (tools.length === 0) {
+            controller.enqueue(encoder.encode("You don't have any custom tools yet. Try saying *\"I wish I could...\"* and I'll build one for you."));
+          } else {
+            controller.enqueue(encoder.encode(`🧰 **Your Custom Tools** (${tools.length})\n\n`));
+            tools.forEach((t) => {
+              controller.enqueue(encoder.encode(`• **${t.label}** — ${t.description}\n  Say: \`use ${t.name}\`\n\n`));
+            });
+          }
+          controller.close();
+        },
+      });
+      return new Response(readable, { headers: { "Content-Type": "text/plain; charset=utf-8", "X-Accel-Buffering": "no" } });
+    }
 
     // ── 1. Call Python orchestrator (non-blocking fallback if offline) ─────
     let orchestratorAddendum = "";
