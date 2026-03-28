@@ -69,17 +69,6 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-16">
-            <Link href="/pricing">
-              <Button size="lg" className="text-white border-0 font-semibold px-8 h-12 text-base shadow-2xl" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 8px 32px rgba(109,40,217,0.3)" }}>
-                <Sparkles className="mr-2 h-5 w-5" />
-                Get Started
-              </Button>
-            </Link>
-            <Link href="/login">
-              <Button size="lg" variant="outline" className="h-12 px-8 text-base font-medium" style={{ borderColor: "rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.65)" }}>
-                Sign in
-              </Button>
-            </Link>
           </div>
 
           {/* Feature badges */}
@@ -167,7 +156,7 @@ export default function Home() {
             <p className="mb-8" style={{ color: "rgba(255,255,255,0.38)" }}>Your AI gets better with every message.</p>
             <Link href="/pricing">
               <Button size="lg" className="text-white border-0 font-semibold px-10 h-12 text-base shadow-2xl" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 8px 32px rgba(109,40,217,0.3)" }}>
-                View Plans
+                Get Started
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
