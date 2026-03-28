@@ -173,7 +173,6 @@ export default function Home() {
             </div>
             <span className="text-sm" style={{ color: "rgba(255,255,255,0.25)" }}>AITaskFlo</span>
           </div>
-          <span className="text-xs" style={{ color: "rgba(255,255,255,0.18)" }}>Powered by Claude</span>
         </div>
       </footer>
     </div>
