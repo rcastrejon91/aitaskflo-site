@@ -249,6 +249,10 @@ export async function routeTask(
 ): Promise<RouterDecision> {
   const DEFAULT: RouterDecision = { route: "groq", taskType: "analysis", useParallel: false };
 
+  // Ollama — local, raw, unfiltered mode
+  const ollamaKeywords = /\b(use local|go local|raw mode|no filter|unfiltered|dark mode|unleash|go raw|beast mode|no limits|local ai|offline mode|shadow mode|uncensored)\b/i;
+  if (ollamaKeywords.test(message)) return { ...DEFAULT, route: "ollama", taskType: "creative" };
+
   // Tool-use → OpenAI (function calling)
   const toolKeywords = /send(?: an?)? email|search the web|search for .{3,}|current weather|what(?:'s| is) the weather|generat(?:e|ing) (?:an? )?image|draw (?:me |a |an )?|create (?:an? )?image|make (?:a |an )?(?:image|picture|photo|illustration)|(?:picture|photo|image) of |show me (?:a |an )?(?:image|picture|photo)|qr code|translate .{3,} (?:to|into)|moon phase|sunrise|sunset|https?:\/\/\S|call (?:the )?api|fetch (?:from )?https?|post to https?/i;
   if (toolKeywords.test(message)) return { ...DEFAULT, route: "openai", taskType: "tool" };
