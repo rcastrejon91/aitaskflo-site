@@ -63,6 +63,30 @@ export async function POST(req: NextRequest) {
         upsertSubscription({ user_id: userId, plan: "free", status: "canceled" });
         break;
       }
+
+      case "invoice.paid": {
+        // Subscription renewed successfully — keep status active
+        const invoice = event.data.object as Stripe.Invoice;
+        const customerId = invoice.customer as string;
+        const customer = await stripe.customers.retrieve(customerId);
+        if (customer.deleted) break;
+        const userId = (customer as Stripe.Customer).metadata?.userId;
+        if (!userId) break;
+        upsertSubscription({ user_id: userId, status: "active" });
+        break;
+      }
+
+      case "invoice.payment_failed": {
+        // Payment failed — mark subscription as past_due
+        const invoice = event.data.object as Stripe.Invoice;
+        const customerId = invoice.customer as string;
+        const customer = await stripe.customers.retrieve(customerId);
+        if (customer.deleted) break;
+        const userId = (customer as Stripe.Customer).metadata?.userId;
+        if (!userId) break;
+        upsertSubscription({ user_id: userId, status: "past_due" });
+        break;
+      }
     }
   } catch (err) {
     console.error("[Stripe webhook] handler error:", err);
