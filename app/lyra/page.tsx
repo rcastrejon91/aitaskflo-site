@@ -6,12 +6,16 @@ import { Dashboard } from "@/components/lyra/Dashboard";
 import { getLyraState, getActiveAgent, getAllAgents, computeLineageGraph } from "@/lib/lyra/agents";
 import { getAllMemories } from "@/lib/lyra/memories";
 import { getAllReflections } from "@/lib/lyra/reflections";
+import { getSubscription } from "@/lib/lyra/db";
 
 export default async function LyraPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
   const userId = (session.user as { id: string }).id;
+
+  const sub = getSubscription(userId);
+  if (sub.plan === "free" || sub.status !== "active") redirect("/pricing");
 
   const agents = getAllAgents();
   const state = getLyraState();

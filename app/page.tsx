@@ -37,9 +37,9 @@ export default function Home() {
                 Sign in
               </Button>
             </Link>
-            <Link href="/lyra">
+            <Link href="/pricing">
               <Button className="text-white border-0 font-semibold shadow-lg" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 4px 16px rgba(109,40,217,0.3)" }}>
-                Launch Lyra
+                Get Started
                 <ArrowRight className="ml-1.5 h-4 w-4" />
               </Button>
             </Link>
@@ -69,10 +69,10 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-16">
-            <Link href="/lyra">
+            <Link href="/pricing">
               <Button size="lg" className="text-white border-0 font-semibold px-8 h-12 text-base shadow-2xl" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 8px 32px rgba(109,40,217,0.3)" }}>
                 <Sparkles className="mr-2 h-5 w-5" />
-                Open Lyra Dashboard
+                Get Started
               </Button>
             </Link>
             <Link href="/login">
@@ -165,9 +165,9 @@ export default function Home() {
           <div className="rounded-3xl p-12" style={{ background: "rgba(109,40,217,0.07)", border: "1px solid rgba(109,40,217,0.18)", boxShadow: "0 0 80px rgba(109,40,217,0.07)" }}>
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">Start building today</h2>
             <p className="mb-8" style={{ color: "rgba(255,255,255,0.38)" }}>Your AI gets better with every message.</p>
-            <Link href="/lyra">
+            <Link href="/pricing">
               <Button size="lg" className="text-white border-0 font-semibold px-10 h-12 text-base shadow-2xl" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 8px 32px rgba(109,40,217,0.3)" }}>
-                Launch Lyra
+                View Plans
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
