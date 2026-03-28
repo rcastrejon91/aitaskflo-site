@@ -1,16 +1,6 @@
 const Database = require("better-sqlite3");
 const db = new Database("/home/aitaskflo/data/lyra.db");
-
-// Check auth accounts table
-try {
-  console.log("Accounts:", db.prepare("SELECT * FROM accounts LIMIT 10").all());
-} catch { console.log("No accounts table"); }
-
-try {
-  console.log("Auth users:", db.prepare("SELECT * FROM auth_users LIMIT 10").all());
-} catch { console.log("No auth_users table"); }
-
-// List all tables
-console.log("Tables:", db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all());
-
+db.prepare("INSERT OR REPLACE INTO subscriptions (user_id, plan, status, updated_at) VALUES ('b9969c91-8bb4-4377-aae5-94e2a8b7f718', 'pro', 'active', datetime('now'))").run();
+const row = db.prepare("SELECT plan, status FROM subscriptions WHERE user_id='b9969c91-8bb4-4377-aae5-94e2a8b7f718'").get();
+console.log("Result:", row);
 db.close();
