@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
 
     // ── Router: classify task before deciding which model handles it ──────
     const decision = await routeTask(message, cleanHistory).catch(() => ({
-      route: "claude" as const,
+      route: "groq" as const,
       taskType: "analysis" as const,
       useParallel: false,
     }));
@@ -294,7 +294,14 @@ export async function POST(req: NextRequest) {
           }
         } catch (err) {
           const safeEnqueue = (msg: string) => { try { controller.enqueue(encoder.encode(msg)); } catch { /* stream closed */ } };
-          if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          if (errMsg.includes("credit") || errMsg.includes("billing") || errMsg.includes("quota")) {
+            try {
+              await streamGroqFallback(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller);
+            } catch {
+              safeEnqueue("⚠️ AI service unavailable. Please try again.");
+            }
+          } else if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
             // API key invalid / no model access → fall back to Groq
             try {
               await streamGroqFallback(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller);
