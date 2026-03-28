@@ -23,6 +23,16 @@ import {
   toolUserLocation,
   toolGodotBuilder,
 } from "@/lib/lyra/tools";
+import {
+  toolAnalyzeImage,
+  toolGmailSend,
+  toolGmailRead,
+  toolCalendarGetEvents,
+  toolCalendarCreateEvent,
+  toolDriveList,
+  toolDriveRead,
+  toolDriveWrite,
+} from "@/lib/lyra/google-tools";
 
 // ── Tool dispatcher ───────────────────────────────────────────────────────────
 
@@ -440,6 +450,53 @@ export async function executeTool(
     const card = JSON.stringify({ tool: "book", ...book });
     controller.enqueue(encoder.encode(`\n${card}`));
     return `Book "${book.title}" is ready! ${book.chapters.length} chapters generated.`;
+  }
+
+  if (name === "analyze_image") {
+    return await toolAnalyzeImage(input.url ?? "", userId);
+  }
+
+  if (name === "gmail_send") {
+    if (!userId) return "This tool requires you to be logged in.";
+    return await toolGmailSend(userId, input.to ?? "", input.subject ?? "", input.body ?? "");
+  }
+
+  if (name === "gmail_read") {
+    if (!userId) return "This tool requires you to be logged in.";
+    const maxResults = input.max_results ? parseInt(input.max_results, 10) || 5 : 5;
+    return await toolGmailRead(userId, input.query, maxResults);
+  }
+
+  if (name === "calendar_get") {
+    if (!userId) return "This tool requires you to be logged in.";
+    const days = input.days ? parseInt(input.days, 10) || 7 : 7;
+    return await toolCalendarGetEvents(userId, days);
+  }
+
+  if (name === "calendar_create") {
+    if (!userId) return "This tool requires you to be logged in.";
+    return await toolCalendarCreateEvent(
+      userId,
+      input.summary ?? "",
+      input.start ?? "",
+      input.end ?? "",
+      input.description
+    );
+  }
+
+  if (name === "drive_list") {
+    if (!userId) return "This tool requires you to be logged in.";
+    return await toolDriveList(userId, input.query);
+  }
+
+  if (name === "drive_read") {
+    if (!userId) return "This tool requires you to be logged in.";
+    return await toolDriveRead(userId, input.file_id ?? "");
+  }
+
+  if (name === "drive_write") {
+    if (!userId) return "This tool requires you to be logged in.";
+    return await toolDriveWrite(userId, input.name ?? "", input.content ?? "", input.mime_type);
   }
 
   const card = JSON.stringify({ tool: name, ...input });

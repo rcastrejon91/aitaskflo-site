@@ -420,6 +420,103 @@ ACTIONS:
       required: ["concept"],
     },
   },
+  {
+    name: "analyze_image",
+    description: "Analyze and describe what's in an image. Use when user shares an image URL or asks what's in a photo.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        url: { type: "string", description: "URL of the image to analyze" },
+        question: { type: "string", description: "Optional specific question about the image" },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "gmail_send",
+    description: "Send an email via the user's connected Gmail account. More reliable than app password method.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        to: { type: "string", description: "Recipient email address" },
+        subject: { type: "string", description: "Email subject line" },
+        body: { type: "string", description: "Full email body" },
+      },
+      required: ["to", "subject", "body"],
+    },
+  },
+  {
+    name: "gmail_read",
+    description: "Read recent emails from the user's Gmail inbox.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Gmail search query, e.g. 'from:boss@company.com' or 'subject:invoice'. Leave empty for latest emails." },
+        max_results: { type: "string", description: "Maximum number of emails to return (default: 5)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "calendar_get",
+    description: "Get upcoming calendar events.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        days: { type: "string", description: "Number of days to look ahead (default: 7)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "calendar_create",
+    description: "Create a new calendar event.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        summary: { type: "string", description: "Event title/name" },
+        start: { type: "string", description: "Start datetime in ISO 8601 format, e.g. 2025-04-01T14:00:00Z" },
+        end: { type: "string", description: "End datetime in ISO 8601 format, e.g. 2025-04-01T15:00:00Z" },
+        description: { type: "string", description: "Optional event description or notes" },
+      },
+      required: ["summary", "start", "end"],
+    },
+  },
+  {
+    name: "drive_list",
+    description: "List files in Google Drive.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Drive search query, e.g. 'name contains \"report\"' or 'mimeType=\"application/pdf\"'. Leave empty to list recent files." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "drive_read",
+    description: "Read content of a Google Drive file.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        file_id: { type: "string", description: "Google Drive file ID (from drive_list)" },
+      },
+      required: ["file_id"],
+    },
+  },
+  {
+    name: "drive_write",
+    description: "Create or update a file in Google Drive.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        name: { type: "string", description: "File name including extension, e.g. 'report.txt'" },
+        content: { type: "string", description: "File content to write" },
+        mime_type: { type: "string", description: "MIME type, e.g. 'text/plain', 'text/html'. Defaults to text/plain." },
+      },
+      required: ["name", "content"],
+    },
+  },
 ];
 
 export function pollinationsUrl(prompt: string): string {
@@ -507,7 +604,28 @@ export async function toolGetWeather(location: string): Promise<string> {
 }
 
 export async function toolSearchWeb(query: string): Promise<string> {
-  // Try Brave Search first if key is configured
+  // Try Google Custom Search first
+  const googleKey = process.env.GOOGLE_SEARCH_API_KEY;
+  const googleCx = process.env.GOOGLE_SEARCH_CX;
+  if (googleKey && googleCx) {
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(googleKey)}&cx=${encodeURIComponent(googleCx)}&q=${encodeURIComponent(query)}&num=5`,
+        { signal: AbortSignal.timeout(10_000) }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const items = (data.items ?? []) as Array<{ title: string; snippet: string; link: string }>;
+        if (items.length > 0) {
+          return items
+            .map((r) => `**${r.title}**\n${r.snippet}\n${r.link}`)
+            .join("\n\n");
+        }
+      }
+    } catch { /* fall through to Brave */ }
+  }
+
+  // Try Brave Search if key is configured
   const braveKey = process.env.BRAVE_SEARCH_API_KEY;
   if (braveKey) {
     try {

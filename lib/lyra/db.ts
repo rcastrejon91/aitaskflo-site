@@ -156,6 +156,20 @@ function initSchema(db: BetterSqlite3Db) {
     );
   `);
 
+  // Add google_tokens table
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS google_tokens (
+        user_id      TEXT PRIMARY KEY,
+        access_token TEXT NOT NULL,
+        refresh_token TEXT,
+        expires_at   TEXT NOT NULL,
+        scopes       TEXT,
+        updated_at   TEXT NOT NULL
+      );
+    `);
+  } catch { /* ignore */ }
+
   // Migrate existing facts table to add new columns if they don't exist
   try {
     db.exec(`ALTER TABLE facts ADD COLUMN importance INTEGER DEFAULT 3`);
@@ -707,5 +721,46 @@ export function buildMemoryContext(userId: string, currentMessage?: string): str
     return parts.join("\n");
   } catch {
     return "";
+  }
+}
+
+// ── Google Tokens ─────────────────────────────────────────────────────────────
+
+export interface DbGoogleTokens {
+  user_id: string;
+  access_token: string;
+  refresh_token: string | null;
+  expires_at: string;
+  scopes: string | null;
+  updated_at: string;
+}
+
+export function saveGoogleTokens(userId: string, data: { access_token: string; refresh_token?: string | null; expires_at: string; scopes?: string | null }): void {
+  const db = getDb();
+  if (!db) return;
+  try {
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO google_tokens (user_id, access_token, refresh_token, expires_at, scopes, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET
+        access_token = excluded.access_token,
+        refresh_token = COALESCE(excluded.refresh_token, refresh_token),
+        expires_at = excluded.expires_at,
+        scopes = COALESCE(excluded.scopes, scopes),
+        updated_at = excluded.updated_at
+    `).run(userId, data.access_token, data.refresh_token ?? null, data.expires_at, data.scopes ?? null, now);
+  } catch (err) {
+    console.error("[Lyra DB] saveGoogleTokens error:", err instanceof Error ? err.message : err);
+  }
+}
+
+export function getGoogleTokens(userId: string): DbGoogleTokens | null {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    return (db.prepare("SELECT * FROM google_tokens WHERE user_id = ?").get(userId) as DbGoogleTokens) ?? null;
+  } catch {
+    return null;
   }
 }
