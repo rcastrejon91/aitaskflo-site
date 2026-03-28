@@ -97,12 +97,14 @@ export default function LyraChat({ persona, referrer }: { persona?: string; refe
   const [loading, setLoading] = useState(false);
   const [conversationId] = useState(generateId);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/lyra/warmup", { method: "POST" }).catch(() => {});
+    fetch("/api/auth/google/status").then(r => r.json()).then(d => setGoogleConnected(!!d.connected)).catch(() => setGoogleConnected(false));
   }, []);
 
   useEffect(() => {
@@ -381,9 +383,18 @@ export default function LyraChat({ persona, referrer }: { persona?: string; refe
               : <Send className="w-4 h-4 text-white" />}
           </motion.button>
         </div>
-        <p className="text-center text-[10px] text-white/15 mt-2.5">
-          Lyra · self-improving AI · powered by Claude
-        </p>
+        <div className="flex items-center justify-center mt-2.5">
+          {googleConnected === true ? (
+            <span className="flex items-center gap-1.5 text-[10px] text-white/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />
+              Google connected
+            </span>
+          ) : googleConnected === false ? (
+            <a href="/api/auth/google" className="flex items-center gap-1.5 text-[10px] text-white/25 hover:text-white/45 transition-colors">
+              🔗 Connect Google to unlock Calendar, Gmail &amp; Drive
+            </a>
+          ) : null}
+        </div>
       </div>
     </div>
   );

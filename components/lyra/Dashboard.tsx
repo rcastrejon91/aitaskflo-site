@@ -457,8 +457,6 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
               ★ {activeAgent.averageScore.toFixed(1)}
             </span>
           )}
-          {/* Google connect button */}
-          <GoogleConnectButton userId={userId} />
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="p-1.5 transition-colors"
