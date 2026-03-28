@@ -14,8 +14,11 @@ export default async function LyraPage() {
 
   const userId = (session.user as { id: string }).id;
 
-  const sub = getSubscription(userId);
-  if (sub.plan === "free" || sub.status !== "active") redirect("/pricing");
+  const ADMIN_IDS = ["admin-1", "b9969c91-8bb4-4377-aae5-94e2a8b7f718"];
+  if (!ADMIN_IDS.includes(userId)) {
+    const sub = getSubscription(userId);
+    if (sub.plan === "free" || sub.status !== "active") redirect("/pricing");
+  }
 
   const agents = getAllAgents();
   const state = getLyraState();
