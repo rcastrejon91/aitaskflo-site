@@ -2,8 +2,11 @@ import { randomUUID } from "crypto";
 import { readStore, updateStore } from "./storage";
 import type { Memory, MemoryType, MemoryImportance } from "@/lib/types/lyra";
 
-const MEMORIES_FILE = "memories.json";
 const MAX_MEMORIES = 200;
+
+function memoriesFile(userId?: string): string {
+  return userId ? `memories-${userId}.json` : "memories.json";
+}
 
 const IMPORTANCE_WEIGHT: Record<MemoryImportance, number> = {
   critical: 1.0,
@@ -13,9 +16,7 @@ const IMPORTANCE_WEIGHT: Record<MemoryImportance, number> = {
 };
 
 export function getAllMemories(userId?: string): Memory[] {
-  const memories = readStore<Memory[]>(MEMORIES_FILE, []);
-  if (!userId) return memories;
-  return memories.filter((m) => m.userId === userId);
+  return readStore<Memory[]>(memoriesFile(userId), []);
 }
 
 export async function storeMemory(
@@ -30,7 +31,8 @@ export async function storeMemory(
     accessCount: 0,
   };
 
-  await updateStore<Memory[]>(MEMORIES_FILE, [], (memories) => {
+  const file = memoriesFile(memory.userId);
+  await updateStore<Memory[]>(file, [], (memories) => {
     memories.push(newMemory);
     // Trim if over limit: drop lowest-scored entries
     if (memories.length > MAX_MEMORIES) {
@@ -88,7 +90,7 @@ export async function getRelevantMemories(
   const memories = getAllMemories(userId);
   const queryTokens = tokenize(query);
 
-  let candidates = type ? memories.filter((m) => m.type === type) : memories;
+  const candidates = type ? memories.filter((m) => m.type === type) : memories;
 
   const scored = candidates.map((m) => {
     const tagScore = tagOverlap(m.tags, queryTokens);
@@ -110,7 +112,8 @@ export async function getRelevantMemories(
   const topIds = new Set(top.map((m) => m.id));
   if (topIds.size > 0) {
     const now = new Date().toISOString();
-    await updateStore<Memory[]>(MEMORIES_FILE, [], (mems) =>
+    const file = memoriesFile(userId);
+    await updateStore<Memory[]>(file, [], (mems) =>
       mems.map((m) =>
         topIds.has(m.id)
           ? { ...m, accessCount: m.accessCount + 1, lastAccessedAt: now }
