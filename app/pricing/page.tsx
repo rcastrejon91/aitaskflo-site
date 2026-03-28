@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Check, ArrowLeft, Zap } from "lucide-react";
-import { PLANS } from "@/lib/stripe";
+import { PLANS } from "@/lib/plans";
 
 const PLAN_KEYS = ["free", "pro", "business"] as const;
 
