@@ -407,17 +407,40 @@ function GeneratedImage({ url }: { url: string }) {
 type Segment =
   | { kind: "text";  value: string }
   | { kind: "image"; url: string }
+  | { kind: "gif";   url: string }
   | { kind: "tool";  json: string };
 
-/** Character-level scanner — handles multi-field tool JSON and __IMG__ tags. */
+function GifEmbed({ url }: { url: string }) {
+  return (
+    <div className="my-2">
+      <img src={url} alt="gif" className="rounded-xl max-w-xs max-h-48 object-cover border border-white/10 shadow-lg" />
+    </div>
+  );
+}
+
+/** Character-level scanner — handles multi-field tool JSON, __IMG__ and __GIF__ tags. */
 function parseSegments(raw: string): Segment[] {
   const segments: Segment[] = [];
-  const DELIM = "__IMG__";
+  const IMG_DELIM = "__IMG__";
+  const GIF_DELIM = "__GIF__";
   let i = 0;
   let textStart = 0;
 
   while (i < raw.length) {
+    // ── GIF tag ────────────────────────────────────────────────────────────
+    if (raw.startsWith(GIF_DELIM, i)) {
+      if (i > textStart) segments.push({ kind: "text", value: raw.slice(textStart, i) });
+      const contentStart = i + GIF_DELIM.length;
+      const closeIdx = raw.indexOf(GIF_DELIM, contentStart);
+      if (closeIdx === -1) { textStart = i; break; }
+      segments.push({ kind: "gif", url: raw.slice(contentStart, closeIdx) });
+      i = closeIdx + GIF_DELIM.length;
+      textStart = i;
+      continue;
+    }
+
     // ── Image tag ──────────────────────────────────────────────────────────
+    const DELIM = IMG_DELIM;
     if (raw.startsWith(DELIM, i)) {
       if (i > textStart) segments.push({ kind: "text", value: raw.slice(textStart, i) });
       const contentStart = i + DELIM.length;
@@ -577,6 +600,7 @@ export function MessageRenderer({ content }: { content: string }) {
     <div className="space-y-1">
       {segments.map((seg, i) => {
         if (seg.kind === "image") return <GeneratedImage key={i} url={seg.url} />;
+        if (seg.kind === "gif")   return <GifEmbed key={i} url={seg.url} />;
         if (seg.kind === "tool")  return <ToolCard key={i} raw={seg.json} />;
         if (!seg.value.trim()) return null;
 

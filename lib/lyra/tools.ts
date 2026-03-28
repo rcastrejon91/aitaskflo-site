@@ -9,6 +9,17 @@ const execAsync = promisify(_exec);
 // Real tool definitions
 export const LYRA_TOOLS: Anthropic.Tool[] = [
   {
+    name: "send_gif",
+    description: "Send a funny or expressive GIF based on the mood or vibe of the conversation. Use spontaneously when something is hilarious, hype, shocking, awkward, or emotionally fitting. Pick a creative search query.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Search term describing the mood or reaction, e.g. 'mind blown', 'harry potter wand', 'yes finally', 'dark magic'" },
+      },
+      required: ["query"],
+    },
+  },
+  {
     name: "image_gen",
     description:
       "Generate an image from a text description. Use whenever the user asks to create, generate, draw, make, or visualize anything.",

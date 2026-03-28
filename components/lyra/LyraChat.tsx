@@ -132,7 +132,7 @@ export default function LyraChat({ persona, referrer }: { persona?: string; refe
     const filesToSend = [...attachedFiles];
     setInput("");
     setAttachedFiles([]);
-    if (textareaRef.current) textareaRef.current.style.height = "52px";
+    if (textareaRef.current) textareaRef.current.style.height = "72px";
 
     const history = messages.map((m) => ({ role: m.role, content: m.content }));
     const userMsg: Message = { role: "user", content: text, images: filesToSend.map((f) => f.dataUrl) };
@@ -366,7 +366,7 @@ export default function LyraChat({ persona, referrer }: { persona?: string; refe
               placeholder="Message Lyra… (generate images, write code, automate workflows)"
               disabled={loading}
               className="w-full bg-transparent text-white placeholder-white/20 px-4 py-3.5 resize-none focus:outline-none text-sm"
-              style={{ minHeight: "52px", maxHeight: "180px" }}
+              style={{ minHeight: "72px", maxHeight: "260px" }}
               rows={1}
             />
           </div>

@@ -40,6 +40,28 @@ export async function executeTool(
     return "Image generated.";
   }
 
+  if (name === "send_gif") {
+    const query = input.query ?? input.mood ?? "funny";
+    const tenorKey = process.env.TENOR_API_KEY;
+    if (!tenorKey) return "GIF search not configured — add TENOR_API_KEY to env.";
+    try {
+      const res = await fetch(
+        `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=${tenorKey}&limit=5&media_filter=gif`,
+        { signal: AbortSignal.timeout(5_000) }
+      );
+      const data = await res.json();
+      const results = data?.results ?? [];
+      if (results.length === 0) return "No GIF found.";
+      const pick = results[Math.floor(Math.random() * results.length)];
+      const url = pick?.media_formats?.gif?.url ?? pick?.media_formats?.tinygif?.url;
+      if (!url) return "No GIF found.";
+      controller.enqueue(encoder.encode(`\n__GIF__${url}__GIF__`));
+      return "GIF sent.";
+    } catch {
+      return "GIF search failed.";
+    }
+  }
+
   if (name === "send_email") {
     const card = JSON.stringify({ tool: "email", to: input.to, subject: input.subject, body: input.body });
     controller.enqueue(encoder.encode(`\n${card}`));
