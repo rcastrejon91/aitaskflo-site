@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { HOSDisplay } from "./HOSDisplay";
 import { OBDPanel } from "./OBDPanel";
+import { OpenpilotPanel } from "./OpenpilotPanel";
 import { VoiceButton } from "./VoiceButton";
 
 interface Message {
@@ -58,6 +59,7 @@ const QUICK_ACTIONS = [
   { label: "HOS status", msg: "What's my HOS status? How many hours do I have left?" },
   { label: "Find loads", msg: "Find me available loads" },
   { label: "Check engine", msg: "Show OBD engine data" },
+  { label: "ADAS status", msg: "What's the openpilot status? Is it engaged?" },
 ];
 
 export default function TruckerChat() {
@@ -68,6 +70,7 @@ export default function TruckerChat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [showOBD, setShowOBD] = useState(false);
+  const [showOpenpilot, setShowOpenpilot] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -142,12 +145,25 @@ export default function TruckerChat() {
           </div>
         </div>
         <button
+          onClick={() => setShowOpenpilot(v => !v)}
+          className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${showOpenpilot ? "bg-blue-800 border-blue-600 text-blue-300" : "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"}`}
+        >
+          🚗 ADAS
+        </button>
+        <button
           onClick={() => setShowOBD(v => !v)}
           className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${showOBD ? "bg-green-800 border-green-600 text-green-300" : "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"}`}
         >
           🔌 OBD
         </button>
       </div>
+
+      {/* openpilot Panel */}
+      {showOpenpilot && (
+        <div className="px-3 pt-3">
+          <OpenpilotPanel />
+        </div>
+      )}
 
       {/* OBD Panel */}
       {showOBD && (

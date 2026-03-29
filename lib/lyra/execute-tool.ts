@@ -766,6 +766,36 @@ export async function executeTool(
     return `OBD action: ${action}. The trucker dashboard will handle Bluetooth communication with the ELM327 dongle.`;
   }
 
+  if (name === "openpilot_status") {
+    const params = new URLSearchParams({ action: "status" });
+    if (input.dongle_id) params.set("dongle", input.dongle_id);
+    try {
+      const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+      const res = await fetch(`${baseUrl}/api/lyra/openpilot?${params}`, {
+        signal: AbortSignal.timeout(10_000),
+      });
+      const data = await res.json() as Record<string, unknown>;
+      const telem = (data.mock ?? data) as Record<string, unknown>;
+      const card = JSON.stringify({ tool: "openpilot", ...telem });
+      controller.enqueue(encoder.encode(`\n${card}`));
+
+      const lines: string[] = [];
+      if (telem.engaged) lines.push("openpilot: ENGAGED");
+      else lines.push("openpilot: standing by");
+      if (telem.speed_mph) lines.push(`Speed: ${telem.speed_mph} mph`);
+      if (telem.lead_distance_m) lines.push(`Lead vehicle: ${telem.lead_distance_m}m ahead`);
+      if (telem.forward_collision_warning) lines.push("⚠️ Forward collision warning active");
+      if (telem.lane_departure_warning) lines.push("⚠️ Lane departure warning active");
+      const dm = telem.driver_monitoring as Record<string, boolean> | undefined;
+      if (dm?.distracted) lines.push("⚠️ Driver distraction detected");
+      if (dm?.asleep) lines.push("🚨 Driver asleep alert");
+      if (telem.source) lines.push(`Source: ${telem.source}`);
+      return lines.join("\n");
+    } catch (err) {
+      return `openpilot API error: ${(err as Error).message}`;
+    }
+  }
+
   const card = JSON.stringify({ tool: name, ...input });
   controller.enqueue(encoder.encode(`\n${card}`));
   return `${name} recorded.`;

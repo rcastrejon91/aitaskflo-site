@@ -725,6 +725,17 @@ ACTIONS:
       required: ["action"],
     },
   },
+  {
+    name: "openpilot_status",
+    description: "Get live openpilot ADAS telemetry: engagement status, speed, steering angle, lead vehicle distance, driver monitoring, and active alerts. Use when user asks about openpilot, autopilot status, ADAS, driver assist, or 'is it engaged'.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        dongle_id: { type: "string", description: "comma.ai device dongle ID (optional — uses default device if omitted)" },
+      },
+      required: [],
+    },
+  },
 ];
 
 export function pollinationsUrl(prompt: string): string {

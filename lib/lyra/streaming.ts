@@ -258,7 +258,7 @@ export async function routeTask(
   if (toolKeywords.test(message)) return { ...DEFAULT, route: "claude", taskType: "tool" };
 
   // Trucker tools → Claude
-  const truckerKeywords = /\b(hours of service|hos\b|log (?:my |a )?(?:drive|driving|off duty|on duty|sleeper)|started driving|going off duty|took a break|load board|find (?:a |me )?(?:load|loads|freight)|loads? (?:going|from|to)|available loads?|obd|check engine|engine data|rpm|fault codes?|dtc|how (?:many |much )?hours? (?:do i have|left|remaining)|can i (?:keep |still )?driv|drive time)\b/i;
+  const truckerKeywords = /\b(hours of service|hos\b|log (?:my |a )?(?:drive|driving|off duty|on duty|sleeper)|started driving|going off duty|took a break|load board|find (?:a |me )?(?:load|loads|freight)|loads? (?:going|from|to)|available loads?|obd|check engine|engine data|rpm|fault codes?|dtc|how (?:many |much )?hours? (?:do i have|left|remaining)|can i (?:keep |still )?driv|drive time|openpilot|comma\.?ai|adas|driver assist|is it engaged|autopilot status|lane departure|forward collision)\b/i;
   if (truckerKeywords.test(message)) return { ...DEFAULT, route: "claude", taskType: "tool" };
 
   // Code → Claude
