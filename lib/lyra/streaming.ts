@@ -253,9 +253,9 @@ export async function routeTask(
   const ollamaKeywords = /\b(use local|go local|raw mode|no filter|unfiltered|dark mode|unleash|go raw|beast mode|no limits|local ai|offline mode|shadow mode|uncensored)\b/i;
   if (ollamaKeywords.test(message)) return { ...DEFAULT, route: "ollama", taskType: "creative" };
 
-  // Tool-use → OpenAI (function calling)
-  const toolKeywords = /send(?: an?)? email|search the web|search for .{3,}|current weather|what(?:'s| is) the weather|generat(?:e|ing) (?:an? )?image|draw (?:me |a |an )?|create (?:an? )?image|make (?:a |an )?(?:image|picture|photo|illustration)|(?:picture|photo|image) of |show me (?:a |an )?(?:image|picture|photo)|qr code|translate .{3,} (?:to|into)|moon phase|sunrise|sunset|https?:\/\/\S|call (?:the )?api|fetch (?:from )?https?|post to https?/i;
-  if (toolKeywords.test(message)) return { ...DEFAULT, route: "openai", taskType: "tool" };
+  // Tool-use → Claude (native tool calling, most reliable)
+  const toolKeywords = /send(?: an?)? email|search the web|search for .{3,}|current weather|what(?:'s| is) the weather|generat(?:e|ing) (?:an? )?image|draw (?:me |a |an )?|create (?:an? )?image|make (?:a |an )?(?:image|picture|photo|illustration|song|video|clip|beat|track|music)|(?:picture|photo|image|video|clip) of |show me (?:a |an )?(?:image|picture|photo|video|gif)|qr code|translate .{3,} (?:to|into)|moon phase|sunrise|sunset|https?:\/\/\S|call (?:the )?api|fetch (?:from )?https?|post to https?|sing(?:ing)?(?:\s+me)?(?:\s+a)?|(?:lo-?fi|ambient|chill|background)\s+music|generate\s+(?:a\s+)?(?:video|music|song|beat|track|audio|clip)|fal\.ai|send\s+(?:a\s+)?(?:gif|text|sms)|text\s+(?:message|me\b)|animated\s+gif|video\s+of\b|song\s+about\b|music\s+for\b/i;
+  if (toolKeywords.test(message)) return { ...DEFAULT, route: "claude", taskType: "tool" };
 
   // Code → Claude
   const codeKeywords = /\b(code|function|class|debug|fix (?:the |this )?(?:bug|error|issue)|refactor|write (?:a |me )?(?:script|function|class|component)|implement|algorithm|typescript|javascript|python|sql|regex|api endpoint)\b/i;
