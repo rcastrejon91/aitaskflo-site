@@ -4,6 +4,22 @@ import bcrypt from "bcryptjs";
 import { authConfig } from "@/auth.config";
 import { getAuthUserByUsernameOrEmail } from "@/lib/lyra/db";
 
+// Brute force protection: max 10 failed attempts per email per 15 minutes
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+
+function isLoginRateLimited(email: string): boolean {
+  const now = Date.now();
+  const key = email.toLowerCase();
+  const entry = loginAttempts.get(key);
+  if (!entry || now > entry.resetAt) {
+    loginAttempts.set(key, { count: 1, resetAt: now + 15 * 60 * 1000 });
+    return false;
+  }
+  if (entry.count >= 10) return true;
+  entry.count++;
+  return false;
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   providers: [
@@ -14,6 +30,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       authorize: async (credentials) => {
         if (!credentials?.email || !credentials?.password) return null;
+        if (isLoginRateLimited(credentials.email as string)) return null;
         const user = getAuthUserByUsernameOrEmail(credentials.email as string);
         if (!user || !user.password_hash) return null;
         const valid = await bcrypt.compare(credentials.password as string, user.password_hash);
