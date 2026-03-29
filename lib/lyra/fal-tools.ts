@@ -12,6 +12,13 @@ function init() {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function cast<T>(v: unknown): T { return v as T; }
 
+// fal.run can return { data: T, requestId } or T directly depending on SDK version
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function unwrap<T>(raw: unknown): T {
+  const r = raw as any;
+  return (r?.data !== undefined ? r.data : r) as T;
+}
+
 // ── Image generation (FLUX) ───────────────────────────────────────────────────
 
 export async function falImageGen(prompt: string, model: "fast" | "quality" | "pro" = "fast"): Promise<string> {
@@ -29,7 +36,7 @@ export async function falImageGen(prompt: string, model: "fast" | "quality" | "p
       enable_safety_checker: true,
     },
   });
-  const result = cast<{ images: Array<{ url: string }> }>(raw);
+  const result = unwrap<{ images: Array<{ url: string }> }>(raw);
   const url = result.images?.[0]?.url;
   if (!url) throw new Error("No image returned from fal.ai");
   return url;
@@ -48,7 +55,7 @@ export async function falImageEdit(imageUrl: string, prompt: string): Promise<st
       num_images: 1,
     },
   });
-  const result = cast<{ images: Array<{ url: string }> }>(raw);
+  const result = unwrap<{ images: Array<{ url: string }> }>(raw);
   const url = result.images?.[0]?.url;
   if (!url) throw new Error("No image returned");
   return url;
@@ -61,7 +68,7 @@ export async function falRemoveBg(imageUrl: string): Promise<string> {
   const raw = await fal.run("fal-ai/birefnet", {
     input: { image_url: imageUrl },
   });
-  const result = cast<{ image: { url: string } }>(raw);
+  const result = unwrap<{ image: { url: string } }>(raw);
   const url = result.image?.url;
   if (!url) throw new Error("No image returned");
   return url;
@@ -74,7 +81,7 @@ export async function falUpscale(imageUrl: string, scale = 4): Promise<string> {
   const raw = await fal.run("fal-ai/aura-sr", {
     input: { image_url: imageUrl, upscaling_factor: String(scale) as "4" },
   });
-  const result = cast<{ image: { url: string } }>(raw);
+  const result = unwrap<{ image: { url: string } }>(raw);
   const url = result.image?.url;
   if (!url) throw new Error("No image returned");
   return url;
@@ -92,7 +99,7 @@ export async function falTextToVideo(prompt: string, duration = 5): Promise<stri
       aspect_ratio: "16:9",
     },
   });
-  const result = cast<{ video: { url: string } }>(raw);
+  const result = unwrap<{ video: { url: string } }>(raw);
   const url = result.video?.url;
   if (!url) throw new Error("No video returned");
   return url;
@@ -109,7 +116,7 @@ export async function falImageToVideo(imageUrl: string, prompt: string): Promise
       duration: "5" as "5" | "10",
     },
   });
-  const result = cast<{ video: { url: string } }>(raw);
+  const result = unwrap<{ video: { url: string } }>(raw);
   const url = result.video?.url;
   if (!url) throw new Error("No video returned");
   return url;
@@ -128,10 +135,10 @@ export async function falTTS(text: string, voiceHint = "aria"): Promise<string> 
     michael: "am_michael", liam: "am_liam", adam: "am_adam", echo: "am_echo",
   };
   const voice: KokoroVoice = voiceMap[voiceHint.toLowerCase()] ?? KOKORO_VOICES[0];
-  const raw = await fal.run("fal-ai/kokoro/american-english", {
+  const raw = await fal.run("fal-ai/kokoro", {
     input: { prompt: text, voice, speed: 1.0 },
   });
-  const result = cast<{ audio: { url: string } }>(raw);
+  const result = unwrap<{ audio: { url: string } }>(raw);
   const url = result.audio?.url;
   if (!url) throw new Error("No audio returned");
   return url;
@@ -144,7 +151,7 @@ export async function falMusicGen(prompt: string, duration = 15): Promise<string
   const raw = await fal.run("fal-ai/stable-audio", {
     input: { prompt, seconds_total: duration, steps: 100 },
   });
-  const result = cast<{ audio_file: { url: string } }>(raw);
+  const result = unwrap<{ audio_file: { url: string } }>(raw);
   const url = result.audio_file?.url;
   if (!url) throw new Error("No audio returned");
   return url;
@@ -157,7 +164,7 @@ export async function falFaceSwap(sourceUrl: string, targetUrl: string): Promise
   const raw = await fal.run("fal-ai/face-swap", {
     input: { base_image_url: targetUrl, swap_image_url: sourceUrl },
   });
-  const result = cast<{ image: { url: string } }>(raw);
+  const result = unwrap<{ image: { url: string } }>(raw);
   const url = result.image?.url;
   if (!url) throw new Error("No image returned");
   return url;
