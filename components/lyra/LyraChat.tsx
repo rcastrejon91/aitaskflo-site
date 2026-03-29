@@ -183,7 +183,21 @@ export default function LyraChat({ persona, referrer }: { persona?: string; refe
           ...(referrer ? { referrer } : {}),
         }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const errText = await res.text();
+        let friendlyError = "Something went wrong. Please try again.";
+        try {
+          const errJson = JSON.parse(errText);
+          if (errJson.error === "limit_reached") {
+            friendlyError = `⚡ You've reached your **${errJson.limit} messages/day** limit on the free plan.\n\n[Upgrade to Pro](/pricing) for unlimited messages.`;
+          } else if (errJson.error === "Unauthorized") {
+            friendlyError = "You need to be signed in to chat. [Sign in](/login)";
+          } else if (errJson.error) {
+            friendlyError = errJson.error;
+          }
+        } catch { /* use default */ }
+        throw new Error(friendlyError);
+      }
 
       const reader = res.body?.getReader();
       if (!reader) throw new Error("No stream");
