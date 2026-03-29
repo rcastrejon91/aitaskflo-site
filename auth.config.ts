@@ -6,7 +6,12 @@ export const authConfig: NextAuthConfig = {
   secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   providers: [],
   callbacks: {
-    authorized({ auth }) {
+    authorized({ auth, request }) {
+      // Allow API key access for programmatic/test requests
+      const apiKey = request?.headers?.get("x-api-key");
+      if (apiKey && process.env.ADMIN_PASSWORD && apiKey === process.env.ADMIN_PASSWORD) {
+        return true;
+      }
       return !!auth;
     },
     jwt({ token, user }) {
