@@ -19,8 +19,8 @@ export async function POST(req: NextRequest) {
     const { message, history, conversationId, agentId, images, persona, referrer } = await req.json();
 
     // API key bypass for programmatic access (test scripts, integrations)
-    const apiKey = req.headers.get("x-api-key");
-    const isApiKeyValid = apiKey && apiKey === process.env.ADMIN_PASSWORD;
+    const apiKey = req.headers.get("x-admin-key") ?? req.headers.get("x-api-key");
+    const isApiKeyValid = apiKey && (apiKey === process.env.ADMIN_PASSWORD || apiKey === process.env.ADMIN_KEY);
 
     const session = isApiKeyValid ? null : await auth();
     const userId = isApiKeyValid
