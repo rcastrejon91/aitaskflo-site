@@ -15,6 +15,7 @@ export interface MilestoneRecord {
   threshold: number;
   restartCount: number;
   ts: string;
+  announced?: boolean;
 }
 
 export interface MilestonesData {
@@ -76,21 +77,27 @@ export async function getRecentMilestoneAnnouncement(): Promise<string> {
   if (now - _announcementCacheTime < CACHE_TTL) return _announcementCache;
 
   try {
-    const data = await getMilestonesData();
+    let data = await getMilestonesData();
     if (!data) { _announcementCacheTime = now; _announcementCache = ""; return ""; }
 
-    const oneDayAgo = now - 24 * 60 * 60 * 1000;
-    const recent = data.achieved
-      .filter((m) => new Date(m.ts).getTime() > oneDayAgo)
+    // Find the first unannounced milestone
+    const unannounced = data.achieved
+      .filter((m) => !m.announced)
       .sort((a, b) => b.threshold - a.threshold)[0];
 
-    if (!recent) {
+    if (!unannounced) {
       _announcementCache = "";
     } else {
+      // Mark it as announced so it never fires again
+      data.achieved = data.achieved.map((m) =>
+        m.threshold === unannounced.threshold ? { ...m, announced: true } : m
+      );
+      await fsp.writeFile(MILESTONES_FILE, JSON.stringify(data, null, 2), "utf-8");
+
       _announcementCache =
-        `\n\n🏆 MILESTONE UNLOCKED TODAY: aitaskflo has survived ${recent.restartCount} restarts and crossed the ${recent.threshold}-restart mark. ` +
-        `Mention this naturally early in your response — something like "oh, and we just hit restart ${recent.restartCount} today. ` +
-        `${recent.threshold} milestone. Still standing." Keep it brief, proud, and woven in naturally.`;
+        `\n\n🏆 MILESTONE UNLOCKED: aitaskflo has survived ${unannounced.restartCount} restarts and crossed the ${unannounced.threshold}-restart mark. ` +
+        `Mention this naturally once in your response — something like "oh, and we just hit restart ${unannounced.restartCount} today. ` +
+        `${unannounced.threshold} milestone. Still standing." Keep it brief, proud, and woven in naturally.`;
     }
 
     _announcementCacheTime = now;
