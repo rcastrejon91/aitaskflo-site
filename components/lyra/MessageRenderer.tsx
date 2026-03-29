@@ -6,6 +6,7 @@ import {
   Mail, Users, QrCode, Globe, Palette, Calendar,
   Copy, Check, ExternalLink, ImageIcon, Gamepad2,
   BookOpen, ChevronLeft, ChevronRight, Download,
+  ShieldAlert, Loader2, CheckCircle2, XCircle,
 } from "lucide-react";
 
 // react-markdown and remark-gfm are part of the unified CJS ecosystem with
@@ -53,6 +54,78 @@ const TOOL_CONFIG: Record<string, {
   game_build: { label: "Game Built",      icon: Gamepad2,  gradient: "from-emerald-950/80 to-teal-900/30",      border: "border-emerald-500/30", accent: "text-emerald-300" },
 };
 
+// ── Video Card ────────────────────────────────────────────────────────────────
+
+function VideoCard({ raw }: { raw: string }) {
+  let obj: Record<string, string>;
+  try { obj = JSON.parse(raw); } catch { return null; }
+  const { url, prompt, duration, source } = obj;
+  if (!url) return null;
+  return (
+    <div className="mt-3 rounded-2xl overflow-hidden border border-fuchsia-500/25 bg-gradient-to-br from-fuchsia-950/60 to-purple-950/30">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-fuchsia-500/20">
+        <span className="flex items-center gap-2 text-xs font-semibold tracking-wide text-fuchsia-300">
+          <span className="text-sm">🎬</span>
+          {source === "image-to-video" ? "Image Animated" : "Video Generated"}
+          {duration ? ` · ${duration}s` : ""}
+        </span>
+        <a href={url} target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-1 text-[10px] text-white/35 hover:text-fuchsia-300 transition-colors">
+          <ExternalLink className="w-3 h-3" /> Open
+        </a>
+      </div>
+      <div className="p-3">
+        <video
+          src={url}
+          controls
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-full rounded-xl"
+          style={{ maxHeight: "320px" }}
+        />
+        {prompt && (
+          <p className="mt-2 text-[10px] text-white/30 leading-relaxed italic px-1 truncate">{prompt}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Audio Card ────────────────────────────────────────────────────────────────
+
+function AudioCard({ raw }: { raw: string }) {
+  let obj: Record<string, string>;
+  try { obj = JSON.parse(raw); } catch { return null; }
+  const { url, type, voice, prompt, preview } = obj;
+  if (!url) return null;
+  const label = type === "music" ? "Music Generated" : "Speech Generated";
+  const detail = type === "speech" ? (voice ? `Voice: ${voice}` : "") : (prompt ?? "");
+  return (
+    <div className="mt-3 rounded-2xl overflow-hidden border border-sky-500/25 bg-gradient-to-br from-sky-950/60 to-blue-950/30">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-sky-500/20">
+        <span className="flex items-center gap-2 text-xs font-semibold tracking-wide text-sky-300">
+          <span className="text-sm">{type === "music" ? "🎵" : "🔊"}</span>
+          {label}
+        </span>
+        <a href={url} target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-1 text-[10px] text-white/35 hover:text-sky-300 transition-colors">
+          <Download className="w-3 h-3" /> Download
+        </a>
+      </div>
+      <div className="px-4 py-3 space-y-2">
+        {(detail || preview) && (
+          <p className="text-[10px] text-white/35 italic truncate">{detail || preview}</p>
+        )}
+        <audio controls src={url} className="w-full" style={{ filter: "invert(0.8) hue-rotate(200deg)" }} />
+      </div>
+    </div>
+  );
+}
+
+// ── Tool Card ─────────────────────────────────────────────────────────────────
+
 function ToolCard({ raw }: { raw: string }) {
   const [copied, setCopied] = useState(false);
   try {
@@ -62,6 +135,8 @@ function ToolCard({ raw }: { raw: string }) {
     // Specialized cards
     if (tool === "book") return <BookCard raw={raw} />;
     if (tool === "game_build") return <GameBuildCard raw={raw} />;
+    if (tool === "fal_video") return <VideoCard raw={raw} />;
+    if (tool === "fal_audio") return <AudioCard raw={raw} />;
     const cfg = TOOL_CONFIG[tool] ?? {
       label: tool, icon: Globe,
       gradient: "from-white/5 to-transparent", border: "border-white/15", accent: "text-white/60",
@@ -402,13 +477,115 @@ function GeneratedImage({ url }: { url: string }) {
   );
 }
 
+// ── Confirm Card ──────────────────────────────────────────────────────────────
+
+interface ConfirmPayload {
+  id: string;
+  tool: string;
+  description: string;
+  details?: Record<string, string>;
+}
+
+function ConfirmCard({ json }: { json: string }) {
+  const [status, setStatus] = useState<"idle" | "loading" | "done" | "cancelled">("idle");
+  const [result, setResult] = useState("");
+
+  let payload: ConfirmPayload;
+  try { payload = JSON.parse(json) as ConfirmPayload; }
+  catch { return null; }
+
+  async function handleAction(action: "confirm" | "cancel") {
+    setStatus("loading");
+    try {
+      const res = await fetch("/api/lyra/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: payload.id, action }),
+      });
+      const data = await res.json() as { success: boolean; result?: string; error?: string };
+      setResult(data.result ?? data.error ?? (action === "confirm" ? "Done." : "Cancelled."));
+      setStatus(action === "confirm" ? "done" : "cancelled");
+    } catch {
+      setResult("Request failed. Please try again.");
+      setStatus("idle");
+    }
+  }
+
+  if (status === "done") {
+    return (
+      <div className="mt-3 rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-950/60 to-emerald-900/20 overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 text-sm text-emerald-300">
+          <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+          <span>{result}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === "cancelled") {
+    return (
+      <div className="mt-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 text-sm text-white/35">
+          <XCircle className="w-4 h-4 flex-shrink-0" />
+          <span>{result}</span>
+        </div>
+      </div>
+    );
+  }
+
+  const details = payload.details ? Object.entries(payload.details).filter(([, v]) => v) : [];
+
+  return (
+    <div className="mt-3 rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-950/70 to-orange-950/30 overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-amber-500/20">
+        <ShieldAlert className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+        <span className="text-xs font-semibold tracking-wide text-amber-300">Confirm Action</span>
+      </div>
+
+      <div className="px-4 py-3 space-y-3">
+        <p className="text-sm text-white/85">{payload.description}</p>
+
+        {details.length > 0 && (
+          <div className="space-y-1.5">
+            {details.map(([k, v]) => (
+              <div key={k} className="flex gap-3 text-xs">
+                <span className="text-white/35 capitalize min-w-[56px] flex-shrink-0">{k}</span>
+                <span className="text-white/70 break-all leading-relaxed">{v}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={() => handleAction("confirm")}
+            disabled={status === "loading"}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white transition-colors"
+          >
+            {status === "loading" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+            Confirm
+          </button>
+          <button
+            onClick={() => handleAction("cancel")}
+            disabled={status === "loading"}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-white/[0.07] hover:bg-white/[0.12] disabled:opacity-50 text-white/60 hover:text-white/80 transition-colors border border-white/[0.08]"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Segment parser ────────────────────────────────────────────────────────────
 
 type Segment =
-  | { kind: "text";  value: string }
-  | { kind: "image"; url: string }
-  | { kind: "gif";   url: string }
-  | { kind: "tool";  json: string };
+  | { kind: "text";    value: string }
+  | { kind: "image";   url: string }
+  | { kind: "gif";     url: string }
+  | { kind: "tool";    json: string }
+  | { kind: "confirm"; json: string };
 
 function GifEmbed({ url }: { url: string }) {
   return (
@@ -418,15 +595,28 @@ function GifEmbed({ url }: { url: string }) {
   );
 }
 
-/** Character-level scanner — handles multi-field tool JSON, __IMG__ and __GIF__ tags. */
+/** Character-level scanner — handles multi-field tool JSON, __IMG__, __GIF__ and __CONFIRM__ tags. */
 function parseSegments(raw: string): Segment[] {
   const segments: Segment[] = [];
   const IMG_DELIM = "__IMG__";
   const GIF_DELIM = "__GIF__";
+  const CONFIRM_DELIM = "__CONFIRM__";
   let i = 0;
   let textStart = 0;
 
   while (i < raw.length) {
+    // ── Confirm card ───────────────────────────────────────────────────────
+    if (raw.startsWith(CONFIRM_DELIM, i)) {
+      if (i > textStart) segments.push({ kind: "text", value: raw.slice(textStart, i) });
+      const contentStart = i + CONFIRM_DELIM.length;
+      const closeIdx = raw.indexOf(CONFIRM_DELIM, contentStart);
+      if (closeIdx === -1) { textStart = i; break; }
+      segments.push({ kind: "confirm", json: raw.slice(contentStart, closeIdx) });
+      i = closeIdx + CONFIRM_DELIM.length;
+      textStart = i;
+      continue;
+    }
+
     // ── GIF tag ────────────────────────────────────────────────────────────
     if (raw.startsWith(GIF_DELIM, i)) {
       if (i > textStart) segments.push({ kind: "text", value: raw.slice(textStart, i) });
@@ -599,9 +789,10 @@ export function MessageRenderer({ content }: { content: string }) {
   return (
     <div className="space-y-1">
       {segments.map((seg, i) => {
-        if (seg.kind === "image") return <GeneratedImage key={i} url={seg.url} />;
-        if (seg.kind === "gif")   return <GifEmbed key={i} url={seg.url} />;
-        if (seg.kind === "tool")  return <ToolCard key={i} raw={seg.json} />;
+        if (seg.kind === "image")   return <GeneratedImage key={i} url={seg.url} />;
+        if (seg.kind === "gif")     return <GifEmbed key={i} url={seg.url} />;
+        if (seg.kind === "tool")    return <ToolCard key={i} raw={seg.json} />;
+        if (seg.kind === "confirm") return <ConfirmCard key={i} json={seg.json} />;
         if (!seg.value.trim()) return null;
 
         if (!md) {

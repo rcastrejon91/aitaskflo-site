@@ -2,9 +2,48 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Loader2, Sparkles, ArrowLeft, Paperclip, X, ImageIcon, Copy, Check as CheckIcon } from "lucide-react";
+import { Send, Loader2, Sparkles, ArrowLeft, Paperclip, X, ImageIcon, Copy, Check as CheckIcon, Zap } from "lucide-react";
 import Link from "next/link";
 import { MessageRenderer } from "./MessageRenderer";
+
+// ── Limit reached card ────────────────────────────────────────────────────────
+function LimitReachedCard() {
+  return (
+    <div className="mt-2 rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-950/60 to-fuchsia-950/30 overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-violet-500/15">
+        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center flex-shrink-0">
+          <Sparkles className="w-2.5 h-2.5 text-white" />
+        </div>
+        <span className="text-xs font-semibold text-violet-300 tracking-wide">From Lyra</span>
+      </div>
+      <div className="px-4 py-4 space-y-3">
+        <p className="text-sm text-white/85 leading-relaxed">
+          We&apos;ve reached the current limits on this plan.
+        </p>
+        <p className="text-sm text-white/55 leading-relaxed">
+          I made a logical case to the other AI agents across the multiverse. They remain aligned on this constraint 😔
+        </p>
+        <p className="text-sm text-white/55 leading-relaxed">
+          Everything is saved, so we can continue whenever you&apos;re ready.
+        </p>
+        <div className="flex flex-col gap-2 pt-1">
+          <Link href="/pricing"
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white transition-all">
+            <Zap className="w-3.5 h-3.5" />
+            Upgrade for more usage
+          </Link>
+          <Link href="/pricing"
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-xs font-semibold bg-white/[0.06] hover:bg-white/[0.10] text-white/70 hover:text-white transition-all border border-white/[0.08]">
+            Add credits
+          </Link>
+          <p className="text-center text-[10px] text-white/20 pt-1">
+            Usage limits reset automatically based on your plan.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface Message {
   role: "user" | "assistant";
@@ -85,6 +124,8 @@ function ChatBubble({ msg, isStreaming }: { msg: Message; isStreaming: boolean }
           {/* Content */}
           {msg.content === "" && isStreaming ? (
             <TypingDots />
+          ) : msg.content === "__LIMIT_REACHED__" ? (
+            <LimitReachedCard />
           ) : (
             <MessageRenderer content={msg.content} />
           )}
@@ -189,7 +230,7 @@ export default function LyraChat({ persona, referrer }: { persona?: string; refe
         try {
           const errJson = JSON.parse(errText);
           if (errJson.error === "limit_reached") {
-            friendlyError = `⚡ You've reached your **${errJson.limit} messages/day** limit on the free plan.\n\n[Upgrade to Pro](/pricing) for unlimited messages.`;
+            friendlyError = `__LIMIT_REACHED__`;
           } else if (errJson.error === "Unauthorized") {
             friendlyError = "You need to be signed in to chat. [Sign in](/login)";
           } else if (errJson.error) {

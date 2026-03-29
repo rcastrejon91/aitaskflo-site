@@ -93,7 +93,7 @@ export async function streamGrokFallback(
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${grokKey}` },
     body: JSON.stringify({
-      model: "grok-2-latest",
+      model: "grok-3-mini-fast",
       messages: grokMessages,
       stream: true,
       max_tokens: 4096,
@@ -346,7 +346,7 @@ export async function streamParallelJudge(
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${grokKey}` },
           body: JSON.stringify({
-            model: "grok-2-latest",
+            model: "grok-3-mini-fast",
             max_tokens: 1024,
             messages: [{ role: "system", content: systemPrompt }, ...flatMessages],
           }),

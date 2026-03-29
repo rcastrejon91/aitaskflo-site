@@ -21,7 +21,7 @@ export function getRealtimeProvider(): ProviderConfig {
     return { provider: "groq", model: "llama-3.3-70b-versatile" };
   }
   if (process.env.XAI_API_KEY) {
-    return { provider: "grok", model: "grok-2-latest" };
+    return { provider: "grok", model: "grok-3-mini-fast" };
   }
   return { provider: "claude", model: "claude-haiku-4-5-20251001" };
 }
@@ -32,7 +32,7 @@ export function getChatProvider(): ProviderConfig {
     return { provider: "groq", model: "llama-3.3-70b-versatile" };
   }
   if (process.env.XAI_API_KEY) {
-    return { provider: "grok", model: "grok-2-latest" };
+    return { provider: "grok", model: "grok-3-mini-fast" };
   }
   return { provider: "claude", model: "claude-haiku-4-5-20251001" };
 }
@@ -40,7 +40,7 @@ export function getChatProvider(): ProviderConfig {
 /** Returns which provider + model to use for game building */
 export function getBuildProvider(): ProviderConfig {
   if (process.env.XAI_API_KEY) {
-    return { provider: "grok", model: "grok-2-latest" };
+    return { provider: "grok", model: "grok-3-mini-fast" };
   }
   return { provider: "claude", model: "claude-sonnet-4-6" };
 }

@@ -18,9 +18,17 @@ export async function POST(req: NextRequest) {
   try {
     const { message, history, conversationId, agentId, images, persona, referrer } = await req.json();
 
-    const session = await auth();
-    const userId = (session?.user as { id?: string } | undefined)?.id;
-    const userEmail = (session?.user as { email?: string } | undefined)?.email ?? null;
+    // API key bypass for programmatic access (test scripts, integrations)
+    const apiKey = req.headers.get("x-api-key");
+    const isApiKeyValid = apiKey && apiKey === process.env.ADMIN_PASSWORD;
+
+    const session = isApiKeyValid ? null : await auth();
+    const userId = isApiKeyValid
+      ? "admin-1"
+      : (session?.user as { id?: string } | undefined)?.id;
+    const userEmail = isApiKeyValid
+      ? "admin@aitaskflo.local"
+      : ((session?.user as { email?: string } | undefined)?.email ?? null);
     const resolvedPersona = persona ?? detectPersona({ email: userEmail, referrer: referrer ?? null, conversationText: message });
     const personaAddendum = getPersonaAddendum(resolvedPersona);
 
@@ -34,7 +42,8 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Usage gating ──────────────────────────────────────────────────────
-    if (userId) {
+    const isAdmin = userId?.startsWith("admin-") ?? false;
+    if (userId && !isAdmin) {
       const sub = getSubscription(userId);
       const plan = PLANS[sub.plan as keyof typeof PLANS] ?? PLANS.free;
       if (plan.messagesPerDay !== Infinity) {

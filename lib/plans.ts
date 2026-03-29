@@ -2,7 +2,7 @@ export const PLANS = {
   free: {
     name: "Free",
     price: 0,
-    messagesPerDay: 10,
+    messagesPerDay: 40,
     stripePriceId: null as string | null,
     features: ["10 messages/day", "Image generation", "Web search", "Weather lookup", "Basic memory"],
   },

@@ -53,7 +53,7 @@ function getDb(): BetterSqlite3Db | null {
   if (_db) return _db;
 
   try {
-    const DATA_DIR = path.join(process.cwd(), "data");
+    const DATA_DIR = path.join(process.env.APP_DIR ?? process.cwd(/*turbopackIgnore: true*/), "data");
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
     const DB_PATH = path.join(DATA_DIR, "lyra.db");
@@ -624,6 +624,10 @@ export function getSubscription(userId: string): DbSubscription {
   const db = getDb();
   const now = new Date().toISOString();
   const free: DbSubscription = { user_id: userId, plan: "free", stripe_customer_id: null, stripe_subscription_id: null, status: "active", current_period_end: null, updated_at: now };
+  // Admin accounts are always pro
+  if (userId === "admin-1" || userId?.startsWith("admin-")) {
+    return { ...free, plan: "pro" };
+  }
   if (!db) return free;
   try {
     return (db.prepare("SELECT * FROM subscriptions WHERE user_id = ?").get(userId) as DbSubscription) ?? free;

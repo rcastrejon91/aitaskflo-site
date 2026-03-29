@@ -1,4 +1,5 @@
 import nodePath from "path";
+import { randomUUID } from "crypto";
 import { upsertCrmContact, searchCrmContacts, createTask, listTasks } from "@/lib/lyra/db";
 import { buildGame, improveGame } from "@/lib/lyra/gamebuilder";
 import { scanJobs, formatJobsForChat, buildCoverLetterPrompt } from "@/lib/lyra/jobscan";
@@ -6,6 +7,7 @@ import { scoreAts, formatAtsScore, buildTailorPrompt } from "@/lib/lyra/resume";
 import { executeHsAction } from "@/lib/lyra/hubspot";
 import { detectEngine } from "@/lib/lyra/gamedev";
 import { generateBook } from "@/lib/lyra/bookgen";
+import { savePendingAction } from "@/lib/lyra/pending-actions";
 import {
   pollinationsUrl,
   toolSendEmail,
@@ -22,6 +24,10 @@ import {
   toolWorldClock,
   toolUserLocation,
   toolGodotBuilder,
+  toolStockPrice,
+  toolCurrencyConvert,
+  toolSendSms,
+  toolGeneratePassword,
 } from "@/lib/lyra/tools";
 import {
   toolAnalyzeImage,
@@ -33,6 +39,16 @@ import {
   toolDriveRead,
   toolDriveWrite,
 } from "@/lib/lyra/google-tools";
+import {
+  falImageGen,
+  falImageEdit,
+  falRemoveBg,
+  falUpscale,
+  falTextToVideo,
+  falImageToVideo,
+  falTTS,
+  falMusicGen,
+} from "@/lib/lyra/fal-tools";
 
 // ── Tool dispatcher ───────────────────────────────────────────────────────────
 
@@ -73,9 +89,16 @@ export async function executeTool(
   }
 
   if (name === "send_email") {
-    const card = JSON.stringify({ tool: "email", to: input.to, subject: input.subject, body: input.body });
-    controller.enqueue(encoder.encode(`\n${card}`));
-    return await toolSendEmail(input.to ?? "", input.subject ?? "", input.body ?? "");
+    const id = randomUUID();
+    savePendingAction({
+      id, tool: "send_email", input, userId, clientIp,
+      createdAt: Date.now(),
+      description: `Send email to ${input.to ?? "recipient"}`,
+      details: { To: input.to ?? "", Subject: input.subject ?? "", Preview: (input.body ?? "").slice(0, 120) },
+    });
+    const token = JSON.stringify({ id, tool: "send_email", description: `Send email to ${input.to ?? "recipient"}`, details: { To: input.to ?? "", Subject: input.subject ?? "" } });
+    controller.enqueue(encoder.encode(`\n__CONFIRM__${token}__CONFIRM__`));
+    return "Waiting for confirmation.";
   }
 
   if (name === "get_weather") {
@@ -458,7 +481,16 @@ export async function executeTool(
 
   if (name === "gmail_send") {
     if (!userId) return "This tool requires you to be logged in.";
-    return await toolGmailSend(userId, input.to ?? "", input.subject ?? "", input.body ?? "");
+    const id = randomUUID();
+    savePendingAction({
+      id, tool: "gmail_send", input, userId, clientIp,
+      createdAt: Date.now(),
+      description: `Send Gmail to ${input.to ?? "recipient"}`,
+      details: { To: input.to ?? "", Subject: input.subject ?? "", Preview: (input.body ?? "").slice(0, 120) },
+    });
+    const token = JSON.stringify({ id, tool: "gmail_send", description: `Send Gmail to ${input.to ?? "recipient"}`, details: { To: input.to ?? "", Subject: input.subject ?? "" } });
+    controller.enqueue(encoder.encode(`\n__CONFIRM__${token}__CONFIRM__`));
+    return "Waiting for confirmation.";
   }
 
   if (name === "gmail_read") {
@@ -475,13 +507,16 @@ export async function executeTool(
 
   if (name === "calendar_create") {
     if (!userId) return "This tool requires you to be logged in.";
-    return await toolCalendarCreateEvent(
-      userId,
-      input.summary ?? "",
-      input.start ?? "",
-      input.end ?? "",
-      input.description
-    );
+    const id = randomUUID();
+    savePendingAction({
+      id, tool: "calendar_create", input, userId, clientIp,
+      createdAt: Date.now(),
+      description: `Create calendar event: ${input.summary ?? "event"}`,
+      details: { Event: input.summary ?? "", Start: input.start ?? "", End: input.end ?? "" },
+    });
+    const token = JSON.stringify({ id, tool: "calendar_create", description: `Create calendar event: ${input.summary ?? "event"}`, details: { Event: input.summary ?? "", Start: input.start ?? "", End: input.end ?? "" } });
+    controller.enqueue(encoder.encode(`\n__CONFIRM__${token}__CONFIRM__`));
+    return "Waiting for confirmation.";
   }
 
   if (name === "drive_list") {
@@ -496,7 +531,183 @@ export async function executeTool(
 
   if (name === "drive_write") {
     if (!userId) return "This tool requires you to be logged in.";
-    return await toolDriveWrite(userId, input.name ?? "", input.content ?? "", input.mime_type);
+    const id = randomUUID();
+    savePendingAction({
+      id, tool: "drive_write", input, userId, clientIp,
+      createdAt: Date.now(),
+      description: `Create Drive file: ${input.name ?? "file"}`,
+      details: { File: input.name ?? "", Preview: (input.content ?? "").slice(0, 120) },
+    });
+    const token = JSON.stringify({ id, tool: "drive_write", description: `Create Drive file: ${input.name ?? "file"}`, details: { File: input.name ?? "" } });
+    controller.enqueue(encoder.encode(`\n__CONFIRM__${token}__CONFIRM__`));
+    return "Waiting for confirmation.";
+  }
+
+  if (name === "stock_price") {
+    controller.enqueue(encoder.encode("\n📈 Fetching market data…\n"));
+    const result = await toolStockPrice(input.symbols ?? "");
+    const card = JSON.stringify({ tool: "stock", symbols: input.symbols });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return result;
+  }
+
+  if (name === "currency_convert") {
+    const result = await toolCurrencyConvert(input.amount ?? "1", input.from ?? "USD", input.to ?? "EUR");
+    const card = JSON.stringify({ tool: "currency", from: input.from, to: input.to, amount: input.amount });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return result;
+  }
+
+  if (name === "send_sms") {
+    const id = randomUUID();
+    savePendingAction({
+      id, tool: "send_sms", input, userId, clientIp,
+      createdAt: Date.now(),
+      description: `Send SMS to ${input.to ?? "recipient"}`,
+      details: { To: input.to ?? "", Message: (input.message ?? "").slice(0, 120) },
+    });
+    const token = JSON.stringify({ id, tool: "send_sms", description: `Send SMS to ${input.to ?? "recipient"}`, details: { To: input.to ?? "", Message: (input.message ?? "").slice(0, 80) } });
+    controller.enqueue(encoder.encode(`\n__CONFIRM__${token}__CONFIRM__`));
+    return "Waiting for confirmation.";
+  }
+
+  if (name === "generate_password") {
+    const length = parseInt(input.length ?? "20", 10) || 20;
+    const count  = parseInt(input.count  ?? "3",  10) || 3;
+    const result = toolGeneratePassword(length, input.type ?? "strong", count);
+    const card = JSON.stringify({ tool: "password", type: input.type ?? "strong", length: String(length) });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return result;
+  }
+
+  if (name === "fal_image") {
+    if (!process.env.FAL_KEY) return "fal.ai is not configured — add FAL_KEY to environment.";
+    controller.enqueue(encoder.encode("\n✨ Generating image with fal.ai FLUX…\n"));
+    const model = (input.model ?? "fast") as "fast" | "quality" | "pro";
+    const url = await falImageGen(input.prompt ?? "", model);
+    controller.enqueue(encoder.encode(`\n__IMG__${url}__IMG__`));
+    const card = JSON.stringify({ tool: "image_gen", model, prompt: (input.prompt ?? "").slice(0, 60) });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return "Image generated with fal.ai.";
+  }
+
+  if (name === "fal_video") {
+    if (!process.env.FAL_KEY) return "fal.ai is not configured — add FAL_KEY to environment.";
+    controller.enqueue(encoder.encode("\n🎬 Generating video with fal.ai Kling… this takes ~60s\n"));
+    const duration = parseInt(input.duration ?? "5", 10) || 5;
+    const url = await falTextToVideo(input.prompt ?? "", duration);
+    const card = JSON.stringify({ tool: "fal_video", url, prompt: (input.prompt ?? "").slice(0, 80), duration: String(duration) });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return `Video ready: ${url}`;
+  }
+
+  if (name === "fal_img_to_video") {
+    if (!process.env.FAL_KEY) return "fal.ai is not configured — add FAL_KEY to environment.";
+    controller.enqueue(encoder.encode("\n🎬 Animating image with fal.ai Kling… this takes ~60s\n"));
+    const url = await falImageToVideo(input.image_url ?? "", input.prompt ?? "");
+    const card = JSON.stringify({ tool: "fal_video", url, prompt: (input.prompt ?? "").slice(0, 80), source: "image-to-video" });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return `Video ready: ${url}`;
+  }
+
+  if (name === "fal_edit_image") {
+    if (!process.env.FAL_KEY) return "fal.ai is not configured — add FAL_KEY to environment.";
+    controller.enqueue(encoder.encode("\n🖌️ Editing image with fal.ai FLUX…\n"));
+    const url = await falImageEdit(input.image_url ?? "", input.prompt ?? "");
+    controller.enqueue(encoder.encode(`\n__IMG__${url}__IMG__`));
+    const card = JSON.stringify({ tool: "image_gen", source: "edit", prompt: (input.prompt ?? "").slice(0, 60) });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return "Image edited with fal.ai.";
+  }
+
+  if (name === "fal_remove_bg") {
+    if (!process.env.FAL_KEY) return "fal.ai is not configured — add FAL_KEY to environment.";
+    controller.enqueue(encoder.encode("\n✂️ Removing background with fal.ai BiRefNet…\n"));
+    const url = await falRemoveBg(input.image_url ?? "");
+    controller.enqueue(encoder.encode(`\n__IMG__${url}__IMG__`));
+    const card = JSON.stringify({ tool: "image_gen", source: "background-removed" });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return "Background removed.";
+  }
+
+  if (name === "fal_upscale") {
+    if (!process.env.FAL_KEY) return "fal.ai is not configured — add FAL_KEY to environment.";
+    controller.enqueue(encoder.encode("\n🔍 Upscaling image with fal.ai AuraSR…\n"));
+    const scale = parseInt(input.scale ?? "4", 10) || 4;
+    const url = await falUpscale(input.image_url ?? "", scale);
+    controller.enqueue(encoder.encode(`\n__IMG__${url}__IMG__`));
+    const card = JSON.stringify({ tool: "image_gen", source: `upscaled-${scale}x` });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return `Image upscaled ${scale}x.`;
+  }
+
+  if (name === "fal_tts") {
+    if (!process.env.FAL_KEY) return "fal.ai is not configured — add FAL_KEY to environment.";
+    controller.enqueue(encoder.encode("\n🔊 Generating speech with fal.ai Kokoro…\n"));
+    const url = await falTTS(input.text ?? "", input.voice ?? "aria");
+    const card = JSON.stringify({ tool: "fal_audio", url, type: "speech", voice: input.voice ?? "aria", preview: (input.text ?? "").slice(0, 60) });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return `Audio ready: ${url}`;
+  }
+
+  if (name === "fal_music") {
+    if (!process.env.FAL_KEY) return "fal.ai is not configured — add FAL_KEY to environment.";
+    controller.enqueue(encoder.encode("\n🎵 Composing music with fal.ai Stable Audio…\n"));
+    const duration = parseInt(input.duration ?? "15", 10) || 15;
+    const url = await falMusicGen(input.prompt ?? "", Math.min(47, duration));
+    const card = JSON.stringify({ tool: "fal_audio", url, type: "music", prompt: (input.prompt ?? "").slice(0, 80) });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return `Music ready: ${url}`;
+  }
+
+  if (name === "fal_sing") {
+    if (!process.env.FAL_KEY) return "fal.ai is not configured — add FAL_KEY to environment.";
+    const lyrics = input.lyrics ?? "";
+    const voice = input.voice ?? "aria";
+    const style = input.style ?? "pop";
+
+    controller.enqueue(encoder.encode("\n🎤 Writing and recording your song…\n"));
+
+    // Generate lyrics with AI if not provided
+    let finalLyrics = lyrics;
+    if (!finalLyrics) {
+      try {
+        const Anthropic = (await import("@anthropic-ai/sdk")).default;
+        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const lang = input.language ?? "English";
+        const msg = await client.messages.create({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 400,
+          messages: [{ role: "user", content: `Write short song lyrics (2 verses + chorus) in ${lang} for a ${style} song. Topic: ${input.topic ?? "life and love"}. Just the lyrics, no stage directions.` }],
+        });
+        finalLyrics = msg.content[0]?.type === "text" ? msg.content[0].text : "La la la, singing for you.";
+      } catch {
+        finalLyrics = "La la la, singing for you, the world is beautiful and bright.";
+      }
+    }
+
+    // Render vocals with Kokoro TTS
+    controller.enqueue(encoder.encode("\n🎙️ Recording vocals…\n"));
+    const vocalUrl = await falTTS(finalLyrics, voice);
+
+    // Also generate backing music
+    controller.enqueue(encoder.encode("\n🎸 Generating backing track…\n"));
+    let musicUrl: string | undefined;
+    try {
+      musicUrl = await falMusicGen(`${style} instrumental backing track, no vocals, melodic`, 20);
+    } catch { /* music is optional */ }
+
+    // Emit vocals audio card
+    const vocalCard = JSON.stringify({ tool: "fal_audio", url: vocalUrl, type: "song", voice, lyrics: finalLyrics.slice(0, 120), style });
+    controller.enqueue(encoder.encode(`\n${vocalCard}`));
+
+    // Emit backing track if generated
+    if (musicUrl) {
+      const musicCard = JSON.stringify({ tool: "fal_audio", url: musicUrl, type: "music", prompt: `${style} backing track` });
+      controller.enqueue(encoder.encode(`\n${musicCard}`));
+    }
+
+    return `Song recorded! Vocals + ${musicUrl ? "backing track" : "a cappella"} — ${finalLyrics.slice(0, 80)}…`;
   }
 
   const card = JSON.stringify({ tool: name, ...input });

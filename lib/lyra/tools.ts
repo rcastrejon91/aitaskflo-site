@@ -505,6 +505,55 @@ ACTIONS:
     },
   },
   {
+    name: "stock_price",
+    description: "Get real-time stock or cryptocurrency prices, percent change, volume, and market cap. Use when the user asks about a stock, share price, crypto price, or market data.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        symbols: { type: "string", description: "Comma-separated ticker symbols, e.g. 'AAPL, TSLA, BTC-USD, ETH-USD'" },
+      },
+      required: ["symbols"],
+    },
+  },
+  {
+    name: "currency_convert",
+    description: "Convert amounts between any world currencies using live exchange rates. Use when the user asks to convert currency, check exchange rates, or compare currencies.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        amount: { type: "string", description: "Amount to convert, e.g. '100'" },
+        from: { type: "string", description: "Source currency code, e.g. 'USD', 'EUR', 'GBP'" },
+        to: { type: "string", description: "Comma-separated target currency codes, e.g. 'EUR, GBP, JPY'" },
+      },
+      required: ["amount", "from", "to"],
+    },
+  },
+  {
+    name: "send_sms",
+    description: "Send a real SMS text message to any phone number via Twilio. Use when the user asks to send a text, SMS, or message to a phone number.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        to: { type: "string", description: "Recipient phone number in E.164 format, e.g. '+12125551234'" },
+        message: { type: "string", description: "SMS message body (160 chars max for single SMS)" },
+      },
+      required: ["to", "message"],
+    },
+  },
+  {
+    name: "generate_password",
+    description: "Generate a cryptographically strong random password. Use when the user asks for a password, passphrase, PIN, or secure token.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        length: { type: "string", description: "Password length (default: 20)" },
+        type: { type: "string", description: "Type: 'strong' (mixed chars), 'passphrase' (random words), 'pin' (digits only), 'hex' (hex token). Default: strong" },
+        count: { type: "string", description: "How many passwords to generate (default: 3)" },
+      },
+      required: [],
+    },
+  },
+  {
     name: "drive_write",
     description: "Create or update a file in Google Drive.",
     input_schema: {
@@ -515,6 +564,114 @@ ACTIONS:
         mime_type: { type: "string", description: "MIME type, e.g. 'text/plain', 'text/html'. Defaults to text/plain." },
       },
       required: ["name", "content"],
+    },
+  },
+  {
+    name: "fal_sing",
+    description: "Write and sing a song in any language using fal.ai. Lyra writes original lyrics and performs them as audio. Use whenever someone asks Lyra to sing, rap, perform, or make a song.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        lyrics: { type: "string", description: "The full lyrics to sing" },
+        language: { type: "string", description: "Language of the lyrics, e.g. 'english', 'spanish', 'japanese', 'french'" },
+        voice: { type: "string", description: "Voice style: 'aria' (default), 'jessica', 'sarah', 'michael', 'liam'" },
+      },
+      required: ["lyrics"],
+    },
+  },
+  {
+    name: "fal_image",
+    description: "Generate a high-quality image using fal.ai FLUX models. Use for photorealistic images, artistic renders, concept art — anything needing better quality than standard image gen. Choose model: 'fast' (instant), 'quality' (detailed), 'pro' (best).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        prompt: { type: "string", description: "Detailed image description including style, lighting, mood, camera angle" },
+        model: { type: "string", description: "Quality level: 'fast' (default), 'quality', or 'pro'" },
+      },
+      required: ["prompt"],
+    },
+  },
+  {
+    name: "fal_video",
+    description: "Generate a short video from a text description using fal.ai Kling AI. Creates 5-10 second cinematic video clips. Use when the user asks to make, animate, or create a video.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        prompt: { type: "string", description: "Detailed video description including motion, camera movement, scene, style" },
+        duration: { type: "string", description: "Duration in seconds: '5' or '10'. Default: 5" },
+      },
+      required: ["prompt"],
+    },
+  },
+  {
+    name: "fal_img_to_video",
+    description: "Animate an image into a video using fal.ai. Takes any image URL and a prompt describing the motion, then generates a 5-second video.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        image_url: { type: "string", description: "URL of the source image to animate" },
+        prompt: { type: "string", description: "Describe the motion and animation, e.g. 'camera slowly zooms in, wind blows through hair'" },
+      },
+      required: ["image_url", "prompt"],
+    },
+  },
+  {
+    name: "fal_edit_image",
+    description: "Transform or edit an existing image using fal.ai. Change style, add elements, modify the scene. Give it an image URL and a description of the changes.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        image_url: { type: "string", description: "URL of the image to edit" },
+        prompt: { type: "string", description: "Describe what changes to make, e.g. 'make it look like a watercolor painting', 'add a sunset background'" },
+      },
+      required: ["image_url", "prompt"],
+    },
+  },
+  {
+    name: "fal_remove_bg",
+    description: "Remove the background from any image using fal.ai BiRefNet. Returns image with transparent background. Use when user asks to remove background, cut out subject, or isolate an object.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        image_url: { type: "string", description: "URL of the image to process" },
+      },
+      required: ["image_url"],
+    },
+  },
+  {
+    name: "fal_upscale",
+    description: "Upscale and enhance image quality using fal.ai AuraSR. Makes images sharper and higher resolution. Use when user wants to enhance, upscale, or improve image quality.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        image_url: { type: "string", description: "URL of the image to upscale" },
+        scale: { type: "string", description: "Upscale factor: '2' or '4'. Default: 4" },
+      },
+      required: ["image_url"],
+    },
+  },
+  {
+    name: "fal_tts",
+    description: "Convert text to natural-sounding speech using fal.ai Kokoro TTS. Returns an audio file URL. Use when user asks to read something aloud, generate voice, or create audio.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        text: { type: "string", description: "Text to speak" },
+        voice: { type: "string", description: "Voice name: 'aria' (default), 'jessica', 'michael', 'sarah', 'liam'" },
+      },
+      required: ["text"],
+    },
+  },
+  {
+    name: "fal_music",
+    description: "Generate original music or audio using fal.ai Stable Audio. Create background music, sound effects, beats, or ambient audio from a text description.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        prompt: { type: "string", description: "Describe the music: genre, mood, instruments, tempo, e.g. 'upbeat lo-fi hip hop with piano and vinyl crackle'" },
+        duration: { type: "string", description: "Duration in seconds (max 47). Default: 15" },
+      },
+      required: ["prompt"],
     },
   },
 ];
@@ -1348,4 +1505,150 @@ func _start_invincibility() -> void:
     default:
       return `Unknown action "${action}". Valid: write_file, read_file, list_files, delete_file, run_command, git_commit, git_push`;
   }
+}
+
+// ── Stock prices (Yahoo Finance, no key) ─────────────────────────────────────
+
+export async function toolStockPrice(symbols: string): Promise<string> {
+  const tickers = symbols.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean).slice(0, 6);
+  const results: string[] = [];
+
+  for (const symbol of tickers) {
+    try {
+      const res = await fetch(
+        `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`,
+        { headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(8_000) }
+      );
+      if (!res.ok) { results.push(`${symbol}: not found`); continue; }
+      const data = await res.json();
+      const meta = data?.chart?.result?.[0]?.meta;
+      if (!meta) { results.push(`${symbol}: no data`); continue; }
+
+      const price = meta.regularMarketPrice ?? meta.previousClose;
+      const prev = meta.previousClose ?? meta.chartPreviousClose;
+      const change = price && prev ? price - prev : null;
+      const changePct = change && prev ? ((change / prev) * 100) : null;
+      const currency = meta.currency ?? "USD";
+      const name = meta.shortName ?? meta.longName ?? symbol;
+      const arrow = change === null ? "" : change >= 0 ? "▲" : "▼";
+      const sign = change === null ? "" : change >= 0 ? "+" : "";
+
+      results.push(
+        `**${symbol}** — ${name}\n` +
+        `Price: ${currency} ${price?.toFixed(2) ?? "N/A"}  ${arrow} ${sign}${change?.toFixed(2) ?? ""} (${sign}${changePct?.toFixed(2) ?? ""}%)\n` +
+        `Volume: ${meta.regularMarketVolume?.toLocaleString() ?? "N/A"}  |  Market: ${meta.exchangeName ?? ""}`
+      );
+    } catch {
+      results.push(`${symbol}: lookup failed`);
+    }
+  }
+
+  return results.join("\n\n") || "No data returned.";
+}
+
+// ── Currency conversion (open.er-api.com, free) ───────────────────────────────
+
+export async function toolCurrencyConvert(amount: string, from: string, to: string): Promise<string> {
+  const amt = parseFloat(amount);
+  if (isNaN(amt)) return `Invalid amount: ${amount}`;
+  const fromCode = from.trim().toUpperCase();
+  const toCodes = to.split(",").map((c) => c.trim().toUpperCase()).filter(Boolean).slice(0, 8);
+
+  try {
+    const res = await fetch(
+      `https://open.er-api.com/v6/latest/${fromCode}`,
+      { signal: AbortSignal.timeout(8_000) }
+    );
+    if (!res.ok) return "Exchange rate service unavailable — try again.";
+    const data = await res.json();
+    if (data.result !== "success") return `Could not get rates for ${fromCode}.`;
+
+    const rates = data.rates as Record<string, number>;
+    const updated = data.time_last_update_utc ?? "";
+
+    const lines = toCodes.map((code) => {
+      const rate = rates[code];
+      if (!rate) return `  ${code}: not available`;
+      const converted = (amt * rate).toFixed(2);
+      return `  **${amt} ${fromCode}** = **${converted} ${code}**  (rate: ${rate.toFixed(4)})`;
+    });
+
+    return `💱 Currency Conversion\n\n${lines.join("\n")}\n\n_Rates updated: ${updated}_`;
+  } catch {
+    return "Currency conversion failed — try again.";
+  }
+}
+
+// ── SMS via Twilio ────────────────────────────────────────────────────────────
+
+export async function toolSendSms(to: string, message: string): Promise<string> {
+  const sid  = process.env.TWILIO_ACCOUNT_SID;
+  const auth = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_FROM;
+
+  if (!sid || !auth || !from) {
+    return "SMS not configured — add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM to .env.local.";
+  }
+
+  try {
+    const body = new URLSearchParams({ To: to, From: from, Body: message });
+    const res = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": "Basic " + Buffer.from(`${sid}:${auth}`).toString("base64"),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body,
+        signal: AbortSignal.timeout(15_000),
+      }
+    );
+    const data = await res.json();
+    if (!res.ok) return `SMS failed: ${data.message ?? res.statusText}`;
+    return `SMS sent to ${to}. SID: ${data.sid}`;
+  } catch (e) {
+    return `SMS error: ${e instanceof Error ? e.message : String(e)}`;
+  }
+}
+
+// ── Password generator (pure crypto) ─────────────────────────────────────────
+
+export function toolGeneratePassword(length = 20, type = "strong", count = 3): string {
+  const WORDS = ["coral","storm","drift","flame","frost","amber","cedar","ember","grove","haven",
+    "marble","onyx","pearl","quartz","ridge","slate","thorn","vault","willow","zenith",
+    "arrow","beacon","cipher","delta","echo","forge","glacier","harbor","iris","jungle"];
+
+  const gen = (): string => {
+    if (type === "pin") {
+      return Array.from({ length }, () => Math.floor(Math.random() * 10)).join("");
+    }
+    if (type === "hex") {
+      return Array.from({ length }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+    }
+    if (type === "passphrase") {
+      const wordCount = Math.max(3, Math.min(8, length));
+      const sep = ["-", "_", ".", "+"][Math.floor(Math.random() * 4)];
+      const picked = Array.from({ length: wordCount }, () => WORDS[Math.floor(Math.random() * WORDS.length)]);
+      picked[Math.floor(Math.random() * wordCount)] += Math.floor(Math.random() * 99);
+      return picked.join(sep);
+    }
+    // strong: mixed uppercase, lowercase, digits, symbols
+    const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    const lower = "abcdefghjkmnpqrstuvwxyz";
+    const digits = "23456789";
+    const symbols = "!@#$%^&*-+=?";
+    const all = upper + lower + digits + symbols;
+    const chars = Array.from({ length }, () => all[Math.floor(Math.random() * all.length)]);
+    // Guarantee at least one of each type
+    chars[0] = upper[Math.floor(Math.random() * upper.length)];
+    chars[1] = digits[Math.floor(Math.random() * digits.length)];
+    chars[2] = symbols[Math.floor(Math.random() * symbols.length)];
+    return chars.sort(() => Math.random() - 0.5).join("");
+  };
+
+  const passwords = Array.from({ length: count }, gen);
+  const label = type === "passphrase" ? "Passphrases" : type === "pin" ? "PINs" : type === "hex" ? "Hex tokens" : "Passwords";
+
+  return `🔐 Generated ${label} (${type}, length ${length}):\n\n${passwords.map((p, i) => `${i + 1}. \`${p}\``).join("\n")}\n\nStore these securely — they won't be shown again.`;
 }
