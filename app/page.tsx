@@ -69,6 +69,17 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-16">
+            <Link href="/login">
+              <Button size="lg" className="text-white border-0 font-semibold px-8 h-12 text-base shadow-2xl" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 8px 32px rgba(109,40,217,0.35)" }}>
+                Start for free
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+            <Link href="/pricing">
+              <Button size="lg" variant="ghost" className="text-white/60 hover:text-white hover:bg-white/[0.06] h-12 px-8 text-base">
+                See pricing
+              </Button>
+            </Link>
           </div>
 
           {/* Feature badges */}
@@ -166,12 +177,17 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="py-8 px-6" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
               <Sparkles className="w-3 h-3 text-white" />
             </div>
             <span className="text-sm" style={{ color: "rgba(255,255,255,0.25)" }}>AITaskFlo</span>
+          </div>
+          <div className="flex items-center gap-6 text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>
+            <span>© 2026 AITaskFlo</span>
+            <Link href="/pricing" className="hover:text-white/60 transition-colors">Pricing</Link>
+            <Link href="/login" className="hover:text-white/60 transition-colors">Sign in</Link>
           </div>
         </div>
       </footer>

@@ -105,10 +105,13 @@ export default function PricingPage() {
                   <h2 className={`text-sm font-semibold tracking-wide uppercase mb-3 ${ACCENTS[key]}`}>
                     {plan.name}
                   </h2>
-                  <div className="flex items-end gap-1">
+                  <div className="flex items-end gap-1 mb-1">
                     <span className="text-4xl font-bold text-white">${plan.price}</span>
                     {plan.price > 0 && <span className="text-white/35 text-sm mb-1">/mo</span>}
                   </div>
+                  <p className="text-xs text-white/30">
+                    {plan.messagesPerDay === Infinity ? "Unlimited messages" : `${plan.messagesPerDay} messages/day`}
+                  </p>
                 </div>
 
                 <ul className="space-y-3 mb-8 flex-1">
@@ -165,6 +168,14 @@ export default function PricingPage() {
               {
                 q: "Can I upgrade or downgrade later?",
                 a: "Yes. You can switch plans at any time. Upgrades take effect immediately, downgrades at the next billing cycle.",
+              },
+              {
+                q: "What happens when I hit my daily limit?",
+                a: "On the Free plan, messages are paused until midnight UTC when the counter resets. You'll see a clear message letting you know — no surprise charges.",
+              },
+              {
+                q: "What's the difference between Pro and Business?",
+                a: "Business adds API access, multiple user seats, an analytics dashboard, white-label options, and priority support on top of everything in Pro.",
               },
             ].map(({ q, a }) => (
               <div key={q} className="rounded-xl p-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>

@@ -23,7 +23,6 @@ function LoginForm() {
   const DESTINATIONS = [
     { label: "Lyra", path: "/lyra" },
     { label: "Play", path: "/play" },
-    { label: "Admin", path: "/admin/healer" },
   ];
 
   async function quickLogin(dest: string) {
@@ -154,7 +153,15 @@ function LoginForm() {
             </div>
 
             <div>
-              <label className="block text-xs text-white/50 mb-1.5">Password</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs text-white/50">Password</label>
+                {mode === "login" && (
+                  <span className="text-[11px] text-white/30 hover:text-white/50 cursor-pointer transition-colors"
+                    onClick={() => setError("To reset your password, email support@aitaskflo.com")}>
+                    Forgot password?
+                  </span>
+                )}
+              </div>
               <div className="relative">
                 <input
                   type={showPass ? "text" : "password"}
@@ -183,7 +190,7 @@ function LoginForm() {
             {mode === "login" && (
               <div className="space-y-2">
                 <p className="text-[11px] text-white/30 text-center">Go to</p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {DESTINATIONS.map((d) => (
                     <button
                       key={d.path}

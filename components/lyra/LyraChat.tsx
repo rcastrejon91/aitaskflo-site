@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Loader2, Sparkles, ArrowLeft, Paperclip, X, ImageIcon } from "lucide-react";
+import { Send, Loader2, Sparkles, ArrowLeft, Paperclip, X, ImageIcon, Copy, Check as CheckIcon } from "lucide-react";
 import Link from "next/link";
 import { MessageRenderer } from "./MessageRenderer";
 
@@ -49,35 +49,56 @@ function TypingDots() {
 // ── Chat bubble ───────────────────────────────────────────────────────────────
 function ChatBubble({ msg, isStreaming }: { msg: Message; isStreaming: boolean }) {
   const isUser = msg.role === "user";
+  const [copied, setCopied] = useState(false);
+
+  function copyMessage() {
+    navigator.clipboard.writeText(msg.content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
 
   return (
-    <div className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"}`}>
+    <div className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"} group`}>
       {!isUser && (
         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-lg shadow-violet-500/25">
           <Sparkles className="w-3 h-3 text-white" />
         </div>
       )}
 
-      <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed max-w-[82%] ${
-        isUser
-          ? "bg-gradient-to-br from-violet-600 to-violet-700 text-white rounded-br-sm shadow-lg shadow-violet-500/20"
-          : "bg-white/[0.05] text-white/90 border border-white/[0.07] rounded-bl-sm backdrop-blur-sm"
-      }`}>
-        {/* Attached images (user uploads) */}
-        {msg.images && msg.images.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-2">
-            {msg.images.map((src, j) => (
-              <img key={j} src={src} alt="attachment"
-                className="max-h-40 rounded-lg object-cover border border-white/10" />
-            ))}
-          </div>
-        )}
+      <div className="flex flex-col gap-1 max-w-[82%]">
+        <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+          isUser
+            ? "bg-gradient-to-br from-violet-600 to-violet-700 text-white rounded-br-sm shadow-lg shadow-violet-500/20"
+            : "bg-white/[0.05] text-white/90 border border-white/[0.07] rounded-bl-sm backdrop-blur-sm"
+        }`}>
+          {/* Attached images (user uploads) */}
+          {msg.images && msg.images.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {msg.images.map((src, j) => (
+                <img key={j} src={src} alt="attachment"
+                  className="max-h-40 rounded-lg object-cover border border-white/10" />
+              ))}
+            </div>
+          )}
 
-        {/* Content */}
-        {msg.content === "" && isStreaming ? (
-          <TypingDots />
-        ) : (
-          <MessageRenderer content={msg.content} />
+          {/* Content */}
+          {msg.content === "" && isStreaming ? (
+            <TypingDots />
+          ) : (
+            <MessageRenderer content={msg.content} />
+          )}
+        </div>
+
+        {/* Copy button — only for assistant messages with content */}
+        {!isUser && msg.content && !isStreaming && (
+          <button
+            onClick={copyMessage}
+            className="self-start flex items-center gap-1 text-[11px] text-white/20 hover:text-white/50 transition-colors opacity-0 group-hover:opacity-100 px-1"
+          >
+            {copied ? <CheckIcon className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+            {copied ? "Copied" : "Copy"}
+          </button>
         )}
       </div>
 
@@ -113,7 +134,15 @@ export default function LyraChat({ persona, referrer }: { persona?: string; refe
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
     files.forEach((file) => {
+      if (file.size > MAX_SIZE) {
+        setMessages((prev) => [...prev, {
+          role: "assistant",
+          content: `⚠️ **${file.name}** is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max file size is 10MB.`,
+        }]);
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (ev) => {
         const dataUrl = ev.target?.result as string;
