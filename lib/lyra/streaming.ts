@@ -44,6 +44,7 @@ export async function streamGroqFallback(
   });
 
   if (!res.ok) {
+    // Groq failed — try Grok before giving up
     await streamGrokFallback(systemPrompt, messages, encoder, controller);
     return;
   }
@@ -80,7 +81,7 @@ export async function streamGrokFallback(
 ): Promise<void> {
   const grokKey = process.env.GROK_API_KEY;
   if (!grokKey) {
-    controller.enqueue(encoder.encode("⚠️ No AI provider available. Please check your API keys."));
+    await streamGroqFallback(systemPrompt, messages, encoder, controller);
     return;
   }
 
@@ -89,21 +90,26 @@ export async function streamGrokFallback(
     ...messages.map((m) => ({ role: m.role, content: flattenContent(m.content) })),
   ];
 
-  const res = await fetch("https://api.x.ai/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${grokKey}` },
-    body: JSON.stringify({
-      model: "grok-3-mini-fast",
-      messages: grokMessages,
-      stream: true,
-      max_tokens: 4096,
-    }),
-    signal: AbortSignal.timeout(60_000),
-  });
+  let res: Response;
+  try {
+    res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${grokKey}` },
+      body: JSON.stringify({
+        model: "grok-3-mini-fast",
+        messages: grokMessages,
+        stream: true,
+        max_tokens: 4096,
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+  } catch {
+    await streamGroqFallback(systemPrompt, messages, encoder, controller);
+    return;
+  }
 
   if (!res.ok) {
-    const err = await res.text().catch(() => res.status.toString());
-    controller.enqueue(encoder.encode(`⚠️ Grok error: ${err}`));
+    await streamClaudeTextFallback(systemPrompt, messages, encoder, controller);
     return;
   }
 
@@ -402,6 +408,42 @@ Reply ONLY with the letter A or B.`,
   }
 
   controller.enqueue(encoder.encode(winner));
+}
+
+// ── Claude text-only fallback (no tools — last resort) ───────────────────────
+
+export async function streamClaudeTextFallback(
+  systemPrompt: string,
+  messages: Array<{ role: string; content: string }>,
+  encoder: TextEncoder,
+  controller: ReadableStreamDefaultController
+): Promise<void> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) {
+    controller.enqueue(encoder.encode("All AI providers are currently unavailable. Please try again shortly."));
+    return;
+  }
+  try {
+    const client = new Anthropic({ apiKey: key });
+    const claudeMessages = messages
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => ({ role: m.role as "user" | "assistant", content: flattenContent(m.content) }));
+
+    const stream = await client.messages.stream({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 2048,
+      system: systemPrompt,
+      messages: claudeMessages.length > 0 ? claudeMessages : [{ role: "user", content: "Hello" }],
+    });
+
+    for await (const event of stream) {
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+        controller.enqueue(encoder.encode(event.delta.text));
+      }
+    }
+  } catch (err) {
+    controller.enqueue(encoder.encode(`Unable to respond right now: ${(err as Error).message}`));
+  }
 }
 
 // Keep Anthropic import used by streamParallelJudge's type signature in chat route
