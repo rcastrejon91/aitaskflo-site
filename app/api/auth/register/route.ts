@@ -2,7 +2,27 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getAuthUserByEmail, createAuthUser } from "@/lib/lyra/db";
 
+// Simple in-memory rate limiter: max 5 registrations per IP per hour
+const attempts = new Map<string, { count: number; resetAt: number }>();
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = attempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    attempts.set(ip, { count: 1, resetAt: now + 60 * 60 * 1000 });
+    return false;
+  }
+  if (entry.count >= 5) return true;
+  entry.count++;
+  return false;
+}
+
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  if (isRateLimited(ip)) {
+    return NextResponse.json({ error: "Too many registration attempts. Try again later." }, { status: 429 });
+  }
+
   try {
     const { email, password, name } = await req.json();
 

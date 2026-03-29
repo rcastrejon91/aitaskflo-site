@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 
 const PYTHON_URL = process.env.PYTHON_ORCHESTRATOR_URL ?? "http://localhost:5328";
 
 export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const body = await req.json();
     const res = await fetch(`${PYTHON_URL}/api/lyra`, {

@@ -6,7 +6,7 @@
 import fsp from "fs/promises";
 import path from "path";
 
-const DATA_DIR = path.join(process.env.APP_DIR ?? process.cwd(), "data");
+const DATA_DIR = path.join(process.env.APP_DIR ?? process.cwd(/*turbopackIgnore: true*/), "data");
 const MILESTONES_FILE = path.join(DATA_DIR, "milestones.json");
 
 export const MILESTONE_THRESHOLDS = [10, 25, 50, 100, 250, 500, 1000, 2500, 5000];

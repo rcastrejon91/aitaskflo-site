@@ -219,8 +219,11 @@ const healHistory: HealEvent[] = [];
 
 export async function GET(req: NextRequest) {
   const adminKey = process.env.ADMIN_PASSWORD ?? process.env.ADMIN_KEY;
-  const provided  = req.headers.get("x-admin-key") ?? req.nextUrl.searchParams.get("key");
-  if (adminKey && provided !== adminKey) {
+  if (!adminKey) {
+    return NextResponse.json({ error: "Healer not configured — set ADMIN_PASSWORD env var" }, { status: 503 });
+  }
+  const provided = req.headers.get("x-admin-key") ?? req.nextUrl.searchParams.get("key");
+  if (provided !== adminKey) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

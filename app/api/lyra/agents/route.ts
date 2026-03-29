@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllAgents, getLyraState, setActiveAgent, computeLineageGraph, getGameStudioAgents } from "@/lib/lyra/agents";
+import { auth } from "@/auth";
 
 export async function GET() {
   try {
@@ -22,6 +23,8 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { activeAgentId } = await req.json();
     if (!activeAgentId) {

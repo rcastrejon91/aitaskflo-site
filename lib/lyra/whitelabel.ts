@@ -8,7 +8,7 @@ import fsp from "fs/promises";
 import path from "path";
 import { WhiteLabelConfig, DEFAULT_WL_TOOLS } from "./resume";
 
-const WL_FILE = path.join(process.env.APP_DIR ?? process.cwd(), "data", "whitelabels.json");
+const WL_FILE = path.join(process.env.APP_DIR ?? process.cwd(/*turbopackIgnore: true*/), "data", "whitelabels.json");
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 

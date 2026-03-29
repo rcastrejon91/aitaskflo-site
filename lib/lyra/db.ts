@@ -329,7 +329,8 @@ export async function compressMemoriesIfNeeded(userId: string): Promise<void> {
     if (!groqKey) {
       // No LLM available — just delete the oldest low-importance facts
       const ids = lowImportance.map((f) => f.id);
-      db.prepare(`DELETE FROM facts WHERE id IN (${ids.join(",")})`).run();
+      const placeholders = ids.map(() => "?").join(",");
+      db.prepare(`DELETE FROM facts WHERE id IN (${placeholders})`).run(...ids);
       return;
     }
 
@@ -360,7 +361,8 @@ ${factsList}`,
 
       // Delete old facts, store compressed ones
       const ids = lowImportance.map((f) => f.id);
-      db.prepare(`DELETE FROM facts WHERE id IN (${ids.join(",")})`).run();
+      const placeholders = ids.map(() => "?").join(",");
+      db.prepare(`DELETE FROM facts WHERE id IN (${placeholders})`).run(...ids);
 
       for (const f of compressed) {
         if (f.key && f.value) upsertFact(userId, `compressed: ${f.key}`, f.value, 3);
@@ -525,17 +527,12 @@ export function getAuthUserByEmail(email: string): AuthUser | null {
 
 export function getAuthUserByUsernameOrEmail(login: string): AuthUser | null {
   const db = getDb();
-  console.log("[db] getDb returned:", !!db, "_dbFailed:", _dbFailed);
   if (!db) return null;
   try {
-    const all = db.prepare("SELECT id,email,name FROM auth_users").all();
-    console.log("[db] all auth_users:", JSON.stringify(all));
-    const result = db.prepare(
+    return db.prepare(
       "SELECT * FROM auth_users WHERE LOWER(email) = LOWER(?) OR LOWER(name) = LOWER(?)"
     ).get(login, login) as AuthUser | null;
-    console.log("[db] lookup result:", !!result);
-    return result;
-  } catch (e) { console.log("[db] error:", e); return null; }
+  } catch { return null; }
 }
 
 export function getAuthUserById(id: string): AuthUser | null {

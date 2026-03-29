@@ -203,8 +203,11 @@ async function checkConversations(): Promise<{ compressed: number }> {
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const adminKey = process.env.ADMIN_PASSWORD ?? process.env.ADMIN_KEY;
+  if (!adminKey) {
+    return NextResponse.json({ error: "Guardian not configured — set ADMIN_PASSWORD env var" }, { status: 503 });
+  }
   const provided = req.headers.get("x-admin-key") ?? req.nextUrl.searchParams.get("key");
-  if (adminKey && provided !== adminKey) {
+  if (provided !== adminKey) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -3,7 +3,7 @@ import type { NextAuthConfig } from "next-auth";
 // Edge-safe auth config — no Node.js imports
 // The credentials provider here is a stub; actual DB lookup happens in auth.ts
 export const authConfig: NextAuthConfig = {
-  secret: process.env.AUTH_SECRET ?? "lyra-dev-secret-change-in-production",
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   providers: [],
   callbacks: {
     authorized({ auth }) {
