@@ -1,12 +1,19 @@
 "use client";
 
+import { useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Bot, Zap, ArrowRight, GitBranch, Brain, ShieldCheck } from "lucide-react";
+import { Sparkles, Bot, Zap, ArrowRight, GitBranch, Brain, ShieldCheck, Play } from "lucide-react";
+import DemoMode from "@/components/lyra/DemoMode";
 
 export default function Home() {
+  const [showDemo, setShowDemo] = useState(false);
   return (
     <div className="min-h-screen text-white overflow-x-hidden" style={{ background: "#080810" }}>
+      <AnimatePresence>
+        {showDemo && <DemoMode onClose={() => setShowDemo(false)} />}
+      </AnimatePresence>
 
       {/* Background decorative blobs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
@@ -75,11 +82,15 @@ export default function Home() {
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
-            <Link href="/pricing">
-              <Button size="lg" variant="ghost" className="text-white/60 hover:text-white hover:bg-white/[0.06] h-12 px-8 text-base">
-                See pricing
-              </Button>
-            </Link>
+            <Button
+              size="lg"
+              variant="ghost"
+              onClick={() => setShowDemo(true)}
+              className="text-white/60 hover:text-white hover:bg-white/[0.06] h-12 px-8 text-base flex items-center gap-2"
+            >
+              <Play className="w-4 h-4" />
+              Watch Lyra Work
+            </Button>
           </div>
 
           {/* Feature badges */}
