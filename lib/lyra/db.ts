@@ -156,6 +156,29 @@ function initSchema(db: BetterSqlite3Db) {
     );
   `);
 
+  // Add HOS (Hours of Service) trucking tables
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS hos_drivers (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL,
+        name        TEXT NOT NULL,
+        cycle       TEXT NOT NULL DEFAULT '70hr8day',
+        created_at  TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS hos_logs (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        driver_id   TEXT NOT NULL,
+        status      TEXT NOT NULL,
+        start_time  TEXT NOT NULL,
+        end_time    TEXT,
+        location    TEXT,
+        notes       TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_hos_logs_driver ON hos_logs(driver_id, start_time DESC);
+    `);
+  } catch { /* ignore */ }
+
   // Add google_tokens table
   try {
     db.exec(`

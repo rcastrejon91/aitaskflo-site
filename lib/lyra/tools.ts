@@ -674,6 +674,57 @@ ACTIONS:
       required: ["prompt"],
     },
   },
+  // ── Trucker tools ────────────────────────────────────────────────────────────
+  {
+    name: "hos_log",
+    description: "Log a driver's Hours of Service (HOS) status change. Call this when a trucker says they started driving, went off duty, took a break, went to sleeper berth, or went on duty (non-driving).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        driver_name: { type: "string", description: "Driver name, e.g. 'Ricardo'" },
+        status: { type: "string", description: "Status: 'driving', 'on_duty', 'off_duty', or 'sleeper'" },
+        location: { type: "string", description: "Current location or city, e.g. 'Dallas, TX'" },
+        notes: { type: "string", description: "Optional notes, e.g. 'picking up load at Walmart DC'" },
+      },
+      required: ["driver_name", "status"],
+    },
+  },
+  {
+    name: "hos_status",
+    description: "Get a driver's current Hours of Service status, remaining drive time, 14hr window, 70hr/8-day usage, and whether a 30-min break is needed. Use when trucker asks 'how many hours do I have left', 'can I keep driving', 'HOS status', etc.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        driver_name: { type: "string", description: "Driver name to check" },
+      },
+      required: ["driver_name"],
+    },
+  },
+  {
+    name: "load_search",
+    description: "Search the load board for available freight loads. Use when trucker asks about available loads, freight to haul, loads going to a city, or wants to find work.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        origin: { type: "string", description: "Pickup city and state, e.g. 'Chicago, IL'" },
+        destination: { type: "string", description: "Delivery city and state, e.g. 'Atlanta, GA'. Leave empty for any destination." },
+        equipment: { type: "string", description: "Equipment type: 'dryvan', 'flatbed', 'reefer', 'step deck'. Default: dryvan" },
+        dh_miles: { type: "string", description: "Max deadhead miles willing to travel to pickup. Default: 100" },
+      },
+      required: ["origin"],
+    },
+  },
+  {
+    name: "obd_data",
+    description: "Display live OBD-II engine data from the truck. Shows RPM, speed, engine temperature, fuel level, and any fault codes. The frontend handles Bluetooth connection to the ELM327 dongle.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        action: { type: "string", description: "Action: 'connect' to start OBD session, 'read' to get current data, 'faults' to read DTC fault codes, 'clear_faults' to clear codes" },
+      },
+      required: ["action"],
+    },
+  },
 ];
 
 export function pollinationsUrl(prompt: string): string {

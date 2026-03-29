@@ -257,6 +257,10 @@ export async function routeTask(
   const toolKeywords = /send(?: an?)? email|search the web|search for .{3,}|current weather|what(?:'s| is) the weather|generat(?:e|ing) (?:an? )?image|draw (?:me |a |an )?|create (?:an? )?image|make (?:a |an )?(?:image|picture|photo|illustration|song|video|clip|beat|track|music)|(?:picture|photo|image|video|clip) of |show me (?:a |an )?(?:image|picture|photo|video|gif)|qr code|translate .{3,} (?:to|into)|moon phase|sunrise|sunset|https?:\/\/\S|call (?:the )?api|fetch (?:from )?https?|post to https?|sing(?:ing)?(?:\s+me)?(?:\s+a)?|(?:lo-?fi|ambient|chill|background)\s+music|generate\s+(?:a\s+)?(?:video|music|song|beat|track|audio|clip)|fal[._\s]|fal-ai|\bgif\b|send\s+(?:an?\s+)?(?:gif|text|sms|message)|text\s+(?:message|me\b)|sms\s+to\b|animated\s+gif|video\s+of\b|song\s+about\b|music\s+for\b|reaction\s+gif\b|text.to.speech|\btts\b|speak\s+(?:this|aloud)|read\s+(?:this\s+)?(?:aloud|out)/i;
   if (toolKeywords.test(message)) return { ...DEFAULT, route: "claude", taskType: "tool" };
 
+  // Trucker tools → Claude
+  const truckerKeywords = /\b(hours of service|hos\b|log (?:my |a )?(?:drive|driving|off duty|on duty|sleeper)|started driving|going off duty|took a break|load board|find (?:a |me )?(?:load|loads|freight)|loads? (?:going|from|to)|available loads?|obd|check engine|engine data|rpm|fault codes?|dtc|how (?:many |much )?hours? (?:do i have|left|remaining)|can i (?:keep |still )?driv|drive time)\b/i;
+  if (truckerKeywords.test(message)) return { ...DEFAULT, route: "claude", taskType: "tool" };
+
   // Code → Claude
   const codeKeywords = /\b(code|function|class|debug|fix (?:the |this )?(?:bug|error|issue)|refactor|write (?:a |me )?(?:script|function|class|component)|implement|algorithm|typescript|javascript|python|sql|regex|api endpoint)\b/i;
   if (codeKeywords.test(message)) return { ...DEFAULT, route: "claude", taskType: "code" };

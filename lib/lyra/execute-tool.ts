@@ -49,6 +49,7 @@ import {
   falTTS,
   falMusicGen,
 } from "@/lib/lyra/fal-tools";
+import { hosLogStatus, hosGetStatus, loadSearch, formatLoads } from "@/lib/lyra/trucker";
 
 // ── Tool dispatcher ───────────────────────────────────────────────────────────
 
@@ -708,6 +709,61 @@ export async function executeTool(
     }
 
     return `Song recorded! Vocals + ${musicUrl ? "backing track" : "a cappella"} — ${finalLyrics.slice(0, 80)}…`;
+  }
+
+  // ── Trucker tools ────────────────────────────────────────────────────────────
+
+  if (name === "hos_log") {
+    const driverName = input.driver_name ?? (userId ? `driver-${userId.slice(0, 6)}` : "Driver");
+    const status = (input.status ?? "off_duty") as "off_duty" | "sleeper" | "driving" | "on_duty";
+    const result = hosLogStatus(userId ?? "anon", driverName, status, input.location, input.notes);
+    const card = JSON.stringify({ tool: "hos_log", driver: driverName, status, location: input.location ?? "" });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return result;
+  }
+
+  if (name === "hos_status") {
+    const driverName = input.driver_name ?? (userId ? `driver-${userId.slice(0, 6)}` : "Driver");
+    const statusData = hosGetStatus(userId ?? "anon", driverName);
+    if (!statusData) return `No HOS logs found for ${driverName}. Use hos_log to start tracking.`;
+    const card = JSON.stringify({
+      tool: "hos_status",
+      driver: driverName,
+      drive_remaining_min: String(statusData.drive_remaining_min),
+      window_remaining_min: String(statusData.window_remaining_min),
+      weekly_remaining_min: String(statusData.weekly_remaining_min),
+      break_needed: statusData.break_needed ? "true" : "false",
+      current_status: statusData.current_status,
+    });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return statusData.summary;
+  }
+
+  if (name === "load_search") {
+    controller.enqueue(encoder.encode("\n🚛 Searching load board…\n"));
+    const useMock = !process.env.DAT_API_KEY;
+    const loads = await loadSearch(
+      input.origin ?? "",
+      input.destination ?? "",
+      input.equipment ?? "dryvan",
+      input.dh_miles ? parseInt(input.dh_miles, 10) : 100
+    );
+    const card = JSON.stringify({
+      tool: "load_board",
+      origin: input.origin ?? "",
+      destination: input.destination ?? "",
+      count: String(loads.length),
+      mock: useMock ? "true" : "false",
+    });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return formatLoads(loads, useMock);
+  }
+
+  if (name === "obd_data") {
+    const action = input.action ?? "read";
+    const card = JSON.stringify({ tool: "obd_data", action });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return `OBD action: ${action}. The trucker dashboard will handle Bluetooth communication with the ELM327 dongle.`;
   }
 
   const card = JSON.stringify({ tool: name, ...input });
