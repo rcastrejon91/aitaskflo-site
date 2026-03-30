@@ -259,7 +259,8 @@ export async function POST(req: NextRequest) {
     const mindContext = await buildMindContext().catch(() => "");
     const milestoneNote = await getRecentMilestoneAnnouncement().catch(() => "");
     const userGamesContext = userId ? buildUserGamesContext(userId) : "";
-    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + userGamesContext + buildLearningContext() + buildLyraTrendContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + gameOverride + mediaOverride + toolOverride + milestoneNote;
+    const adminContext = isAdmin ? "\n\n[ADMIN MODE] You are speaking with the platform admin (Ricky). You have access to the 'cloudflare' tool to manage aitaskflo.com's security, analytics, firewall, cache, and IP blocking. Use it directly when asked about Cloudflare, site security, traffic stats, blocking IPs, or purging cache. Do NOT search the web for Cloudflare info — use the tool." : "";
+    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + userGamesContext + buildLearningContext() + buildLyraTrendContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + gameOverride + mediaOverride + toolOverride + milestoneNote + adminContext;
 
     // ── 3. Build user content (text + optional images) ────────────────────
     type ImageBlock = { type: "image"; source: { type: "base64"; media_type: string; data: string } };
