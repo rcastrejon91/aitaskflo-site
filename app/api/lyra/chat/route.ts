@@ -213,6 +213,31 @@ export async function POST(req: NextRequest) {
     const wantsAts = ["ats score", "score my resume", "resume score", "check my resume", "resume match"].some(t => msgLower.includes(t));
     const wantsTailor = ["tailor my resume", "tailor resume", "rewrite my resume", "optimize my resume"].some(t => msgLower.includes(t));
 
+    // Media generation — never ask for clarification, always act immediately
+    const wantsVideo    = /\b(generat|creat|mak|produc|show|make me|give me)\w*\s+(?:a\s+|an\s+|me\s+a\s+)?(?:short\s+)?(?:video|clip|animation|film)/i.test(message);
+    const wantsMusic    = /\b(generat|creat|mak|compos|produc)\w*\s+(?:some\s+|a\s+|an\s+)?(?:music|song|beat|track|audio|lo-?fi|ambient|sound)/i.test(message);
+    const wantsSing     = /\b(sing|rap|perform|record)\b/i.test(message);
+    const wantsFalImage = /\b(fal|flux|high.?quality|realistic|cinematic|photorealistic)\b.*\b(image|photo|picture|art|illustration)\b/i.test(message);
+    const wantsTTS      = /\b(read (?:this|that|it) (?:aloud|out)|speak (?:this|that|aloud)|text.to.speech|\btts\b|say (?:this|that|it) (?:out loud|aloud))\b/i.test(message);
+    const wantsGif      = /\bsend (?:me )?(?:a |an )?(?:reaction\s+)?gif\b|\breaction gif\b/i.test(message);
+    const wantsSms      = /\bsend (?:a |an )?(?:text|sms|message)\b.{0,30}\b(\+?1?\d{10,}|\+\d{8,})\b/i.test(message);
+
+    const mediaOverride = wantsVideo
+      ? `\n\nCRITICAL: Call fal_video IMMEDIATELY with a creative, detailed prompt based on what the user described. Do NOT ask for clarification. Do NOT explain what you are about to do. Just call the tool now.`
+      : wantsSing
+      ? `\n\nCRITICAL: Call fal_sing IMMEDIATELY. Write the lyrics yourself based on context. Do NOT ask what to sing about. Just create and call the tool.`
+      : wantsMusic
+      ? `\n\nCRITICAL: Call fal_music IMMEDIATELY with a descriptive music prompt. Do NOT ask for clarification. Just call the tool now.`
+      : wantsFalImage
+      ? `\n\nCRITICAL: Call fal_image IMMEDIATELY with a detailed prompt. Do NOT ask for clarification. Just call the tool.`
+      : wantsTTS
+      ? `\n\nCRITICAL: Call fal_tts IMMEDIATELY with the text the user wants spoken. Do NOT ask questions. Just call the tool.`
+      : wantsGif
+      ? `\n\nCRITICAL: Call send_gif IMMEDIATELY with a creative search query matching the mood. Do NOT ask what kind of gif. Just pick one and call the tool.`
+      : wantsSms
+      ? `\n\nCRITICAL: Call send_sms IMMEDIATELY with the phone number and message from the user's request.`
+      : "";
+
     const toolOverride = wantsHubspot
       ? `\n\nCRITICAL: User wants HubSpot CRM action. Call the hubspot tool IMMEDIATELY. Do not explain, do not ask for an API key, just call it — the key is already configured server-side.`
       : wantsJobs
@@ -234,7 +259,7 @@ export async function POST(req: NextRequest) {
     const mindContext = await buildMindContext().catch(() => "");
     const milestoneNote = await getRecentMilestoneAnnouncement().catch(() => "");
     const userGamesContext = userId ? buildUserGamesContext(userId) : "";
-    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + userGamesContext + buildLearningContext() + buildLyraTrendContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + gameOverride + toolOverride + milestoneNote;
+    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + userGamesContext + buildLearningContext() + buildLyraTrendContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + gameOverride + mediaOverride + toolOverride + milestoneNote;
 
     // ── 3. Build user content (text + optional images) ────────────────────
     type ImageBlock = { type: "image"; source: { type: "base64"; media_type: string; data: string } };
