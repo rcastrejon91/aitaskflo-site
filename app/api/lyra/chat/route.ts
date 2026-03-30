@@ -5,6 +5,7 @@ import { upsertUser, buildMemoryContext, extractAndStoreFacts, getSubscription, 
 import { PLANS } from "@/lib/stripe";
 import { buildLearningContext } from "@/lib/lyra/weblearner";
 import { buildGameContext, buildUserGamesContext, detectEngine } from "@/lib/lyra/gamedev";
+import { buildLyraTrendContext } from "@/lib/lyra/trends";
 import { auth } from "@/auth";
 import { LYRA_TOOLS, getLunarPersonalityNote } from "@/lib/lyra/tools";
 import { streamGroqFallback, streamGrokFallback, streamOllamaFallback, streamOpenAIFallback, routeTask, streamParallelJudge } from "@/lib/lyra/streaming";
@@ -233,7 +234,7 @@ export async function POST(req: NextRequest) {
     const mindContext = await buildMindContext().catch(() => "");
     const milestoneNote = await getRecentMilestoneAnnouncement().catch(() => "");
     const userGamesContext = userId ? buildUserGamesContext(userId) : "";
-    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + userGamesContext + buildLearningContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + gameOverride + toolOverride + milestoneNote;
+    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + userGamesContext + buildLearningContext() + buildLyraTrendContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + gameOverride + toolOverride + milestoneNote;
 
     // ── 3. Build user content (text + optional images) ────────────────────
     type ImageBlock = { type: "image"; source: { type: "base64"; media_type: string; data: string } };
