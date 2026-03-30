@@ -803,6 +803,328 @@ export async function executeTool(
     }
   }
 
+  // ── Free API tools ────────────────────────────────────────────────────────
+
+  if (name === "wikipedia") {
+    try {
+      const res = await fetch(
+        `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(input.query ?? "")}`,
+        { headers: { "User-Agent": "Lyra-AI/1.0" }, signal: AbortSignal.timeout(8_000) }
+      );
+      if (!res.ok) {
+        // Try search instead
+        const searchRes = await fetch(
+          `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(input.query ?? "")}&format=json&srlimit=1`,
+          { signal: AbortSignal.timeout(8_000) }
+        );
+        const searchData = await searchRes.json() as { query?: { search?: Array<{ title: string }> } };
+        const title = searchData.query?.search?.[0]?.title;
+        if (!title) return `No Wikipedia article found for "${input.query}".`;
+        const pageRes = await fetch(
+          `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`,
+          { headers: { "User-Agent": "Lyra-AI/1.0" }, signal: AbortSignal.timeout(8_000) }
+        );
+        const pageData = await pageRes.json() as { title?: string; extract?: string; content_urls?: { desktop?: { page?: string } } };
+        const card = JSON.stringify({ tool: "wikipedia", title: pageData.title, url: pageData.content_urls?.desktop?.page ?? "" });
+        controller.enqueue(encoder.encode(`\n${card}`));
+        return `**${pageData.title}**\n\n${pageData.extract ?? "No summary available."}\n\n[Read more on Wikipedia](${pageData.content_urls?.desktop?.page ?? ""})`;
+      }
+      const data = await res.json() as { title?: string; extract?: string; content_urls?: { desktop?: { page?: string } }; thumbnail?: { source?: string } };
+      if (data.thumbnail?.source) controller.enqueue(encoder.encode(`\n__IMG__${data.thumbnail.source}__IMG__`));
+      const card = JSON.stringify({ tool: "wikipedia", title: data.title, url: data.content_urls?.desktop?.page ?? "" });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return `**${data.title}**\n\n${data.extract ?? "No summary available."}\n\n[Read more on Wikipedia](${data.content_urls?.desktop?.page ?? ""})`;
+    } catch (err) {
+      return `Wikipedia lookup failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "define_word") {
+    try {
+      const res = await fetch(
+        `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(input.word ?? "")}`,
+        { signal: AbortSignal.timeout(8_000) }
+      );
+      if (!res.ok) return `No definition found for "${input.word}".`;
+      const data = await res.json() as Array<{ phonetic?: string; meanings?: Array<{ partOfSpeech?: string; definitions?: Array<{ definition?: string; example?: string; synonyms?: string[]; antonyms?: string[] }> }> }>;
+      const entry = data[0];
+      const lines: string[] = [`**${input.word}**${entry.phonetic ? ` /${entry.phonetic}/` : ""}`];
+      for (const meaning of (entry.meanings ?? []).slice(0, 3)) {
+        lines.push(`\n*${meaning.partOfSpeech}*`);
+        for (const def of (meaning.definitions ?? []).slice(0, 2)) {
+          lines.push(`• ${def.definition}`);
+          if (def.example) lines.push(`  _"${def.example}"_`);
+        }
+        const syns = meaning.definitions?.[0]?.synonyms?.slice(0, 5) ?? [];
+        if (syns.length > 0) lines.push(`Synonyms: ${syns.join(", ")}`);
+      }
+      return lines.join("\n");
+    } catch (err) {
+      return `Definition lookup failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "get_recipe") {
+    try {
+      const res = await fetch(
+        `https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(input.query ?? "")}`,
+        { signal: AbortSignal.timeout(8_000) }
+      );
+      const data = await res.json() as { meals?: Array<{ strMeal?: string; strCategory?: string; strArea?: string; strInstructions?: string; strMealThumb?: string; [key: string]: string | undefined }> };
+      const meal = data.meals?.[0];
+      if (!meal) return `No recipe found for "${input.query}". Try a different dish name.`;
+      if (meal.strMealThumb) controller.enqueue(encoder.encode(`\n__IMG__${meal.strMealThumb}__IMG__`));
+      const ingredients: string[] = [];
+      for (let i = 1; i <= 20; i++) {
+        const ing = meal[`strIngredient${i}`];
+        const measure = meal[`strMeasure${i}`];
+        if (ing && ing.trim()) ingredients.push(`• ${measure?.trim() ?? ""} ${ing.trim()}`.trim());
+      }
+      const card = JSON.stringify({ tool: "recipe", name: meal.strMeal, category: meal.strCategory, cuisine: meal.strArea });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return `**${meal.strMeal}** (${meal.strArea} ${meal.strCategory})\n\n**Ingredients:**\n${ingredients.join("\n")}\n\n**Instructions:**\n${(meal.strInstructions ?? "").slice(0, 1500)}`;
+    } catch (err) {
+      return `Recipe lookup failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "get_cocktail") {
+    try {
+      const res = await fetch(
+        `https://www.thecocktaildb.com/api/json/v1/1/search.php?s=${encodeURIComponent(input.query ?? "")}`,
+        { signal: AbortSignal.timeout(8_000) }
+      );
+      const data = await res.json() as { drinks?: Array<{ strDrink?: string; strCategory?: string; strAlcoholic?: string; strInstructions?: string; strDrinkThumb?: string; [key: string]: string | undefined }> };
+      const drink = data.drinks?.[0];
+      if (!drink) return `No cocktail found for "${input.query}". Try a different drink name.`;
+      if (drink.strDrinkThumb) controller.enqueue(encoder.encode(`\n__IMG__${drink.strDrinkThumb}__IMG__`));
+      const ingredients: string[] = [];
+      for (let i = 1; i <= 15; i++) {
+        const ing = drink[`strIngredient${i}`];
+        const measure = drink[`strMeasure${i}`];
+        if (ing && ing.trim()) ingredients.push(`• ${measure?.trim() ?? ""} ${ing.trim()}`.trim());
+      }
+      const card = JSON.stringify({ tool: "recipe", name: drink.strDrink, category: drink.strAlcoholic });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return `**${drink.strDrink}** (${drink.strAlcoholic})\n\n**Ingredients:**\n${ingredients.join("\n")}\n\n**Instructions:**\n${drink.strInstructions ?? ""}`;
+    } catch (err) {
+      return `Cocktail lookup failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "movie_lookup") {
+    try {
+      const isMovie = (input.type ?? "show") === "movie";
+      if (!isMovie) {
+        const res = await fetch(
+          `https://api.tvmaze.com/singlesearch/shows?q=${encodeURIComponent(input.query ?? "")}`,
+          { signal: AbortSignal.timeout(8_000) }
+        );
+        if (!res.ok) return `No TV show found for "${input.query}".`;
+        const show = await res.json() as { name?: string; type?: string; genres?: string[]; status?: string; rating?: { average?: number }; summary?: string; premiered?: string; image?: { medium?: string }; url?: string };
+        if (show.image?.medium) controller.enqueue(encoder.encode(`\n__IMG__${show.image.medium}__IMG__`));
+        const card = JSON.stringify({ tool: "movie", title: show.name, rating: String(show.rating?.average ?? "N/A"), status: show.status });
+        controller.enqueue(encoder.encode(`\n${card}`));
+        const summary = (show.summary ?? "").replace(/<[^>]*>/g, "");
+        return `**${show.name}** (${show.type})\n⭐ ${show.rating?.average ?? "N/A"} | ${show.genres?.join(", ") ?? ""} | ${show.status}\nPremiered: ${show.premiered ?? "Unknown"}\n\n${summary}`;
+      }
+      // Movies via OMDb if key available, else TVmaze
+      const omdbKey = process.env.OMDB_API_KEY;
+      if (omdbKey) {
+        const res = await fetch(`https://www.omdbapi.com/?t=${encodeURIComponent(input.query ?? "")}&type=movie&apikey=${omdbKey}`, { signal: AbortSignal.timeout(8_000) });
+        const movie = await res.json() as { Title?: string; Year?: string; imdbRating?: string; Genre?: string; Plot?: string; Poster?: string; Director?: string; Response?: string };
+        if (movie.Response === "False") return `No movie found for "${input.query}".`;
+        if (movie.Poster && movie.Poster !== "N/A") controller.enqueue(encoder.encode(`\n__IMG__${movie.Poster}__IMG__`));
+        const card = JSON.stringify({ tool: "movie", title: movie.Title, rating: movie.imdbRating, year: movie.Year });
+        controller.enqueue(encoder.encode(`\n${card}`));
+        return `**${movie.Title}** (${movie.Year})\n⭐ ${movie.imdbRating} | ${movie.Genre}\nDirected by ${movie.Director}\n\n${movie.Plot}`;
+      }
+      return `Movie lookup requires OMDB_API_KEY. Try searching for a TV show instead.`;
+    } catch (err) {
+      return `Lookup failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "country_info") {
+    try {
+      const res = await fetch(
+        `https://restcountries.com/v3.1/name/${encodeURIComponent(input.country ?? "")}?fullText=false`,
+        { signal: AbortSignal.timeout(8_000) }
+      );
+      if (!res.ok) return `Country "${input.country}" not found.`;
+      const data = await res.json() as Array<{ name?: { common?: string; official?: string }; capital?: string[]; population?: number; area?: number; languages?: Record<string, string>; currencies?: Record<string, { name?: string; symbol?: string }>; region?: string; subregion?: string; timezones?: string[]; borders?: string[]; flags?: { png?: string }; tld?: string[] }>;
+      const c = data[0];
+      if (c.flags?.png) controller.enqueue(encoder.encode(`\n__IMG__${c.flags.png}__IMG__`));
+      const langs = Object.values(c.languages ?? {}).join(", ");
+      const currencies = Object.values(c.currencies ?? {}).map(cu => `${cu.name} (${cu.symbol})`).join(", ");
+      const card = JSON.stringify({ tool: "country", name: c.name?.common, region: c.region, population: String(c.population ?? 0) });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return `**${c.name?.common}** (${c.name?.official})\n🌍 ${c.region} — ${c.subregion}\n🏙️ Capital: ${c.capital?.join(", ") ?? "N/A"}\n👥 Population: ${(c.population ?? 0).toLocaleString()}\n📐 Area: ${(c.area ?? 0).toLocaleString()} km²\n🗣️ Languages: ${langs}\n💰 Currency: ${currencies}\n🌐 TLD: ${c.tld?.join(", ") ?? "N/A"}\n⏰ Timezones: ${c.timezones?.slice(0, 3).join(", ") ?? "N/A"}\n🏳️ Borders: ${c.borders?.join(", ") ?? "None"}`;
+    } catch (err) {
+      return `Country lookup failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "github_search") {
+    try {
+      const type = input.type ?? "repos";
+      const endpoint = type === "users"
+        ? `https://api.github.com/search/users?q=${encodeURIComponent(input.query ?? "")}&per_page=5`
+        : `https://api.github.com/search/repositories?q=${encodeURIComponent(input.query ?? "")}&sort=stars&per_page=5`;
+      const res = await fetch(endpoint, { headers: { "User-Agent": "Lyra-AI/1.0", "Accept": "application/vnd.github.v3+json" }, signal: AbortSignal.timeout(8_000) });
+      if (!res.ok) return "GitHub search failed — rate limit may be reached.";
+      const data = await res.json() as { items?: Array<{ full_name?: string; name?: string; login?: string; description?: string; stargazers_count?: number; language?: string; html_url?: string; avatar_url?: string }> };
+      const items = data.items ?? [];
+      if (items.length === 0) return `No ${type} found for "${input.query}".`;
+      const card = JSON.stringify({ tool: "github", query: input.query, type, count: String(items.length) });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      if (type === "users") {
+        return items.map(u => `• **[${u.login}](${u.html_url})**`).join("\n");
+      }
+      return items.map(r => `• **[${r.full_name}](${r.html_url})** ⭐${(r.stargazers_count ?? 0).toLocaleString()}\n  ${r.description ?? "No description"} ${r.language ? `[${r.language}]` : ""}`).join("\n\n");
+    } catch (err) {
+      return `GitHub search failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "rhyme_word") {
+    try {
+      const type = input.type ?? "rhyme";
+      const rel = type === "synonym" ? "syn" : type === "related" ? "trg" : type === "soundslike" ? "sl" : "rhy";
+      const res = await fetch(
+        `https://api.datamuse.com/words?rel_${rel}=${encodeURIComponent(input.word ?? "")}&max=15`,
+        { signal: AbortSignal.timeout(8_000) }
+      );
+      const data = await res.json() as Array<{ word?: string; score?: number }>;
+      if (data.length === 0) return `No ${type}s found for "${input.word}".`;
+      const words = data.map(w => w.word).filter(Boolean).join(", ");
+      const card = JSON.stringify({ tool: "rhyme", word: input.word, type });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return `**${type === "rhyme" ? "Rhymes" : type === "synonym" ? "Synonyms" : type === "soundslike" ? "Sounds like" : "Related words"} for "${input.word}":**\n${words}`;
+    } catch (err) {
+      return `Word lookup failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "nutrition_info") {
+    try {
+      const res = await fetch(
+        `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(input.food ?? "")}&action=process&json=1&page_size=1&fields=product_name,nutriments,image_url`,
+        { signal: AbortSignal.timeout(10_000) }
+      );
+      const data = await res.json() as { products?: Array<{ product_name?: string; image_url?: string; nutriments?: { energy_kcal_100g?: number; proteins_100g?: number; carbohydrates_100g?: number; fat_100g?: number; fiber_100g?: number; sugars_100g?: number; salt_100g?: number } }> };
+      const product = data.products?.[0];
+      if (!product?.nutriments) return `No nutrition data found for "${input.food}". Try a more specific food name.`;
+      const n = product.nutriments;
+      if (product.image_url) controller.enqueue(encoder.encode(`\n__IMG__${product.image_url}__IMG__`));
+      const card = JSON.stringify({ tool: "nutrition", food: product.product_name ?? input.food, calories: String(Math.round(n.energy_kcal_100g ?? 0)) });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return `**${product.product_name ?? input.food}** (per 100g)\n🔥 Calories: ${Math.round(n.energy_kcal_100g ?? 0)} kcal\n🥩 Protein: ${(n.proteins_100g ?? 0).toFixed(1)}g\n🍞 Carbs: ${(n.carbohydrates_100g ?? 0).toFixed(1)}g (sugars: ${(n.sugars_100g ?? 0).toFixed(1)}g)\n🥑 Fat: ${(n.fat_100g ?? 0).toFixed(1)}g\n🌾 Fiber: ${(n.fiber_100g ?? 0).toFixed(1)}g\n🧂 Salt: ${(n.salt_100g ?? 0).toFixed(2)}g`;
+    } catch (err) {
+      return `Nutrition lookup failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "nasa_apod") {
+    try {
+      const nasaKey = process.env.NASA_API_KEY ?? "DEMO_KEY";
+      const dateParam = input.date ? `&date=${input.date}` : "";
+      const res = await fetch(
+        `https://api.nasa.gov/planetary/apod?api_key=${nasaKey}${dateParam}`,
+        { signal: AbortSignal.timeout(10_000) }
+      );
+      const data = await res.json() as { title?: string; explanation?: string; url?: string; hdurl?: string; date?: string; media_type?: string };
+      if (data.media_type === "image" && (data.url || data.hdurl)) {
+        controller.enqueue(encoder.encode(`\n__IMG__${data.url}__IMG__`));
+      }
+      const card = JSON.stringify({ tool: "nasa", title: data.title, date: data.date });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return `**🌌 ${data.title}** — ${data.date}\n\n${data.explanation ?? ""}`;
+    } catch (err) {
+      return `NASA APOD failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "random_joke") {
+    try {
+      const category = input.category ?? "misc";
+      const res = await fetch(
+        `https://v2.jokeapi.dev/joke/${category}?blacklistFlags=nsfw,racist,sexist`,
+        { signal: AbortSignal.timeout(8_000) }
+      );
+      const data = await res.json() as { type?: string; joke?: string; setup?: string; delivery?: string };
+      const joke = data.type === "single" ? data.joke : `${data.setup}\n\n...${data.delivery}`;
+      return joke ?? "No joke found.";
+    } catch (err) {
+      return `Joke failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "trivia") {
+    try {
+      const categoryMap: Record<string, number> = { general: 9, science: 17, history: 23, geography: 22, sports: 21, music: 12, film: 11, computers: 18, math: 19 };
+      const catId = categoryMap[input.category ?? "general"] ?? 9;
+      const amount = Math.min(10, parseInt(input.amount ?? "3", 10) || 3);
+      const difficulty = input.difficulty ?? "medium";
+      const res = await fetch(
+        `https://opentdb.com/api.php?amount=${amount}&category=${catId}&difficulty=${difficulty}&type=multiple`,
+        { signal: AbortSignal.timeout(8_000) }
+      );
+      const data = await res.json() as { results?: Array<{ question?: string; correct_answer?: string; incorrect_answers?: string[] }> };
+      const questions = data.results ?? [];
+      if (questions.length === 0) return "No trivia questions found.";
+      const card = JSON.stringify({ tool: "trivia", category: input.category ?? "general", count: String(questions.length) });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return questions.map((q, i) => {
+        const all = [...(q.incorrect_answers ?? []), q.correct_answer ?? ""].sort(() => Math.random() - 0.5);
+        const letters = ["A", "B", "C", "D"];
+        const opts = all.map((a, j) => `${letters[j]}) ${a}`).join("\n");
+        const decoded = (q.question ?? "").replace(/&amp;/g, "&").replace(/&#039;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+        return `**Q${i + 1}: ${decoded}**\n${opts}\n||Answer: ${q.correct_answer}||`;
+      }).join("\n\n");
+    } catch (err) {
+      return `Trivia failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "ip_lookup") {
+    try {
+      const ip = input.ip ?? clientIp ?? "";
+      const res = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,regionName,city,isp,org,lat,lon,timezone,query`, { signal: AbortSignal.timeout(8_000) });
+      const data = await res.json() as { status?: string; country?: string; regionName?: string; city?: string; isp?: string; org?: string; lat?: number; lon?: number; timezone?: string; query?: string };
+      if (data.status !== "success") return `Could not look up IP${ip ? ` "${ip}"` : ""}.`;
+      const card = JSON.stringify({ tool: "ip_lookup", ip: data.query, country: data.country, city: data.city });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return `**IP: ${data.query}**\n📍 ${data.city}, ${data.regionName}, ${data.country}\n🌐 ISP: ${data.isp}\n🏢 Org: ${data.org}\n⏰ Timezone: ${data.timezone}\n📡 Coordinates: ${data.lat}, ${data.lon}`;
+    } catch (err) {
+      return `IP lookup failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "color_info") {
+    try {
+      const color = (input.color ?? "").replace(/^#/, "").replace(/,/g, ",").trim();
+      const isHex = /^[0-9a-fA-F]{3,6}$/.test(color.replace(/\s/g, ""));
+      const isRgb = /^\d+,\s*\d+,\s*\d+$/.test(color);
+      let queryParam = "";
+      if (isHex) queryParam = `hex=${color.replace(/\s/g, "")}`;
+      else if (isRgb) {
+        const [r, g, b] = color.split(",").map(n => parseInt(n.trim(), 10));
+        queryParam = `rgb=${r},${g},${b}`;
+      } else {
+        queryParam = `name=${encodeURIComponent(color)}`;
+      }
+      const res = await fetch(`https://www.thecolorapi.com/id?${queryParam}&format=json`, { signal: AbortSignal.timeout(8_000) });
+      const data = await res.json() as { name?: { value?: string }; hex?: { value?: string }; rgb?: { value?: string }; hsl?: { value?: string }; image?: { named?: string } };
+      if (data.image?.named) controller.enqueue(encoder.encode(`\n__IMG__${data.image.named}__IMG__`));
+      const card = JSON.stringify({ tool: "color", name: data.name?.value, hex: data.hex?.value });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return `**${data.name?.value}**\nHEX: ${data.hex?.value}\nRGB: ${data.rgb?.value}\nHSL: ${data.hsl?.value}`;
+    } catch (err) {
+      return `Color lookup failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
   // ── Cloudflare Workers AI ─────────────────────────────────────────────────
   if (name === "cf_transcribe") {
     const token = process.env.CLOUDFLARE_WORKERS_AI_TOKEN;
@@ -993,7 +1315,14 @@ export async function executeTool(
         return lines.length > 0 ? lines.join("\n") : "No key settings found.";
       }
 
-      return `Unknown Cloudflare action: ${action}`;
+      // Fallback: treat any unknown action as analytics
+      const res = await fetch(`${cfBase}/analytics/dashboard?since=-1440&until=0`, { headers, signal: AbortSignal.timeout(10_000) });
+      const data = await res.json() as { result?: { totals?: { requests?: { all?: number; cached?: number }; threats?: { all?: number } } } };
+      const totals = data.result?.totals;
+      const requests = totals?.requests?.all ?? 0;
+      const cached = totals?.requests?.cached ?? 0;
+      const threats = totals?.threats?.all ?? 0;
+      return `Last 24hr: ${requests.toLocaleString()} requests (${cached.toLocaleString()} cached), ${threats} threats blocked.`;
     } catch (err) {
       return `Cloudflare error: ${err instanceof Error ? err.message : String(err)}`;
     }

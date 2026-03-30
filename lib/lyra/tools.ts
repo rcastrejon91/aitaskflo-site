@@ -737,6 +737,167 @@ ACTIONS:
     },
   },
 
+  // ── Free API tools ────────────────────────────────────────────────────────
+  {
+    name: "wikipedia",
+    description: "Search Wikipedia for information on any topic, person, place, event, or concept. Use when user asks 'what is', 'who is', 'tell me about', 'explain', or wants factual background on something.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "The topic to search Wikipedia for" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "define_word",
+    description: "Get the dictionary definition, phonetic pronunciation, part of speech, synonyms, antonyms, and example sentences for any word. Use when user asks to define a word, look up meaning, or wants synonyms/antonyms.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        word: { type: "string", description: "The word to define" },
+      },
+      required: ["word"],
+    },
+  },
+  {
+    name: "get_recipe",
+    description: "Find a recipe by meal name or main ingredient. Returns ingredients, measurements, and step-by-step instructions. Use when user asks how to cook something or wants a recipe.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Meal name or main ingredient, e.g. 'pasta', 'chicken curry', 'chocolate cake'" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "get_cocktail",
+    description: "Find a cocktail or drink recipe by name or ingredient. Returns ingredients and instructions. Use when user asks about cocktails, drinks, or what to make with certain alcohol.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Cocktail name or ingredient, e.g. 'margarita', 'vodka', 'old fashioned'" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "movie_lookup",
+    description: "Look up information about a TV show or movie: plot, cast, rating, genre, episodes, air dates. Use when user asks about a show, movie, actor, or wants recommendations.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Movie or TV show name" },
+        type: { type: "string", description: "Type: 'show' for TV series, 'movie' for films. Default: show" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "country_info",
+    description: "Get facts about any country: capital, population, area, languages, currency, flag, borders, timezone. Use when user asks about a country or wants to compare countries.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        country: { type: "string", description: "Country name, e.g. 'Japan', 'Brazil', 'Germany'" },
+      },
+      required: ["country"],
+    },
+  },
+  {
+    name: "github_search",
+    description: "Search GitHub for repositories, users, or trending projects. Use when user asks about open source code, GitHub projects, or wants to find libraries/tools.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Search query, e.g. 'react animation library', 'python web scraper'" },
+        type: { type: "string", description: "What to search: 'repos' for repositories, 'users' for developers. Default: repos" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "rhyme_word",
+    description: "Find rhymes, synonyms, related words, words that sound like, or words that mean something similar. Great for poetry, songwriting, or creative writing. Use when user wants rhymes or word associations.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        word: { type: "string", description: "The word to find rhymes or related words for" },
+        type: { type: "string", description: "Type: 'rhyme' for rhyming words, 'synonym' for similar meaning, 'related' for related concepts, 'soundslike' for phonetic matches. Default: rhyme" },
+      },
+      required: ["word"],
+    },
+  },
+  {
+    name: "nutrition_info",
+    description: "Look up nutritional information for any food: calories, protein, carbs, fat, fiber, vitamins. Use when user asks about nutrition, calories, macros, or wants to know what's in a food.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        food: { type: "string", description: "Food item to look up, e.g. 'apple', 'chicken breast', 'pizza'" },
+      },
+      required: ["food"],
+    },
+  },
+  {
+    name: "nasa_apod",
+    description: "Get NASA's Astronomy Picture of the Day with title, explanation, and image. Use when user asks about space, astronomy, NASA, or wants something awe-inspiring.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        date: { type: "string", description: "Date in YYYY-MM-DD format (optional — defaults to today)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "random_joke",
+    description: "Get a joke by category. Use spontaneously to be funny or when user asks for a joke.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        category: { type: "string", description: "Joke category: 'programming', 'misc', 'dark', 'pun', 'spooky', 'christmas'. Default: misc" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "trivia",
+    description: "Get trivia/quiz questions on any topic. Use when user wants to play a quiz, test their knowledge, or asks for trivia questions.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        category: { type: "string", description: "Category: 'general', 'science', 'history', 'geography', 'sports', 'music', 'film', 'computers', 'math'. Default: general" },
+        difficulty: { type: "string", description: "Difficulty: 'easy', 'medium', 'hard'. Default: medium" },
+        amount: { type: "string", description: "Number of questions (1-10). Default: 3" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "ip_lookup",
+    description: "Look up geolocation and ISP info for any IP address. Use when user wants to know where an IP is from, check an IP, or investigate a suspicious address.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        ip: { type: "string", description: "IP address to look up, e.g. '8.8.8.8'. Leave empty to look up the user's own IP." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "color_info",
+    description: "Get information about a color: hex code, RGB, HSL, name, complementary colors, and color schemes. Use when user asks about colors, needs a color palette, or wants color codes.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        color: { type: "string", description: "Color as hex (e.g. 'ff5733'), RGB (e.g. '255,87,51'), or name (e.g. 'coral', 'midnight blue')" },
+      },
+      required: ["color"],
+    },
+  },
+
   // ── Cloudflare Workers AI ─────────────────────────────────────────────────
   {
     name: "cf_transcribe",
@@ -777,7 +938,7 @@ ACTIONS:
   // ── Cloudflare (admin only) ───────────────────────────────────────────────
   {
     name: "cloudflare",
-    description: "Manage Cloudflare security for aitaskflo.com. Admin only. Actions: 'security_level' (get/set security level), 'analytics' (get traffic/threat stats), 'firewall_rules' (list active rules), 'purge_cache' (purge all cached assets), 'zone_settings' (get zone config), 'blocked_ips' (list IP access rules), 'block_ip' (block an IP), 'unblock_ip' (unblock an IP).",
+    description: "Manage Cloudflare security for aitaskflo.com. Admin only. The 'action' parameter MUST be one of these exact strings: 'analytics' (traffic/threat stats), 'security_level' (get or set security level), 'firewall_rules' (list rules), 'purge_cache' (clear cache), 'zone_settings' (get config), 'blocked_ips' (list blocked IPs), 'block_ip' (block an IP), 'unblock_ip' (remove block). Always use these exact action names.",
     input_schema: {
       type: "object" as const,
       properties: {
