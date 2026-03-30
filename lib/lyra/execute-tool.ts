@@ -803,6 +803,202 @@ export async function executeTool(
     }
   }
 
+  // ── Cloudflare Workers AI ─────────────────────────────────────────────────
+  if (name === "cf_transcribe") {
+    const token = process.env.CLOUDFLARE_WORKERS_AI_TOKEN;
+    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+    if (!token || !accountId) return "Cloudflare Workers AI is not configured.";
+    controller.enqueue(encoder.encode("\n🎙️ Transcribing audio with Cloudflare Whisper…\n"));
+    try {
+      const audioRes = await fetch(input.audio_url ?? "", { signal: AbortSignal.timeout(30_000) });
+      if (!audioRes.ok) return `Could not fetch audio file: ${audioRes.statusText}`;
+      const audioBuffer = await audioRes.arrayBuffer();
+      const res = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/openai/whisper`,
+        {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${token}` },
+          body: audioBuffer,
+          signal: AbortSignal.timeout(60_000),
+        }
+      );
+      const data = await res.json() as { result?: { text?: string }; success?: boolean };
+      if (!data.success || !data.result?.text) return "Transcription failed — could not process audio.";
+      const transcript = data.result.text;
+      const card = JSON.stringify({ tool: "cf_transcribe", preview: transcript.slice(0, 80) });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return `**Transcript:**\n\n${transcript}`;
+    } catch (err) {
+      return `Transcription error: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "cf_summarize") {
+    const token = process.env.CLOUDFLARE_WORKERS_AI_TOKEN;
+    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+    if (!token || !accountId) return "Cloudflare Workers AI is not configured.";
+    controller.enqueue(encoder.encode("\n📝 Summarizing with Cloudflare AI…\n"));
+    const style = input.style ?? "bullets";
+    const styleInstruction = style === "tldr"
+      ? "Summarize in one sentence (TL;DR)."
+      : style === "paragraph"
+      ? "Write a concise 2-3 sentence summary."
+      : "Extract the 5 most important points as bullet points.";
+    try {
+      const res = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.1-8b-instruct`,
+        {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [
+              { role: "system", content: `You are a concise summarizer. ${styleInstruction} Be direct and clear.` },
+              { role: "user", content: `Summarize this:\n\n${(input.text ?? "").slice(0, 8000)}` },
+            ],
+            max_tokens: 400,
+          }),
+          signal: AbortSignal.timeout(30_000),
+        }
+      );
+      const data = await res.json() as { result?: { response?: string }; success?: boolean };
+      if (!data.success || !data.result?.response) return "Summary failed.";
+      const summary = data.result.response;
+      const card = JSON.stringify({ tool: "cf_summarize", style, words: String((input.text ?? "").split(" ").length) });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return summary;
+    } catch (err) {
+      return `Summarize error: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "cf_image_gen") {
+    const token = process.env.CLOUDFLARE_WORKERS_AI_TOKEN;
+    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+    if (!token || !accountId) return "Cloudflare Workers AI is not configured.";
+    controller.enqueue(encoder.encode("\n🎨 Generating image with Cloudflare SDXL…\n"));
+    try {
+      const body: Record<string, unknown> = { prompt: input.prompt ?? "" };
+      if (input.negative_prompt) body.negative_prompt = input.negative_prompt;
+      const res = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0`,
+        {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(60_000),
+        }
+      );
+      if (!res.ok) return `Image generation failed: ${res.statusText}`;
+      const imageBuffer = await res.arrayBuffer();
+      const base64 = Buffer.from(imageBuffer).toString("base64");
+      const dataUrl = `data:image/png;base64,${base64}`;
+      controller.enqueue(encoder.encode(`\n__IMG__${dataUrl}__IMG__`));
+      const card = JSON.stringify({ tool: "image_gen", source: "cloudflare-sdxl", prompt: (input.prompt ?? "").slice(0, 60) });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return "Image generated with Cloudflare SDXL.";
+    } catch (err) {
+      return `Image generation error: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  // ── Cloudflare (admin only) ───────────────────────────────────────────────
+  if (name === "cloudflare") {
+    const cfToken = process.env.CLOUDFLARE_API_TOKEN;
+    const zoneId = process.env.CLOUDFLARE_ZONE_ID;
+    if (!cfToken || !zoneId) return "Cloudflare is not configured.";
+
+    // Admin-only gate
+    const isAdmin = userId?.startsWith("admin-") ?? false;
+    if (!isAdmin) return "Cloudflare management is restricted to admin users.";
+
+    const action = input.action ?? "analytics";
+    const cfBase = `https://api.cloudflare.com/client/v4/zones/${zoneId}`;
+    const headers = { "Authorization": `Bearer ${cfToken}`, "Content-Type": "application/json" };
+
+    try {
+      if (action === "analytics") {
+        const res = await fetch(`${cfBase}/analytics/dashboard?since=-1440&until=0`, { headers, signal: AbortSignal.timeout(10_000) });
+        const data = await res.json() as { result?: { totals?: { requests?: { all?: number; cached?: number }; threats?: { all?: number } } } };
+        const totals = data.result?.totals;
+        const requests = totals?.requests?.all ?? 0;
+        const cached = totals?.requests?.cached ?? 0;
+        const threats = totals?.threats?.all ?? 0;
+        const card = JSON.stringify({ tool: "cloudflare", action, requests: String(requests), threats: String(threats) });
+        controller.enqueue(encoder.encode(`\n${card}`));
+        return `Last 24hr: ${requests.toLocaleString()} requests (${cached.toLocaleString()} cached), ${threats} threats blocked.`;
+      }
+
+      if (action === "security_level") {
+        if (input.level) {
+          const res = await fetch(`${cfBase}/settings/security_level`, {
+            method: "PATCH", headers,
+            body: JSON.stringify({ value: input.level }),
+            signal: AbortSignal.timeout(10_000),
+          });
+          const data = await res.json() as { result?: { value?: string } };
+          return `Security level set to: ${data.result?.value ?? input.level}`;
+        }
+        const res = await fetch(`${cfBase}/settings/security_level`, { headers, signal: AbortSignal.timeout(10_000) });
+        const data = await res.json() as { result?: { value?: string } };
+        return `Current security level: ${data.result?.value ?? "unknown"}`;
+      }
+
+      if (action === "purge_cache") {
+        const res = await fetch(`${cfBase}/purge_cache`, {
+          method: "POST", headers,
+          body: JSON.stringify({ purge_everything: true }),
+          signal: AbortSignal.timeout(10_000),
+        });
+        const data = await res.json() as { success?: boolean };
+        return data.success ? "Cache purged successfully." : "Cache purge failed.";
+      }
+
+      if (action === "blocked_ips" || action === "firewall_rules") {
+        const res = await fetch(`${cfBase}/firewall/access_rules/rules?per_page=20`, { headers, signal: AbortSignal.timeout(10_000) });
+        const data = await res.json() as { result?: Array<{ configuration?: { value?: string }; mode?: string; notes?: string }> };
+        const rules = data.result ?? [];
+        if (rules.length === 0) return "No IP access rules found.";
+        const lines = rules.map(r => `• ${r.configuration?.value ?? "?"} — ${r.mode} ${r.notes ? `(${r.notes})` : ""}`);
+        return `${rules.length} IP rules:\n${lines.join("\n")}`;
+      }
+
+      if (action === "block_ip") {
+        if (!input.ip) return "Provide an ip parameter to block.";
+        const res = await fetch(`${cfBase}/firewall/access_rules/rules`, {
+          method: "POST", headers,
+          body: JSON.stringify({ mode: "block", configuration: { target: "ip", value: input.ip }, notes: "Blocked via Lyra" }),
+          signal: AbortSignal.timeout(10_000),
+        });
+        const data = await res.json() as { success?: boolean };
+        return data.success ? `IP ${input.ip} blocked.` : `Failed to block ${input.ip}.`;
+      }
+
+      if (action === "unblock_ip") {
+        if (!input.ip) return "Provide an ip parameter to unblock.";
+        // Find the rule ID first
+        const listRes = await fetch(`${cfBase}/firewall/access_rules/rules?configuration.value=${input.ip}`, { headers, signal: AbortSignal.timeout(10_000) });
+        const listData = await listRes.json() as { result?: Array<{ id?: string }> };
+        const rule = listData.result?.[0];
+        if (!rule?.id) return `No block rule found for ${input.ip}.`;
+        const delRes = await fetch(`${cfBase}/firewall/access_rules/rules/${rule.id}`, { method: "DELETE", headers, signal: AbortSignal.timeout(10_000) });
+        const delData = await delRes.json() as { success?: boolean };
+        return delData.success ? `IP ${input.ip} unblocked.` : `Failed to unblock ${input.ip}.`;
+      }
+
+      if (action === "zone_settings") {
+        const res = await fetch(`${cfBase}/settings`, { headers, signal: AbortSignal.timeout(10_000) });
+        const data = await res.json() as { result?: Array<{ id?: string; value?: unknown }> };
+        const settings = (data.result ?? []).filter(s => ["ssl", "security_level", "waf", "bot_fight_mode", "browser_check", "always_use_https"].includes(s.id ?? ""));
+        const lines = settings.map(s => `• ${s.id}: ${s.value}`);
+        return lines.length > 0 ? lines.join("\n") : "No key settings found.";
+      }
+
+      return `Unknown Cloudflare action: ${action}`;
+    } catch (err) {
+      return `Cloudflare error: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
   const card = JSON.stringify({ tool: name, ...input });
   controller.enqueue(encoder.encode(`\n${card}`));
   return `${name} recorded.`;

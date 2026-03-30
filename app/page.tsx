@@ -64,15 +64,15 @@ export default function Home() {
           </div>
 
           <h1 className="text-6xl sm:text-7xl md:text-8xl font-bold tracking-tight mb-6 leading-[1.05]">
-            <span className="text-white">AI that learns</span>
+            <span className="text-white">AI that actually learns</span>
             <br />
             <span style={{ background: "linear-gradient(135deg, rgb(167,139,250), rgb(240,171,252), rgb(249,168,212))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              as it works
+              how to help you
             </span>
           </h1>
 
           <p className="text-lg sm:text-xl mb-10 max-w-2xl mx-auto leading-relaxed" style={{ color: "rgba(255,255,255,0.4)" }}>
-            Meet Lyra — an AI that builds persistent memory, reflects on every conversation, and evolves into smarter versions of itself.
+            Meet Lyra, an AI that remembers what matters, improves from every conversation, and becomes more useful the more you use it.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-16">
@@ -113,9 +113,9 @@ export default function Home() {
       <section className="relative py-28 px-6">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">Built to get smarter over time</h2>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">Built to improve over time</h2>
             <p className="text-lg max-w-xl mx-auto" style={{ color: "rgba(255,255,255,0.35)" }}>
-              Every conversation makes Lyra more capable, more personalized, more effective.
+              Most AI tools reset every conversation. Lyra builds understanding as you use it.
             </p>
           </div>
 
@@ -124,37 +124,37 @@ export default function Home() {
               {
                 icon: <Brain className="w-5 h-5" />,
                 title: "Persistent Memory",
-                desc: "Lyra remembers context across sessions — no need to re-explain who you are or what you're working on.",
+                desc: "Lyra remembers context across conversations so you do not have to repeat yourself. It understands your preferences, projects, and priorities.",
                 iconBg: "rgba(109,40,217,0.12)", iconBorder: "rgba(109,40,217,0.25)", iconColor: "rgb(196,181,253)",
               },
               {
                 icon: <Sparkles className="w-5 h-5" />,
                 title: "Reflection Engine",
-                desc: "After each conversation, Lyra scores itself, identifies gaps, and extracts lessons to improve future interactions.",
+                desc: "Lyra reviews conversations to understand what worked well and what could be improved. Each interaction helps it respond more clearly next time.",
                 iconBg: "rgba(134,25,143,0.12)", iconBorder: "rgba(134,25,143,0.25)", iconColor: "rgb(240,171,252)",
               },
               {
                 icon: <GitBranch className="w-5 h-5" />,
                 title: "Agent Evolution",
-                desc: "When ready, Lyra evolves into an improved version — preserving lineage while upgrading its core.",
+                desc: "Lyra can improve itself while keeping everything it has already learned. You keep the progress while gaining better performance.",
                 iconBg: "rgba(79,70,229,0.12)", iconBorder: "rgba(79,70,229,0.25)", iconColor: "rgb(165,180,252)",
               },
               {
                 icon: <Zap className="w-5 h-5" />,
-                title: "Instant Automation",
-                desc: "Execute real tasks: draft emails, write content, build workflows — all through natural language.",
+                title: "Real Automation",
+                desc: "Lyra does more than respond with text. It can help draft emails, research information, generate content, and assist with workflows.",
                 iconBg: "rgba(161,98,7,0.15)", iconBorder: "rgba(161,98,7,0.3)", iconColor: "rgb(252,211,77)",
               },
               {
                 icon: <Bot className="w-5 h-5" />,
                 title: "Agent Lineage",
-                desc: "Visualize the full evolution tree of your AI — see every generation and switch between them.",
+                desc: "You can see how Lyra improves over time. Track changes, compare versions, and understand how your AI becomes more capable.",
                 iconBg: "rgba(236,72,153,0.1)", iconBorder: "rgba(236,72,153,0.25)", iconColor: "rgb(249,168,212)",
               },
               {
                 icon: <ShieldCheck className="w-5 h-5" />,
-                title: "Private & Isolated",
-                desc: "Your data, memories, and conversations are fully isolated to your account. No shared state.",
+                title: "Private by Design",
+                desc: "Your data and conversations stay connected only to your account. Your memory and activity are not shared with other users.",
                 iconBg: "rgba(16,185,129,0.1)", iconBorder: "rgba(16,185,129,0.25)", iconColor: "rgb(110,231,183)",
               },
             ].map((f) => (
@@ -175,7 +175,7 @@ export default function Home() {
         <div className="max-w-2xl mx-auto text-center">
           <div className="rounded-3xl p-12" style={{ background: "rgba(109,40,217,0.07)", border: "1px solid rgba(109,40,217,0.18)", boxShadow: "0 0 80px rgba(109,40,217,0.07)" }}>
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">Start building today</h2>
-            <p className="mb-8" style={{ color: "rgba(255,255,255,0.38)" }}>Your AI gets better with every message.</p>
+            <p className="mb-8" style={{ color: "rgba(255,255,255,0.38)" }}>Your AI becomes more useful with every interaction.</p>
             <Link href="/pricing">
               <Button size="lg" className="text-white border-0 font-semibold px-10 h-12 text-base shadow-2xl" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 8px 32px rgba(109,40,217,0.3)" }}>
                 Get Started

@@ -736,6 +736,58 @@ ACTIONS:
       required: [],
     },
   },
+
+  // ── Cloudflare Workers AI ─────────────────────────────────────────────────
+  {
+    name: "cf_transcribe",
+    description: "Transcribe audio or video to text using Cloudflare's Whisper AI. Use when user uploads audio, wants to transcribe a voice memo, meeting recording, or any audio file. Accepts a public URL to the audio file.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        audio_url: { type: "string", description: "Public URL to the audio file (mp3, wav, m4a, ogg, etc.)" },
+      },
+      required: ["audio_url"],
+    },
+  },
+  {
+    name: "cf_summarize",
+    description: "Summarize any long text, article, document, or pasted content using Cloudflare AI. Use when user pastes a wall of text, article, email thread, or asks to summarize something.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        text: { type: "string", description: "The text content to summarize" },
+        style: { type: "string", description: "Summary style: 'bullets' for key points, 'paragraph' for prose, 'tldr' for one sentence. Default: bullets" },
+      },
+      required: ["text"],
+    },
+  },
+  {
+    name: "cf_image_gen",
+    description: "Generate an image using Cloudflare's Stable Diffusion XL. Use as a fast free alternative to fal.ai for image generation when user asks to create, draw, generate, or visualize anything.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        prompt: { type: "string", description: "Detailed description of the image to generate including style, mood, lighting" },
+        negative_prompt: { type: "string", description: "Things to exclude from the image (optional)" },
+      },
+      required: ["prompt"],
+    },
+  },
+
+  // ── Cloudflare (admin only) ───────────────────────────────────────────────
+  {
+    name: "cloudflare",
+    description: "Manage Cloudflare security for aitaskflo.com. Admin only. Actions: 'security_level' (get/set security level), 'analytics' (get traffic/threat stats), 'firewall_rules' (list active rules), 'purge_cache' (purge all cached assets), 'zone_settings' (get zone config), 'blocked_ips' (list IP access rules), 'block_ip' (block an IP), 'unblock_ip' (unblock an IP).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        action: { type: "string", description: "Action to perform: analytics, security_level, firewall_rules, purge_cache, zone_settings, blocked_ips, block_ip, unblock_ip" },
+        ip: { type: "string", description: "IP address (required for block_ip and unblock_ip)" },
+        level: { type: "string", description: "Security level for security_level action: off, essentially_off, low, medium, high, under_attack" },
+      },
+      required: ["action"],
+    },
+  },
 ];
 
 export function pollinationsUrl(prompt: string): string {
