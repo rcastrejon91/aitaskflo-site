@@ -4,7 +4,7 @@ import { getActiveAgent, getAgent, incrementConversationCount } from "@/lib/lyra
 import { upsertUser, buildMemoryContext, extractAndStoreFacts, getSubscription, getTodayUsage, incrementUsage } from "@/lib/lyra/db";
 import { PLANS } from "@/lib/stripe";
 import { buildLearningContext } from "@/lib/lyra/weblearner";
-import { buildGameContext, detectEngine } from "@/lib/lyra/gamedev";
+import { buildGameContext, buildUserGamesContext, detectEngine } from "@/lib/lyra/gamedev";
 import { auth } from "@/auth";
 import { LYRA_TOOLS, getLunarPersonalityNote } from "@/lib/lyra/tools";
 import { streamGroqFallback, streamGrokFallback, streamOllamaFallback, streamOpenAIFallback, routeTask, streamParallelJudge } from "@/lib/lyra/streaming";
@@ -232,7 +232,8 @@ export async function POST(req: NextRequest) {
 
     const mindContext = await buildMindContext().catch(() => "");
     const milestoneNote = await getRecentMilestoneAnnouncement().catch(() => "");
-    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + buildLearningContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + gameOverride + toolOverride + milestoneNote;
+    const userGamesContext = userId ? buildUserGamesContext(userId) : "";
+    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + userGamesContext + buildLearningContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + gameOverride + toolOverride + milestoneNote;
 
     // ── 3. Build user content (text + optional images) ────────────────────
     type ImageBlock = { type: "image"; source: { type: "base64"; media_type: string; data: string } };

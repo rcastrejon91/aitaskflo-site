@@ -258,21 +258,32 @@ export function listExistingGames(): string[] {
 }
 
 export function buildGameContext(message: string): string {
-  // Always inject the list of existing games so Lyra always remembers them
-  const games = listExistingGames();
-  const gamesNote = games.length > 0
-    ? `\n\nGAMES YOU HAVE BUILT (on disk — always remember these when asked):\n${games.map(g => `  • ${g}`).join("\n")}\n`
-    : "";
-
   if (isGameTopic(message)) {
-    // Add inspiration note if a known game is referenced
     const inspiration = detectGameInspiration(message);
     const inspirationNote = inspiration
       ? `\nKNOWN GAME REFERENCE DETECTED — build inspired by this:\nGenre: ${inspiration.genre}\nConcept: ${inspiration.concept}\nKey features to include: ${inspiration.keyFeatures}\n`
       : "";
-    return GAME_DEV_CONTEXT + inspirationNote + gamesNote;
+    return GAME_DEV_CONTEXT + inspirationNote;
   }
-  return gamesNote;
+  return "";
+}
+
+// Per-user game list — only called with a specific userId, never injected globally
+export function buildUserGamesContext(userId: string): string {
+  try {
+    const games = listExistingGames();
+    if (games.length === 0) return "";
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getFacts } = require("@/lib/lyra/db") as typeof import("@/lib/lyra/db");
+    const facts = getFacts(userId, 50);
+    const gameFacts = facts.filter((f) => f.key.startsWith("game:"));
+    if (gameFacts.length === 0) return "";
+
+    return `\n\nGAMES YOU HAVE BUILT FOR THIS USER:\n${gameFacts.map(f => `  • ${f.value}`).join("\n")}\n`;
+  } catch {
+    return "";
+  }
 }
 
 // ── Genre-specific patterns ───────────────────────────────────────────────────
