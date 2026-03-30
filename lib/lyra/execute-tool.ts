@@ -388,6 +388,13 @@ export async function executeTool(
       export_url: result.exportUrl ?? "",
     });
     controller.enqueue(encoder.encode(`\n${card}`));
+
+    // Store game in user memory so Lyra always remembers it
+    if (userId) {
+      const { upsertFact } = await import("@/lib/lyra/db");
+      upsertFact(userId, `game: ${slug}`, `Built a ${genre} game called "${rawConcept}" (folder: ${slug}). ${result.summary.slice(0, 200)}`, 5);
+    }
+
     return `Game "${slug}" built — ${result.files.length} files written.`;
   }
 

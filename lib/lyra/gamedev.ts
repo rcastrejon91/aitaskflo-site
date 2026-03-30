@@ -235,16 +235,44 @@ export function detectGameInspiration(text: string): { genre: string; concept: s
  * Returns the full game dev context if the user message is game-related,
  * otherwise returns empty string.
  */
+// ── List games on disk ────────────────────────────────────────────────────────
+
+export function listExistingGames(): string[] {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require("fs") as typeof import("fs");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const path = require("path") as typeof import("path");
+    const BASE = process.env.GAME_DIR
+      ? path.dirname(process.env.GAME_DIR)
+      : "/home/aitaskflo/game";
+    if (!fs.existsSync(BASE)) return [];
+    return fs.readdirSync(BASE).filter((d: string) => {
+      try {
+        return fs.statSync(path.join(BASE, d)).isDirectory();
+      } catch { return false; }
+    });
+  } catch {
+    return [];
+  }
+}
+
 export function buildGameContext(message: string): string {
+  // Always inject the list of existing games so Lyra always remembers them
+  const games = listExistingGames();
+  const gamesNote = games.length > 0
+    ? `\n\nGAMES YOU HAVE BUILT (on disk — always remember these when asked):\n${games.map(g => `  • ${g}`).join("\n")}\n`
+    : "";
+
   if (isGameTopic(message)) {
     // Add inspiration note if a known game is referenced
     const inspiration = detectGameInspiration(message);
     const inspirationNote = inspiration
       ? `\nKNOWN GAME REFERENCE DETECTED — build inspired by this:\nGenre: ${inspiration.genre}\nConcept: ${inspiration.concept}\nKey features to include: ${inspiration.keyFeatures}\n`
       : "";
-    return GAME_DEV_CONTEXT + inspirationNote;
+    return GAME_DEV_CONTEXT + inspirationNote + gamesNote;
   }
-  return "";
+  return gamesNote;
 }
 
 // ── Genre-specific patterns ───────────────────────────────────────────────────
