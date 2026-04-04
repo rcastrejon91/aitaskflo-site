@@ -416,7 +416,8 @@ function GeneratedImage({ url, isGameContext }: { url: string; isGameContext?: b
   const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [retries, setRetries] = useState(0);
   const [gamePrompt, setGamePrompt] = useState<"idle" | "asked" | "added">("idle");
-  const MAX_RETRIES = 5;
+  const isFalUrl = url.includes("fal.media") || url.includes("fal.run") || url.includes("storage.googleapis") || url.startsWith("data:");
+  const MAX_RETRIES = isFalUrl ? 1 : 5;
 
   // Pollinations can take 20-30s on cold start — retry up to 5 times
   const handleError = () => {
@@ -435,8 +436,10 @@ function GeneratedImage({ url, isGameContext }: { url: string; isGameContext?: b
     setRetries(r => r + 1);
   };
 
-  // Add cache-busting param on retries so browser doesn't serve cached error
-  const imgUrl = retries > 0 ? `${url}&_r=${retries}` : url;
+  // Pollinations needs cache-busting on retry (cold-start); fal/CDN URLs don't use query params
+  const imgUrl = (retries > 0 && !isFalUrl)
+    ? `${url}${url.includes("?") ? "&" : "?"}_r=${retries}`
+    : url;
 
   return (
     <div className="mt-3 rounded-2xl overflow-hidden border border-white/10 bg-black/30">
