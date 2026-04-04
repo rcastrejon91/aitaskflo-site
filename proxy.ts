@@ -18,12 +18,19 @@ export default auth((req) => {
     if (provided === adminKey) return NextResponse.next();
   }
 
+  // Public routes — no auth required
+  const pathname = req.nextUrl.pathname;
+  const publicPaths = ["/play", "/api/game/build"];
+  if (publicPaths.some(p => pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
+
   if (!req.auth) {
-    if (req.nextUrl.pathname.startsWith("/api/")) {
+    if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("callbackUrl", req.nextUrl.pathname);
+    loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
 });

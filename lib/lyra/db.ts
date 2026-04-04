@@ -193,6 +193,40 @@ function initSchema(db: BetterSqlite3Db) {
     `);
   } catch { /* ignore */ }
 
+  // Add marketplace_games and game_ratings tables
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS marketplace_games (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        slug          TEXT UNIQUE NOT NULL,
+        title         TEXT NOT NULL,
+        genre         TEXT NOT NULL DEFAULT 'unknown',
+        engine        TEXT NOT NULL DEFAULT 'godot2d',
+        concept       TEXT,
+        thumbnail_url TEXT,
+        play_count    INTEGER DEFAULT 0,
+        avg_rating    REAL DEFAULT 0,
+        rating_count  INTEGER DEFAULT 0,
+        hidden        INTEGER DEFAULT 0,
+        featured      INTEGER DEFAULT 0,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS game_ratings (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        game_slug        TEXT NOT NULL,
+        user_fingerprint TEXT NOT NULL,
+        stars            INTEGER NOT NULL CHECK(stars >= 1 AND stars <= 5),
+        created_at       TEXT NOT NULL,
+        UNIQUE(game_slug, user_fingerprint),
+        FOREIGN KEY (game_slug) REFERENCES marketplace_games(slug)
+      );
+      CREATE INDEX IF NOT EXISTS idx_marketplace_trending ON marketplace_games(play_count DESC, avg_rating DESC);
+      CREATE INDEX IF NOT EXISTS idx_marketplace_newest ON marketplace_games(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_game_ratings_slug ON game_ratings(game_slug);
+    `);
+  } catch { /* ignore */ }
+
   // Migrate existing facts table to add new columns if they don't exist
   try {
     db.exec(`ALTER TABLE facts ADD COLUMN importance INTEGER DEFAULT 3`);
@@ -784,6 +818,153 @@ export function getGoogleTokens(userId: string): DbGoogleTokens | null {
   if (!db) return null;
   try {
     return (db.prepare("SELECT * FROM google_tokens WHERE user_id = ?").get(userId) as DbGoogleTokens) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// ── Marketplace Games ──────────────────────────────────────────────────────────
+
+export interface MarketplaceGame {
+  id: number;
+  slug: string;
+  title: string;
+  genre: string;
+  engine: string;
+  concept: string | null;
+  thumbnail_url: string | null;
+  play_count: number;
+  avg_rating: number;
+  rating_count: number;
+  hidden: number;
+  featured: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export function saveMarketplaceGame(game: {
+  slug: string;
+  title: string;
+  genre: string;
+  engine: string;
+  concept?: string;
+  thumbnail_url?: string;
+}): MarketplaceGame | null {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO marketplace_games (slug, title, genre, engine, concept, thumbnail_url, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(slug) DO UPDATE SET
+        title = excluded.title,
+        genre = excluded.genre,
+        engine = excluded.engine,
+        concept = COALESCE(excluded.concept, concept),
+        thumbnail_url = COALESCE(excluded.thumbnail_url, thumbnail_url),
+        updated_at = excluded.updated_at
+    `).run(game.slug, game.title, game.genre, game.engine, game.concept ?? null, game.thumbnail_url ?? null, now, now);
+    return (db.prepare("SELECT * FROM marketplace_games WHERE slug = ?").get(game.slug) as MarketplaceGame) ?? null;
+  } catch (err) {
+    console.error("[Lyra DB] saveMarketplaceGame error:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+export function getMarketplaceGame(slug: string): MarketplaceGame | null {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    return (db.prepare("SELECT * FROM marketplace_games WHERE slug = ?").get(slug) as MarketplaceGame) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function listMarketplaceGames(sort: "trending" | "newest" | "top_rated" = "trending", limit = 50): MarketplaceGame[] {
+  const db = getDb();
+  if (!db) return [];
+  try {
+    const orderBy = sort === "newest"
+      ? "created_at DESC"
+      : sort === "top_rated"
+      ? "avg_rating DESC, rating_count DESC"
+      : "(play_count * 0.6 + avg_rating * rating_count * 0.4) DESC";
+    return db.prepare(`SELECT * FROM marketplace_games WHERE hidden = 0 ORDER BY ${orderBy} LIMIT ?`).all(limit) as MarketplaceGame[];
+  } catch {
+    return [];
+  }
+}
+
+export function incrementPlayCount(slug: string): void {
+  const db = getDb();
+  if (!db) return;
+  try {
+    db.prepare("UPDATE marketplace_games SET play_count = play_count + 1, updated_at = ? WHERE slug = ?")
+      .run(new Date().toISOString(), slug);
+  } catch { /* ignore */ }
+}
+
+export function rateGame(slug: string, fingerprint: string, stars: number): { avg_rating: number; rating_count: number } | null {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO game_ratings (game_slug, user_fingerprint, stars, created_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(game_slug, user_fingerprint) DO UPDATE SET stars = excluded.stars
+    `).run(slug, fingerprint, stars, now);
+    // Recalculate avg
+    const stats = db.prepare("SELECT AVG(stars) as avg, COUNT(*) as cnt FROM game_ratings WHERE game_slug = ?").get(slug) as { avg: number; cnt: number };
+    db.prepare("UPDATE marketplace_games SET avg_rating = ?, rating_count = ?, updated_at = ? WHERE slug = ?")
+      .run(Math.round(stats.avg * 10) / 10, stats.cnt, now, slug);
+    return { avg_rating: Math.round(stats.avg * 10) / 10, rating_count: stats.cnt };
+  } catch (err) {
+    console.error("[Lyra DB] rateGame error:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+export function getUserRating(slug: string, fingerprint: string): number | null {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    const row = db.prepare("SELECT stars FROM game_ratings WHERE game_slug = ? AND user_fingerprint = ?").get(slug, fingerprint) as { stars: number } | undefined;
+    return row?.stars ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function setGameHidden(slug: string, hidden: boolean): void {
+  const db = getDb();
+  if (!db) return;
+  try {
+    db.prepare("UPDATE marketplace_games SET hidden = ?, updated_at = ? WHERE slug = ?")
+      .run(hidden ? 1 : 0, new Date().toISOString(), slug);
+  } catch { /* ignore */ }
+}
+
+export function setGameFeatured(slug: string, featured: boolean): void {
+  const db = getDb();
+  if (!db) return;
+  try {
+    // Ensure column exists (migration for existing DBs)
+    try { db.exec("ALTER TABLE marketplace_games ADD COLUMN featured INTEGER DEFAULT 0"); } catch { /* already exists */ }
+    // Only one featured game at a time — clear existing first
+    if (featured) db.prepare("UPDATE marketplace_games SET featured = 0").run();
+    db.prepare("UPDATE marketplace_games SET featured = ?, updated_at = ? WHERE slug = ?")
+      .run(featured ? 1 : 0, new Date().toISOString(), slug);
+  } catch { /* ignore */ }
+}
+
+export function getFeaturedGame(): MarketplaceGame | null {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    return (db.prepare("SELECT * FROM marketplace_games WHERE featured = 1 AND hidden = 0 LIMIT 1").get() as MarketplaceGame) ?? null;
   } catch {
     return null;
   }

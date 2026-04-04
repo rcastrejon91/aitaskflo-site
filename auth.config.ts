@@ -12,6 +12,15 @@ export const authConfig: NextAuthConfig = {
       if (apiKey && process.env.ADMIN_PASSWORD && apiKey === process.env.ADMIN_PASSWORD) {
         return true;
       }
+      // Public routes — no auth required
+      const pathname = request?.nextUrl?.pathname ?? "";
+      const publicPaths = [
+        "/api/game/build",   // game build status check
+        "/api/games",        // marketplace game list + ratings + play count
+        "/games",            // marketplace UI pages
+        "/play",             // game player page
+      ];
+      if (publicPaths.some(p => pathname.startsWith(p))) return true;
       return !!auth;
     },
     jwt({ token, user }) {

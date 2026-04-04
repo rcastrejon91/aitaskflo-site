@@ -41,14 +41,8 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET(req: NextRequest) {
-  // Check whether a build already exists
-  const adminKey = process.env.ADMIN_PASSWORD ?? process.env.ADMIN_KEY;
-  const provided  = req.headers.get("x-admin-key") ?? req.nextUrl.searchParams.get("key");
-  if (adminKey && provided !== adminKey) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export async function GET(_req: NextRequest) {
+  // Public — just checks whether a web export exists, no auth needed
   const outDir = path.join(process.cwd(), "public", "game");
   const exists = await fsp.access(path.join(outDir, "index.html")).then(() => true).catch(() => false);
   let buildTime: string | null = null;

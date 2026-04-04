@@ -11,7 +11,7 @@ import fsp from "fs/promises";
 import nodePath from "path";
 import { exec as _exec } from "child_process";
 import { promisify } from "util";
-import { getGenrePatterns, get3DGenrePatterns } from "./gamedev";
+import { getGenrePatterns, get3DGenrePatterns, getBabylonPatterns, getPhaserPatterns, getThreeJsPatterns } from "./gamedev";
 
 const execAsync = promisify(_exec);
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -127,9 +127,125 @@ const BUILDER_TOOLS: Anthropic.Tool[] = [
   },
 ];
 
+// ── Browser phase system prompts ──────────────────────────────────────────────
+
+function buildBrowserPhasePrompt(
+  phase: "design" | "build" | "polish" | "verify",
+  concept: string,
+  genre: string,
+  engine: "phaser" | "threejs" | "babylon"
+): string {
+  const engineName = engine === "phaser" ? "Phaser 3" : engine === "babylon" ? "Babylon.js" : "Three.js";
+  const cdnUrl = engine === "phaser"
+    ? "https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"
+    : engine === "babylon"
+    ? "https://cdn.babylonjs.com/babylon.js"
+    : "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+
+  const enginePatterns = engine === "phaser"
+    ? getPhaserPatterns(genre)
+    : engine === "babylon"
+    ? getBabylonPatterns(genre)
+    : getThreeJsPatterns(genre);
+
+  const base = `You are Lyra, a world-class senior game developer building a ${genre} browser game using ${engineName}.
+Concept: "${concept}"
+CDN: <script src="${cdnUrl}"></script>
+
+${enginePatterns}
+
+CODE RULES:
+- Single index.html file, all CSS and JS inline
+- No external assets — generate all graphics programmatically (Canvas API, CSS shapes, or engine primitives)
+- Score system clearly visible on screen
+- Lives/health system
+- Game Over screen with final score and restart button
+- Win condition or endless play with increasing difficulty
+- Smooth gameplay, responsive controls`;
+
+  switch (phase) {
+    case "design":
+      return `${base}
+
+PHASE 1 — DESIGN
+Write DESIGN.md in ONE write_file call. Then call done().
+No text narration — just the two tool calls.
+
+DESIGN.md must contain:
+- Core game loop (what the player does every second)
+- Controls (keyboard + mouse/touch)
+- Player mechanics and stats
+- Enemy/obstacle types and behaviors
+- Win/lose conditions
+- Visual style approach (colors, shapes)`;
+
+    case "build":
+      return `${base}
+
+PHASE 2 — BUILD
+Write the COMPLETE, PLAYABLE game as index.html in ONE write_file call.
+Path: index.html
+The file must be self-contained: CDN script, all CSS, all JS, all game logic inline.
+
+REQUIRED SYSTEMS:
+✓ CDN script tag at top of <head>
+✓ Full game loop (requestAnimationFrame or engine loop)
+✓ Player movement and controls
+✓ Enemy/obstacle system with multiple types
+✓ Score tracking displayed on screen
+✓ Lives/health with visual indicator
+✓ Collision detection
+✓ Increasing difficulty over time
+✓ Game Over screen: show score, restart button
+✓ Visual feedback on hits (flash, particles, or color change)
+
+Write the complete file, then call done().`;
+
+    case "polish":
+      return `${base}
+
+PHASE 3 — POLISH
+First call read_file with path "index.html" to see the current game.
+Then rewrite it with these improvements:
+
+1. Screen shake on damage (offset canvas or camera)
+2. Particle burst on enemy death (use canvas arcs or engine particles)
+3. Smooth acceleration/deceleration instead of instant velocity
+4. Sound effects via Web Audio API (short generated tones — no files needed):
+   const ctx = new AudioContext();
+   function playBeep(freq, duration) { const o=ctx.createOscillator(); const g=ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.value=freq; g.gain.setValueAtTime(0.3,ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+duration); o.start(); o.stop(ctx.currentTime+duration); }
+5. Power-ups or collectibles with visual pop
+6. Combo counter or multiplier system
+7. Better game feel: enemy variety, visual distinction, animations
+
+Write the improved index.html. Call done() when complete.`;
+
+    case "verify":
+      return `${base}
+
+PHASE 4 — VERIFY
+Read index.html. Check for and fix:
+1. Any JavaScript errors or undefined variable references
+2. Missing event listener attachments
+3. requestAnimationFrame or engine loop running correctly
+4. All buttons (restart, menu) connected and working
+5. Score and health display updating correctly
+6. Mobile: add touch event support if missing
+   canvas.addEventListener('touchstart', e => { e.preventDefault(); handleTouch(e.touches[0]); }, {passive:false});
+
+Fix any issues. Write the corrected index.html.
+Then call done() with final summary.`;
+  }
+}
+
 // ── Phase system prompts ──────────────────────────────────────────────────────
 
-function buildPhasePrompt(phase: "design" | "build" | "polish" | "verify", concept: string, genre: string, gameDir: string, engine: "godot2d" | "godot3d" | "phaser" | "threejs" = "godot2d", spriteManifest: SpriteManifest = {}): string {
+function buildPhasePrompt(phase: "design" | "build" | "polish" | "verify", concept: string, genre: string, gameDir: string, engine: "godot2d" | "godot3d" | "phaser" | "threejs" | "babylon" = "godot2d", spriteManifest: SpriteManifest = {}): string {
+  // Browser engine path
+  if (engine === "phaser" || engine === "threejs" || engine === "babylon") {
+    return buildBrowserPhasePrompt(phase, concept, genre, engine);
+  }
+
   const genrePatterns = engine === "godot3d" ? get3DGenrePatterns(genre) : getGenrePatterns(genre);
   const is3D = engine === "godot3d";
 
@@ -554,7 +670,7 @@ async function runPhase(
   onProgress: (p: BuildProgress) => void,
   maxTurns: number,
   allFilesWritten: string[],
-  engine: "godot2d" | "godot3d" | "phaser" | "threejs" = "godot2d",
+  engine: "godot2d" | "godot3d" | "phaser" | "threejs" | "babylon" = "godot2d",
   spriteManifest: SpriteManifest = {}
 ): Promise<{ summary?: string; files?: string[]; playInstructions?: string }> {
   const systemPrompt = buildPhasePrompt(phase, concept, genre, gameDir, engine, spriteManifest);
@@ -562,11 +678,20 @@ async function runPhase(
   const phaseNames = { design: "Designing game architecture", build: "Building the game", polish: "Polishing and adding juice", verify: "Verifying and committing" };
   onProgress({ type: "phase", message: phaseNames[phase] });
 
+  const isBrowser = engine === "phaser" || engine === "threejs" || engine === "babylon";
   const initMessages: Record<string, string> = {
-    design: `Write DESIGN.md now. Concept: "${concept}", Genre: ${genre}. ONE write_file call, then done(). No text output — just the two tool calls.`,
-    build: `START WRITING FILES NOW. First tool call: write_files with project.godot + all autoloads. Do not output any text — go straight to tool calls. Keep writing files until everything is done, then call done(). Every turn must have at least one write_file or write_files call.`,
-    polish: `List files, read Player.gd, then write improvements. No text narration — straight to tool calls.`,
-    verify: `Read key scripts, fix issues, run git commit, call done(). No narration — tool calls only.`,
+    design: isBrowser
+      ? `Write DESIGN.md now for this browser game. ONE write_file call, then done(). No text output.`
+      : `Write DESIGN.md now. Concept: "${concept}", Genre: ${genre}. ONE write_file call, then done(). No text output — just the two tool calls.`,
+    build: isBrowser
+      ? `Write the complete game as index.html NOW. Use write_file with path "index.html". Include ALL game logic inline — CDN script, CSS, JS, everything. No text output — straight to write_file then done().`
+      : `START WRITING FILES NOW. First tool call: write_files with project.godot + all autoloads. Do not output any text — go straight to tool calls. Keep writing files until everything is done, then call done(). Every turn must have at least one write_file or write_files call.`,
+    polish: isBrowser
+      ? `Read index.html first, then rewrite it with improvements. No text narration — straight to tool calls.`
+      : `List files, read Player.gd, then write improvements. No text narration — straight to tool calls.`,
+    verify: isBrowser
+      ? `Read index.html, fix any issues found, write the corrected file, then call done(). No narration — tool calls only.`
+      : `Read key scripts, fix issues, run git commit, call done(). No narration — tool calls only.`,
   };
 
   const messages: Anthropic.MessageParam[] = [
@@ -674,65 +799,46 @@ async function runPhase(
   return {};
 }
 
-// ── Browser game builder (Phaser / Three.js) ─────────────────────────────────
+// ── Browser game builder (Phaser / Three.js / Babylon.js — 4-phase loop) ──────
 
 async function buildBrowserGame(
   concept: string,
   genre: string,
-  engine: "phaser" | "threejs",
+  engine: "phaser" | "threejs" | "babylon",
   gameDir: string,
-  onProgress: (p: BuildProgress) => void
+  onProgress: (p: BuildProgress) => void,
+  maxTurns: number = 20
 ): Promise<BuildResult> {
-  const engineName = engine === "phaser" ? "Phaser 3" : "Three.js";
+  const engineName = engine === "phaser" ? "Phaser 3" : engine === "babylon" ? "Babylon.js" : "Three.js";
   const cdnUrl = engine === "phaser"
     ? "https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"
+    : engine === "babylon"
+    ? "https://cdn.babylonjs.com/babylon.js"
     : "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
 
-  onProgress({ type: "phase", message: `Building ${engineName} browser game…` });
+  onProgress({ type: "phase", message: `Building ${engineName} browser game (4-phase loop)…` });
 
   const artUrls = generateGameArt(concept, genre);
   onProgress({ type: "art", message: "Concept art ready", artUrls });
 
-  const prompt = `Write a complete, playable ${genre} game using ${engineName}. Single HTML file, all code inline, CDN script tag included. Concept: ${concept}. Make it fun, polished, with score/lives/game-over screen. Return ONLY the complete HTML file content, nothing else.
-
-Requirements:
-- CDN: <script src="${cdnUrl}"></script>
-- All game logic inline in the HTML file
-- Score system clearly visible
-- Lives or health system
-- Game Over screen with final score + restart button
-- Win condition or endless play with increasing difficulty
-- Smooth gameplay, responsive controls
-- No external assets required — generate all graphics programmatically`;
-
-  const response = await client.messages.create({
-    model: "claude-opus-4-6",
-    max_tokens: 8000,
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  const htmlContent = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map(b => b.text)
-    .join("");
-
-  // Extract just the HTML if Claude added explanation text
-  const htmlMatch = htmlContent.match(/<!DOCTYPE html>[\s\S]*/i) ?? [htmlContent];
-  const html = htmlMatch[0];
-
-  // Write to gameDir/index.html
   await fsp.mkdir(gameDir, { recursive: true });
-  const localPath = nodePath.join(gameDir, "index.html");
-  await fsp.writeFile(localPath, html, "utf-8");
-  onProgress({ type: "file", message: "index.html" });
+  const allFilesWritten: string[] = [];
 
-  // Copy to public/games/<slug>/index.html for immediate serving
+  // 4-phase iterative loop (same as Godot but tuned for browser games)
+  await runPhase("design", concept, genre, gameDir, onProgress, 3, allFilesWritten, engine, {});
+  const buildResult = await runPhase("build", concept, genre, gameDir, onProgress, Math.floor(maxTurns * 0.5), allFilesWritten, engine, {});
+  const polishResult = await runPhase("polish", concept, genre, gameDir, onProgress, Math.floor(maxTurns * 0.3), allFilesWritten, engine, {});
+  const verifyResult = await runPhase("verify", concept, genre, gameDir, onProgress, Math.floor(maxTurns * 0.2), allFilesWritten, engine, {});
+
+  // Copy final index.html to public games dir
   const slug = nodePath.basename(gameDir);
   const publicDir = process.env.NEXT_PUBLIC_GAME_HOST_DIR ?? "/var/www/aitaskflo/public/games";
   const exportDir = nodePath.join(publicDir, slug);
   let exportUrl: string | undefined;
   try {
     await fsp.mkdir(exportDir, { recursive: true });
+    const localIndexPath = nodePath.join(gameDir, "index.html");
+    const html = await fsp.readFile(localIndexPath, "utf-8");
     await fsp.writeFile(nodePath.join(exportDir, "index.html"), html, "utf-8");
     const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
     exportUrl = `${baseUrl}/games/${slug}/`;
@@ -741,8 +847,10 @@ Requirements:
     // Public dir may not exist in dev — that's fine
   }
 
-  const files = ["index.html"];
-  const summary = `Complete ${genre} browser game built with ${engineName} from concept: "${concept}". Single HTML file with all game code inline.`;
+  const files = verifyResult.files ?? polishResult.files ?? buildResult.files ?? allFilesWritten;
+  const summary = verifyResult.summary ?? polishResult.summary ?? buildResult.summary
+    ?? `Complete ${genre} browser game built with ${engineName} from concept: "${concept}". Built across 4 iterative phases.`;
+  const localPath = nodePath.join(gameDir, "index.html");
   const playInstructions = exportUrl
     ? `Open ${exportUrl} in your browser to play.`
     : `Open ${localPath} in your browser to play. No server required.`;
@@ -760,11 +868,11 @@ export async function buildGame(
   gameDir: string,
   onProgress: (p: BuildProgress) => void,
   maxTurns: number = 30,
-  engine: "godot2d" | "godot3d" | "phaser" | "threejs" = "godot2d"
+  engine: "godot2d" | "godot3d" | "phaser" | "threejs" | "babylon" = "godot2d"
 ): Promise<BuildResult> {
-  // Browser games (Phaser / Three.js) — fast single-call path
-  if (engine === "phaser" || engine === "threejs") {
-    return buildBrowserGame(concept, genre, engine, gameDir, onProgress);
+  // Browser games (Phaser / Three.js / Babylon.js) — 4-phase iterative loop
+  if (engine === "phaser" || engine === "threejs" || engine === "babylon") {
+    return buildBrowserGame(concept, genre, engine, gameDir, onProgress, maxTurns);
   }
 
   await fsp.mkdir(gameDir, { recursive: true });

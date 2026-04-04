@@ -18,17 +18,15 @@ export default function PlayPage() {
     checkBuild(saved);
   }, []);
 
-  async function checkBuild(key: string) {
+  async function checkBuild(_key: string) {
     try {
-      const res = await fetch(`/api/game/build?key=${encodeURIComponent(key)}`, {
-        headers: key ? { "x-admin-key": key } : {},
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setBuilt(data.built);
-        setBuildTime(data.buildTime);
-      }
-    } catch { /* ignore */ }
+      const res = await fetch("/api/game/build");
+      const data = await res.json();
+      setBuilt(data.built ?? false);
+      setBuildTime(data.buildTime ?? null);
+    } catch {
+      setBuilt(false);
+    }
   }
 
   async function triggerBuild() {

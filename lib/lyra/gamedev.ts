@@ -14,6 +14,7 @@ const GAME_KEYWORDS = [
   "roguelike", "dungeon", "npc", "dialogue", "quest", "boss", "loot",
   "particle", "sound", "music", "ui", "hud", "menu", "save", "load",
   "3d", "fps", "first person", "third person", "open world", "phaser", "threejs", "browser game",
+  "babylon", "tactics", "deck", "deck-building", "card game", "turn-based", "strategy",
 ];
 
 export function isGameTopic(text: string): boolean {
@@ -169,6 +170,126 @@ func load_game():
   var file = FileAccess.open("user://save.json", FileAccess.READ)
   var data = JSON.parse_string(file.get_as_text())
 
+────────────────────────────────────────
+SHADER PATTERNS (Godot 4 — attach as ShaderMaterial)
+────────────────────────────────────────
+• Outline shader (2D):
+  shader_type canvas_item;
+  uniform vec4 outline_color: source_color = vec4(0,0,0,1);
+  uniform float outline_size: hint_range(0,10) = 2.0;
+  void fragment() {
+    vec4 col = texture(TEXTURE, UV);
+    float a = col.a;
+    a = max(a, texture(TEXTURE, UV + vec2(outline_size * TEXTURE_PIXEL_SIZE.x, 0)).a);
+    a = max(a, texture(TEXTURE, UV - vec2(outline_size * TEXTURE_PIXEL_SIZE.x, 0)).a);
+    a = max(a, texture(TEXTURE, UV + vec2(0, outline_size * TEXTURE_PIXEL_SIZE.y)).a);
+    a = max(a, texture(TEXTURE, UV - vec2(0, outline_size * TEXTURE_PIXEL_SIZE.y)).a);
+    COLOR = mix(outline_color, col, col.a);
+    COLOR.a = a;
+  }
+
+• Hurt flash (red tint):
+  shader_type canvas_item;
+  uniform float flash_amount: hint_range(0,1) = 0.0;
+  void fragment() {
+    vec4 col = texture(TEXTURE, UV);
+    col.rgb = mix(col.rgb, vec3(1,0,0), flash_amount);
+    COLOR = col;
+  }
+  # In GDScript: hurt_material.set_shader_parameter("flash_amount", 1.0)
+  # then tween to 0 over 0.2s
+
+• Dissolve shader:
+  shader_type canvas_item;
+  uniform float dissolve: hint_range(0,1) = 0.0;
+  uniform sampler2D noise_texture;
+  void fragment() {
+    vec4 col = texture(TEXTURE, UV);
+    float noise = texture(noise_texture, UV).r;
+    col.a *= step(dissolve, noise);
+    COLOR = col;
+  }
+  # Set dissolve from 0→1 on death for crumble effect
+
+• Water ripple (2D):
+  shader_type canvas_item;
+  uniform float wave_speed: hint_range(0.1, 5.0) = 1.5;
+  uniform float wave_strength: hint_range(0.0, 0.05) = 0.01;
+  void fragment() {
+    vec2 uv = UV;
+    uv.x += sin(uv.y * 20.0 + TIME * wave_speed) * wave_strength;
+    uv.y += cos(uv.x * 20.0 + TIME * wave_speed) * wave_strength * 0.5;
+    COLOR = texture(TEXTURE, uv);
+  }
+
+────────────────────────────────────────
+MOBILE TOUCH CONTROLS (Godot 4)
+────────────────────────────────────────
+• Virtual joystick (CanvasLayer overlay):
+  # VirtualJoystick.gd — attach to CanvasLayer
+  @export var dead_zone: float = 10.0
+  var touching: bool = false
+  var touch_id: int = -1
+  var origin: Vector2 = Vector2.ZERO
+  var current: Vector2 = Vector2.ZERO
+  var max_radius: float = 80.0
+
+  func get_vector() -> Vector2:
+    if not touching: return Vector2.ZERO
+    var delta = current - origin
+    if delta.length() < dead_zone: return Vector2.ZERO
+    return delta.normalized() * min(delta.length() / max_radius, 1.0)
+
+  func _input(event: InputEvent) -> void:
+    if event is InputEventScreenTouch:
+      if event.pressed and not touching and event.position.x < 400:
+        touching = true; touch_id = event.index; origin = event.position
+        $Base.global_position = origin; $Stick.global_position = origin
+      elif not event.pressed and event.index == touch_id:
+        touching = false; touch_id = -1; $Stick.global_position = origin
+    if event is InputEventScreenDrag and event.index == touch_id:
+      var delta = event.position - origin
+      var clamped = delta.normalized() * min(delta.length(), max_radius)
+      current = origin + clamped; $Stick.global_position = current
+
+• Touch action buttons (right side of screen):
+  # In HUD.tscn: add TouchScreenButton nodes for jump/attack
+  # TouchScreenButton has action property — connects to InputMap
+  # Set shape = CircleShape2D, texture for the button image
+  # PassByPress = true for continuous hold detection
+
+• Detect mobile: OS.get_name() in ["Android", "iOS"] to show/hide virtual controls
+
+────────────────────────────────────────
+DYNAMIC MUSIC SYSTEM (intensity-based layers)
+────────────────────────────────────────
+# AudioManager autoload with layered stems:
+# Each track has multiple AudioStreamPlayer nodes (bass, drums, melody, tension)
+# Fade layers in/out based on game intensity
+
+var intensity: float = 0.0  # 0=calm, 1=combat
+var layers: Array[AudioStreamPlayer] = []  # [bass, drums, melody, tension]
+const LAYER_TARGETS = [
+  [0.0, 0.0, 0.0, 0.0],  # silence
+  [1.0, 0.0, 0.0, 0.0],  # exploration (bass only)
+  [1.0, 1.0, 0.0, 0.0],  # alert (bass+drums)
+  [1.0, 1.0, 1.0, 0.0],  # chase (full band)
+  [1.0, 1.0, 1.0, 1.0],  # boss (all layers+tension)
+]
+
+func set_intensity(new_intensity: float, transition_time: float = 2.0):
+  intensity = clamp(new_intensity, 0.0, 1.0)
+  var tier = int(intensity * 4)
+  var targets = LAYER_TARGETS[tier]
+  for i in layers.size():
+    create_tween().tween_property(layers[i], "volume_db",
+      linear_to_db(targets[i]) if targets[i] > 0 else -80.0, transition_time)
+
+# Usage: AudioManager.set_intensity(0.2)  # exploration
+#         AudioManager.set_intensity(0.75) # combat
+#         AudioManager.set_intensity(1.0)  # boss
+# Trigger on: enemy spotted (0.75), enemy killed (0.4), entering safe room (0.0)
+
 ══════════════════ END GAME BRAIN ══════════════════
 `;
 
@@ -215,6 +336,26 @@ export const GAME_INSPIRATIONS: Record<string, { genre: string; concept: string;
     genre: "rpg",
     concept: "open world dark fantasy RPG as a monster hunter navigating morally grey choices",
     keyFeatures: "sign magic system (5 spells), alchemy potions with toxicity, bestiary, dialogue choices with consequences, crossbow, two sword styles",
+  },
+  "xcom": {
+    genre: "tactics",
+    concept: "turn-based tactical squad combat — move and shoot on a grid, manage cover and overwatch",
+    keyFeatures: "action points per unit, cover system (half/full cover % bonus), overwatch ambush, permadeath soldiers with persistent names/rank, fog of war, base management between missions",
+  },
+  "fire emblem": {
+    genre: "tactics",
+    concept: "turn-based tactics on a grid with story-driven characters, weapon triangle system",
+    keyFeatures: "weapon triangle (sword>axe>lance), support conversations build relationship bonuses, permadeath (classic mode), pair-up/dual system, class promotion, map objectives beyond killing",
+  },
+  "slay the spire": {
+    genre: "deck_building",
+    concept: "roguelike deck-builder — build a card deck through runs, fight turn-based encounters",
+    keyFeatures: "energy per turn (play cards that cost energy), relics that modify rules, map branching path choices, elite/boss fights, card upgrades at campfires, 3 distinct character classes with unique card sets",
+  },
+  "ftl": {
+    genre: "deck_building",
+    concept: "spaceship roguelite — manage crew and systems in real-time pause combat across a sector map",
+    keyFeatures: "pause to give orders, target enemy subsystems (shields/weapons/engines), crew manning rooms, fire/breach hull damage, FTL jump to next beacon, permadeath run structure, random event text encounters",
   },
 };
 
@@ -563,6 +704,217 @@ Overall mood = weighted average of all needs → drives animation blending, spee
     add_child(bubble)
     await get_tree().create_timer(duration).timeout
     bubble.queue_free()
+`,
+
+    tactics: `
+TURN-BASED TACTICS PATTERNS (XCOM / Fire Emblem style):
+
+────────── GRID + MOVEMENT ──────────
+const TILE_SIZE = 64
+var grid: Array[Array] = []   # 2D array of TileData objects
+class TileData:
+  var walkable: bool = true
+  var cover: int = 0           # 0=none, 1=half, 2=full
+  var occupant: Node = null    # unit standing here
+
+func get_tiles_in_range(origin: Vector2i, move_range: int) -> Array[Vector2i]:
+  var result = []; var visited = {}
+  var queue = [[origin, move_range]]
+  while queue.size() > 0:
+    var item = queue.pop_front()
+    var pos: Vector2i = item[0]; var rem: int = item[1]
+    if visited.has(pos): continue
+    visited[pos] = true; result.append(pos)
+    if rem == 0: continue
+    for dir in [Vector2i(1,0),Vector2i(-1,0),Vector2i(0,1),Vector2i(0,-1)]:
+      var next = pos + dir
+      if is_in_bounds(next) and grid[next.y][next.x].walkable and not grid[next.y][next.x].occupant:
+        queue.append([next, rem - 1])
+  return result
+
+────────── ACTION POINTS ──────────
+var units: Array[Unit] = []
+var current_unit_idx: int = 0
+var turn: int = 1
+var phase: String = "player"  # "player" or "enemy"
+
+class Unit:
+  var unit_name: String; var team: int   # 0=player, 1=enemy
+  var max_hp: int = 20; var hp: int = 20
+  var move_range: int = 4; var attack_range: int = 1
+  var action_points: int = 2; var max_ap: int = 2
+  var grid_pos: Vector2i
+  var has_moved: bool = false; var has_acted: bool = false
+  var cover_bonus: int = 0   # from current tile
+
+func end_unit_turn():
+  current_unit_idx = (current_unit_idx + 1) % units.size()
+  if current_unit_idx == 0:
+    turn += 1; _start_new_round()
+  var unit = units[current_unit_idx]
+  unit.has_moved = false; unit.has_acted = false; unit.action_points = unit.max_ap
+
+────────── COVER + HIT CHANCE ──────────
+func calc_hit_chance(attacker: Unit, target: Unit) -> float:
+  var base = 0.75
+  var cover_reduction = [0.0, 0.25, 0.50]  # none/half/full
+  var range_penalty = max(0.0, (grid_distance(attacker.grid_pos, target.grid_pos) - 2) * 0.05)
+  return clamp(base - cover_reduction[target.cover_bonus] - range_penalty, 0.05, 0.95)
+
+func attack(attacker: Unit, target: Unit):
+  var hit = randf() <= calc_hit_chance(attacker, target)
+  if hit:
+    var damage = attacker.attack_stat + randi_range(-2, 2)
+    target.hp -= damage
+    damage_label.show(target.grid_pos, damage, false)
+    if target.hp <= 0: _kill_unit(target)
+  else:
+    damage_label.show(target.grid_pos, "MISS", true)
+  attacker.has_acted = true
+
+────────── FOG OF WAR ──────────
+var visible_tiles: Dictionary = {}
+func update_fog_of_war():
+  visible_tiles.clear()
+  for unit in units:
+    if unit.team != 0: continue
+    for tile in get_tiles_in_range(unit.grid_pos, unit.sight_range):
+      visible_tiles[tile] = true
+  # Set tile/enemy opacity based on visibility
+  for enemy in get_tree().get_nodes_in_group("enemies"):
+    enemy.visible = visible_tiles.has(enemy.grid_pos)
+
+────────── AI (enemy turn) ──────────
+func run_enemy_ai():
+  for unit in units:
+    if unit.team != 1 or unit.hp <= 0: continue
+    # Find nearest player unit
+    var target = _nearest_player_unit(unit)
+    if target == null: continue
+    var dist = grid_distance(unit.grid_pos, target.grid_pos)
+    # Move toward target if out of attack range
+    if dist > unit.attack_range and not unit.has_moved:
+      var path = _pathfind_toward(unit, target.grid_pos, unit.move_range)
+      if path.size() > 0: _move_unit(unit, path[-1])
+    # Attack if in range
+    if grid_distance(unit.grid_pos, target.grid_pos) <= unit.attack_range and not unit.has_acted:
+      attack(unit, target)
+  end_unit_turn()
+`,
+
+    deck_building: `
+DECK-BUILDING ROGUELIKE PATTERNS (Slay the Spire style):
+
+────────── CARD SYSTEM ──────────
+class_name CardData extends Resource
+@export var card_name: String
+@export var card_type: String  # "attack", "skill", "power"
+@export var energy_cost: int = 1
+@export var description: String
+@export var effects: Array[Dictionary] = []
+# effects example: [{"type":"damage","value":6},{"type":"draw","value":1}]
+
+var deck: Array[CardData] = []     # full deck
+var hand: Array[CardData] = []     # current hand (5 cards)
+var discard: Array[CardData] = []  # played cards
+var exhaust: Array[CardData] = []  # exhausted this run
+
+func draw_cards(count: int = 5):
+  for i in count:
+    if deck.is_empty():
+      deck = discard.duplicate(); discard.clear()
+      deck.shuffle()
+    if deck.is_empty(): break
+    hand.append(deck.pop_back())
+  hand_updated.emit(hand)
+
+func play_card(card: CardData, target = null):
+  if energy < card.energy_cost: return
+  energy -= card.energy_cost
+  for effect in card.effects:
+    _apply_effect(effect, target)
+  hand.erase(card)
+  if not card.exhausted: discard.append(card)
+  else: exhaust.append(card)
+  hand_updated.emit(hand)
+
+────────── ENERGY + TURN ──────────
+var max_energy: int = 3; var energy: int = 3
+var block: int = 0      # reset each turn
+var player_hp: int = 80; var max_hp: int = 80
+
+func start_player_turn():
+  energy = max_energy
+  block = 0  # or keep block if relic says so
+  draw_cards(5)
+  turn_started.emit()
+
+func end_player_turn():
+  hand.append_array(hand)   # discard remaining hand
+  discard.append_array(hand); hand.clear()
+  _run_enemy_intents()
+
+────────── ENEMY INTENT SYSTEM ──────────
+class EnemyIntent:
+  var intent_type: String  # "attack","block","buff","debuff"
+  var value: int; var icon: Texture2D
+
+class Enemy:
+  var hp: int; var max_hp: int
+  var block: int = 0
+  var intent: EnemyIntent
+  var intent_pattern: Array[EnemyIntent] = []  # cycles through
+  var pattern_idx: int = 0
+
+  func get_next_intent() -> EnemyIntent:
+    intent = intent_pattern[pattern_idx % intent_pattern.size()]
+    pattern_idx += 1; return intent
+
+  func execute_intent(player):
+    match intent.intent_type:
+      "attack": player.take_damage(max(0, intent.value - player.block)); player.block = max(0, player.block - intent.value)
+      "block": block += intent.value
+      "buff": apply_buff(intent)
+    intent = get_next_intent()  # show next intent
+
+────────── RELICS ──────────
+var relics: Array[RelicData] = []
+
+class_name RelicData extends Resource
+@export var relic_name: String
+@export var description: String
+# Hooks: relic can connect to signals on GameManager
+# e.g. "Burning Blood": connect player.combat_end → heal 6
+# e.g. "Anchor": skip draw on turn 1, start with 10 block instead
+
+────────── MAP + RUN STRUCTURE ──────────
+# Map is a branching path of nodes:
+# Node types: combat, elite, rest, shop, event, boss
+enum NodeType { COMBAT, ELITE, REST, SHOP, EVENT, BOSS }
+class MapNode:
+  var type: NodeType; var connections: Array[MapNode] = []
+  var visited: bool = false; var reward: Variant
+
+func generate_map(floors: int = 15, width: int = 7) -> Array[Array]:
+  var map: Array[Array] = []
+  for floor in floors:
+    var row = []; var count = randi_range(3, width)
+    for i in count:
+      var node = MapNode.new()
+      node.type = _random_node_type(floor)
+      row.append(node)
+    map.append(row)
+  _connect_floors(map); return map
+
+func _random_node_type(floor: int) -> NodeType:
+  if floor == 0: return NodeType.COMBAT
+  if floor % 8 == 0: return NodeType.REST
+  var roll = randf()
+  if roll < 0.45: return NodeType.COMBAT
+  elif roll < 0.65: return NodeType.EVENT
+  elif roll < 0.75: return NodeType.SHOP
+  elif roll < 0.85: return NodeType.REST
+  else: return NodeType.ELITE
 `,
 
     "life sim": `# alias to simulation`,
@@ -921,6 +1273,8 @@ func on_generator_progress(gen_id: int, progress: float):
   const keys = Object.keys(patterns);
 
   // Specific game/genre mappings
+  if (g.includes("deck") || g.includes("card") || g.includes("slay the spire") || g.includes("ftl")) return patterns["deck_building"];
+  if (g.includes("tactics") || g.includes("tactical") || g.includes("xcom") || g.includes("fire emblem") || g.includes("turn-based strategy")) return patterns["tactics"];
   if (g.includes("sim") || g.includes("life") || g.includes("tycoon") || g.includes("management")) return patterns["simulation"];
   if (g.includes("resident") || g.includes("survival horror") || g.includes("survival_horror") || g.includes("re ") || g.includes("re2")) return patterns["survival_horror"];
   if (g.includes("silent") || g.includes("psychological") || g.includes("psych horror")) return patterns["psychological_horror"];
@@ -1633,11 +1987,148 @@ function updatePlayerHeight(player) {
   return patterns["fps_browser"];
 }
 
+// ── Babylon.js browser 3D game patterns ──────────────────────────────────────
+
+export function getBabylonPatterns(genre: string): string {
+  const g = genre.toLowerCase();
+
+  const base = `
+BABYLON.JS BROWSER GAME PATTERN:
+CDN: https://cdn.babylonjs.com/babylon.js (optional: https://cdn.babylonjs.com/cannon.js for physics)
+
+// ── SCENE SETUP ───────────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const engine = new BABYLON.Engine(canvas, true);
+const scene = new BABYLON.Scene(engine);
+
+// Camera
+const camera = new BABYLON.FreeCamera('cam', new BABYLON.Vector3(0, 5, -10), scene);
+camera.setTarget(BABYLON.Vector3.Zero());
+camera.attachControl(canvas, true);
+
+// Lights
+const light = new BABYLON.HemisphericLight('light', new BABYLON.Vector3(0, 1, 0), scene);
+light.intensity = 0.8;
+const dirLight = new BABYLON.DirectionalLight('dir', new BABYLON.Vector3(-1, -2, -1), scene);
+dirLight.position = new BABYLON.Vector3(20, 40, 20);
+
+// Ground
+const ground = BABYLON.MeshBuilder.CreateGround('ground', { width: 50, height: 50 }, scene);
+const groundMat = new BABYLON.StandardMaterial('groundMat', scene);
+groundMat.diffuseColor = new BABYLON.Color3(0.3, 0.5, 0.3);
+ground.material = groundMat;
+
+// Resize
+window.addEventListener('resize', () => engine.resize());
+
+// Game loop
+engine.runRenderLoop(() => { update(); scene.render(); });
+`;
+
+  const fps = `
+BABYLON.JS FPS PATTERN:
+// UniversalCamera for FPS movement
+const camera = new BABYLON.UniversalCamera('fps', new BABYLON.Vector3(0, 2, 0), scene);
+camera.setTarget(new BABYLON.Vector3(0, 2, 10));
+camera.attachControl(canvas, true);
+camera.speed = 0.5;
+camera.angularSensibility = 2000;
+camera.minZ = 0.1;
+
+// Pointer lock for mouse look
+canvas.addEventListener('click', () => canvas.requestPointerLock());
+
+// WASD input (Babylon handles it via UniversalCamera)
+camera.keysUp = [87];    // W
+camera.keysDown = [83];  // S
+camera.keysLeft = [65];  // A
+camera.keysRight = [68]; // D
+
+// Gravity + collision
+scene.gravity = new BABYLON.Vector3(0, -9.8, 0);
+camera.applyGravity = true;
+camera.checkCollisions = true;
+camera.ellipsoid = new BABYLON.Vector3(0.5, 1, 0.5);
+ground.checkCollisions = true;
+
+// Shooting raycast
+scene.onPointerDown = (evt) => {
+  if (evt.button !== 0) return;
+  const ray = scene.createPickingRay(scene.pointerX, scene.pointerY, BABYLON.Matrix.Identity(), camera);
+  const hit = scene.pickWithRay(ray);
+  if (hit.pickedMesh && hit.pickedMesh.metadata?.isEnemy) {
+    takeDamage(hit.pickedMesh, 25);
+  }
+};
+
+// Enemy sphere
+function spawnEnemy(pos) {
+  const enemy = BABYLON.MeshBuilder.CreateSphere('enemy', { diameter: 1.5 }, scene);
+  enemy.position = pos;
+  const mat = new BABYLON.StandardMaterial('emat', scene);
+  mat.diffuseColor = new BABYLON.Color3(0.9, 0.2, 0.2);
+  enemy.material = mat;
+  enemy.metadata = { isEnemy: true, hp: 50 };
+  enemies.push(enemy);
+}
+`;
+
+  const platformer3d = `
+BABYLON.JS 3D PLATFORMER PATTERN:
+// ArcRotateCamera for third-person
+const camera = new BABYLON.ArcRotateCamera('cam', -Math.PI/2, Math.PI/3, 10, BABYLON.Vector3.Zero(), scene);
+camera.attachControl(canvas, false);
+camera.lowerRadiusLimit = 4; camera.upperRadiusLimit = 15;
+
+// Player box with physics impostor
+const player = BABYLON.MeshBuilder.CreateBox('player', { width: 0.8, height: 1.8, depth: 0.8 }, scene);
+player.position = new BABYLON.Vector3(0, 1, 0);
+scene.enablePhysics(new BABYLON.Vector3(0, -20, 0), new BABYLON.CannonJSPlugin());
+player.physicsImpostor = new BABYLON.PhysicsImpostor(player, BABYLON.PhysicsImpostor.BoxImpostor, { mass: 1, friction: 0.5 });
+ground.physicsImpostor = new BABYLON.PhysicsImpostor(ground, BABYLON.PhysicsImpostor.BoxImpostor, { mass: 0 });
+
+// Input
+const keys = {};
+window.addEventListener('keydown', e => keys[e.code] = true);
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+let onGround = false;
+scene.registerAfterRender(() => {
+  const vel = player.physicsImpostor.getLinearVelocity();
+  const speed = 6;
+  const forward = camera.getForwardRay().direction;
+  forward.y = 0; forward.normalize();
+  const right = BABYLON.Vector3.Cross(forward, BABYLON.Vector3.Up());
+  let move = BABYLON.Vector3.Zero();
+  if (keys['KeyW']) move.addInPlace(forward);
+  if (keys['KeyS']) move.subtractInPlace(forward);
+  if (keys['KeyA']) move.subtractInPlace(right);
+  if (keys['KeyD']) move.addInPlace(right);
+  if (move.length() > 0) move.normalize().scaleInPlace(speed);
+  player.physicsImpostor.setLinearVelocity(new BABYLON.Vector3(move.x, vel.y, move.z));
+  if (keys['Space'] && onGround) {
+    player.physicsImpostor.setLinearVelocity(new BABYLON.Vector3(vel.x, 12, vel.z));
+    onGround = false;
+  }
+  camera.target = player.position.add(new BABYLON.Vector3(0, 1, 0));
+  // Check on ground
+  onGround = Math.abs(vel.y) < 0.1 && player.position.y < 1.1;
+});
+`;
+
+  if (g.includes("fps") || g.includes("shooter") || g.includes("first person")) return base + fps;
+  if (g.includes("platformer") || g.includes("platform") || g.includes("jump")) return base + platformer3d;
+  return base + fps;
+}
+
 // ── Engine detector ───────────────────────────────────────────────────────────
 
-export function detectEngine(text: string): "godot2d" | "godot3d" | "phaser" | "threejs" {
+export function detectEngine(text: string): "godot2d" | "godot3d" | "phaser" | "threejs" | "babylon" {
   const lower = text.toLowerCase();
 
+  if (lower.includes("babylon") || lower.includes("babylon.js") || lower.includes("babylonjs")) {
+    return "babylon";
+  }
   if (lower.includes("three.js") || lower.includes("threejs") || lower.includes("three js")) {
     return "threejs";
   }

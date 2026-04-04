@@ -94,8 +94,8 @@ async function runOpenAIToolLoop(
     loopMessages.push({
       role: "assistant",
       content: msg.content ?? "",
-      ...({ tool_calls: msg.tool_calls } as unknown as OAIMessage),
-    });
+      tool_calls: msg.tool_calls,
+    } as OAIMessage);
 
     // Execute each tool call
     for (const tc of msg.tool_calls) {

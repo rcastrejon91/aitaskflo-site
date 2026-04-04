@@ -244,12 +244,19 @@ function GameBuildCard({ raw }: { raw: string }) {
 
         {/* Play in browser button */}
         {exportUrl && (
-          <a href={exportUrl} target="_blank" rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold transition-all"
-            style={{ background: "linear-gradient(135deg, rgb(16,185,129), rgb(5,150,105))", color: "white" }}>
-            <Gamepad2 className="w-4 h-4" />
-            Play in Browser
-          </a>
+          <div className="flex gap-2">
+            <a href={exportUrl} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all"
+              style={{ background: "linear-gradient(135deg, rgb(16,185,129), rgb(5,150,105))", color: "white" }}>
+              <Gamepad2 className="w-4 h-4" />
+              Play Now
+            </a>
+            <a href={`/games/${obj.name}`}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+              style={{ background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.4)", color: "rgb(167,139,250)" }}>
+              🏪 Marketplace
+            </a>
+          </div>
         )}
 
         <div className="rounded-xl bg-black/30 border border-white/[0.06] px-3 py-2.5">

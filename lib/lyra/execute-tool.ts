@@ -354,12 +354,12 @@ export async function executeTool(
     const BASE_GAME_DIR = process.env.GAME_DIR ? nodePath.dirname(process.env.GAME_DIR) : "/home/aitaskflo/game";
     const gameDir = nodePath.join(BASE_GAME_DIR, slug);
 
-    // Complex genres need more turns (browser games are single-call, so maxTurns is irrelevant)
+    // Complex genres need more turns (browser games use 4-phase loop, maxTurns scales phases)
     const g = genre.toLowerCase();
     const isComplex = g.includes("sim") || g.includes("tycoon") || g.includes("life") || g.includes("management") || g.includes("rpg") || g.includes("asymmetric") || g.includes("open world");
     const maxTurns = isComplex ? 45 : 30;
 
-    const engineLabel = engine === "phaser" ? "Phaser 3 browser" : engine === "threejs" ? "Three.js browser" : engine === "godot3d" ? "Godot 4 3D" : "Godot 4 2D";
+    const engineLabel = engine === "phaser" ? "Phaser 3 browser" : engine === "threejs" ? "Three.js browser" : engine === "babylon" ? "Babylon.js browser" : engine === "godot3d" ? "Godot 4 3D" : "Godot 4 2D";
     controller.enqueue(encoder.encode(`\n🎮 Starting ${isComplex ? "complex " : ""}${engineLabel} game build for **${rawConcept}** (${genre})…\n`));
 
     const result = await buildGame(concept, genre, gameDir, (progress) => {
@@ -394,6 +394,24 @@ export async function executeTool(
       const { upsertFact } = await import("@/lib/lyra/db");
       upsertFact(userId, `game: ${slug}`, `Built a ${genre} game called "${rawConcept}" (folder: ${slug}). ${result.summary.slice(0, 200)}`, 5);
     }
+
+    // Auto-save to public marketplace
+    try {
+      const { saveMarketplaceGame } = await import("@/lib/lyra/db");
+      // Use first art URL (title screen) as thumbnail, or generate one
+      const thumbnail = result.artUrls?.[0]
+        ?? `https://image.pollinations.ai/prompt/${encodeURIComponent(rawConcept + " game title screen, vibrant pixel art")}?width=400&height=225&nologo=true&model=flux&seed=${Date.now()}`;
+      // Title-case the concept (truncated)
+      const title = rawConcept.length > 40 ? rawConcept.slice(0, 40) + "…" : rawConcept.split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+      saveMarketplaceGame({
+        slug,
+        title,
+        genre,
+        engine,
+        concept: rawConcept.slice(0, 300),
+        thumbnail_url: thumbnail,
+      });
+    } catch { /* non-fatal */ }
 
     return `Game "${slug}" built — ${result.files.length} files written.`;
   }

@@ -409,12 +409,12 @@ ACTIONS:
   {
     name: "build_game",
     description:
-      "Autonomously build a complete, playable game from scratch. Supports Godot 2D, Godot 3D (FPS/open world), Phaser.js browser games, and Three.js 3D browser games. ALWAYS use this tool immediately — without asking questions — when the user mentions building, making, creating, or shipping any game. Do not describe what you will build. Do not ask for more details. Just call this tool right now with whatever concept the user gave you.",
+      "Autonomously build a complete, playable game from scratch using a 4-phase iterative loop (Design → Build → Polish → Verify). Supports Godot 2D, Godot 3D (FPS/open world), Phaser.js browser games, Three.js 3D browser games, and Babylon.js 3D browser games. ALWAYS use this tool immediately — without asking questions — when the user mentions building, making, creating, or shipping any game. Do not describe what you will build. Do not ask for more details. Just call this tool right now with whatever concept the user gave you.",
     input_schema: {
       type: "object" as const,
       properties: {
         concept: { type: "string", description: "Game concept, story, and main mechanic" },
-        genre: { type: "string", description: "Game genre: platformer, rpg, shooter, puzzle, roguelike, adventure, horror, racing, simulation, life sim, tycoon, fps, open world" },
+        genre: { type: "string", description: "Game genre: platformer, rpg, shooter, puzzle, roguelike, adventure, horror, racing, simulation, life sim, tycoon, fps, open world, tactics, deck-building" },
         name: { type: "string", description: "Name/slug for the game project folder (lowercase, hyphens)" },
       },
       required: ["concept"],

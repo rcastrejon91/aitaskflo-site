@@ -1,20 +1,16 @@
 ; Engine configuration file.
 ; It's best edited using the editor UI and not directly,
 ; since the parameters that go here are not all obvious.
-;
-; Format:
-;   [section] ; section goes between []
-;   param=value ; assign values to parameters
 
 config_version=5
 
 [application]
 
 config/name="The 13th Witch"
-config/description="A dark narrative RPG — built by Lyra"
+config/description="A dark fantasy action RPG built by Lyra"
 run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.4", "GL Compatibility")
-config/icon="res://assets/icon.svg"
+boot_splash/show_image=false
 
 [autoload]
 
@@ -24,6 +20,7 @@ GameManager="*res://scripts/GameManager.gd"
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
+window/size/resizable=true
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 
@@ -31,3 +28,5 @@ window/stretch/aspect="expand"
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+textures/canvas_textures/default_texture_filter=0
+environment/defaults/default_clear_color=Color(0.04, 0.03, 0.06, 1)
