@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Send, Loader2, Lightbulb, GitBranch,
-  Zap, ArrowLeft, CheckCircle, AlertCircle, X, LogOut, SlidersHorizontal,
+  Zap, ArrowLeft, CheckCircle, AlertCircle, X, LogOut, SlidersHorizontal, Settings,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
@@ -451,12 +451,22 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
           )}
         </AnimatePresence>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1">
           {activeAgent.averageScore > 0 && (
             <span className="text-[11px] hidden md:block" style={{ color: "rgba(255,255,255,0.2)" }}>
               ★ {activeAgent.averageScore.toFixed(1)}
             </span>
           )}
+          <Link
+            href="/account"
+            className="p-1.5 transition-colors"
+            style={{ color: "rgba(255,255,255,0.2)" }}
+            title="Account settings"
+            onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.6)")}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.2)")}
+          >
+            <Settings className="w-3.5 h-3.5" />
+          </Link>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="p-1.5 transition-colors"

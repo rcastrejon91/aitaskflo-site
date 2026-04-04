@@ -186,8 +186,27 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Social proof strip */}
+      <section className="py-12 px-6" style={{ borderTop: "1px solid rgba(255,255,255,0.04)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+        <div className="max-w-4xl mx-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
+            {[
+              { stat: "10k+", label: "Messages sent" },
+              { stat: "3", label: "AI models" },
+              { stat: "∞", label: "Memory depth" },
+              { stat: "$0", label: "To start" },
+            ].map((s) => (
+              <div key={s.label}>
+                <div className="text-2xl font-bold mb-1" style={{ background: "linear-gradient(135deg, rgb(167,139,250), rgb(240,171,252))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{s.stat}</div>
+                <div className="text-xs" style={{ color: "rgba(255,255,255,0.35)" }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
-      <footer className="py-8 px-6" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+      <footer className="py-10 px-6">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
@@ -195,10 +214,13 @@ export default function Home() {
             </div>
             <span className="text-sm" style={{ color: "rgba(255,255,255,0.25)" }}>AITaskFlo</span>
           </div>
-          <div className="flex items-center gap-6 text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>
             <span>© 2026 AITaskFlo</span>
             <Link href="/pricing" className="hover:text-white/60 transition-colors">Pricing</Link>
             <Link href="/login" className="hover:text-white/60 transition-colors">Sign in</Link>
+            <Link href="/privacy" className="hover:text-white/60 transition-colors">Privacy</Link>
+            <Link href="/terms" className="hover:text-white/60 transition-colors">Terms</Link>
+            <a href="mailto:support@aitaskflo.com" className="hover:text-white/60 transition-colors">Support</a>
           </div>
         </div>
       </footer>

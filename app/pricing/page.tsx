@@ -1,5 +1,7 @@
 "use client";
 
+// Note: metadata for client components is set via layout — pricing has no server metadata file
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
