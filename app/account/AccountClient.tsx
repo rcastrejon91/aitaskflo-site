@@ -169,7 +169,7 @@ export default function AccountClient({ user, subscription }: Props) {
         </div>
 
         <p className="text-center text-white/20 text-xs mt-8">
-          Questions? <a href="mailto:support@aitaskflo.com" className="hover:text-white/40 transition-colors">support@aitaskflo.com</a>
+          Questions? <a href="mailto:aitaskflo@gmail.com" className="hover:text-white/40 transition-colors">aitaskflo@gmail.com</a>
         </p>
       </div>
     </div>

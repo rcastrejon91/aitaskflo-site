@@ -42,7 +42,7 @@ export default function TermsPage() {
             },
             {
               title: "3. Accounts",
-              body: `You must provide accurate information when registering. You are responsible for maintaining the confidentiality of your credentials and for all activity under your account. Notify us immediately of unauthorized use at support@aitaskflo.com.`,
+              body: `You must provide accurate information when registering. You are responsible for maintaining the confidentiality of your credentials and for all activity under your account. Notify us immediately of unauthorized use at aitaskflo@gmail.com.`,
             },
             {
               title: "4. Acceptable Use",
@@ -78,11 +78,11 @@ export default function TermsPage() {
             },
             {
               title: "12. Governing Law",
-              body: `These Terms are governed by the laws of the State of Texas, United States. Disputes shall be resolved in the courts of Texas.`,
+              body: `These Terms are governed by the laws of the State of Illinois, United States. Disputes shall be resolved in the courts of Cook County, Illinois.`,
             },
             {
               title: "13. Contact",
-              body: `Questions about these Terms? Email support@aitaskflo.com.`,
+              body: `Questions about these Terms? Email aitaskflo@gmail.com.`,
             },
           ].map(({ title, body }) => (
             <section key={title}>

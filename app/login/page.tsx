@@ -157,7 +157,7 @@ function LoginForm() {
                 <label className="block text-xs text-white/50">Password</label>
                 {mode === "login" && (
                   <span className="text-[11px] text-white/30 hover:text-white/50 cursor-pointer transition-colors"
-                    onClick={() => setError("To reset your password, email support@aitaskflo.com")}>
+                    onClick={() => setError("To reset your password, email aitaskflo@gmail.com")}>
                     Forgot password?
                   </span>
                 )}

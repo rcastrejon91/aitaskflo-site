@@ -220,7 +220,7 @@ export default function Home() {
             <Link href="/login" className="hover:text-white/60 transition-colors">Sign in</Link>
             <Link href="/privacy" className="hover:text-white/60 transition-colors">Privacy</Link>
             <Link href="/terms" className="hover:text-white/60 transition-colors">Terms</Link>
-            <a href="mailto:support@aitaskflo.com" className="hover:text-white/60 transition-colors">Support</a>
+            <a href="mailto:aitaskflo@gmail.com" className="hover:text-white/60 transition-colors">Support</a>
           </div>
         </div>
       </footer>

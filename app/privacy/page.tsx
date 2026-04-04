@@ -54,7 +54,7 @@ export default function PrivacyPage() {
             },
             {
               title: "6. Data Retention",
-              body: `We retain your account data for as long as your account is active. You may request deletion of your account and associated data at any time by emailing support@aitaskflo.com.`,
+              body: `We retain your account data for as long as your account is active. You may request deletion of your account and associated data at any time by emailing aitaskflo@gmail.com.`,
             },
             {
               title: "7. Security",
@@ -62,7 +62,7 @@ export default function PrivacyPage() {
             },
             {
               title: "8. Your Rights",
-              body: `You have the right to access, correct, or delete your personal data. To exercise these rights, contact us at support@aitaskflo.com. EU/EEA residents have additional rights under GDPR.`,
+              body: `You have the right to access, correct, or delete your personal data. To exercise these rights, contact us at aitaskflo@gmail.com. EU/EEA residents have additional rights under GDPR.`,
             },
             {
               title: "9. Changes to This Policy",
@@ -70,7 +70,7 @@ export default function PrivacyPage() {
             },
             {
               title: "10. Contact",
-              body: `Questions? Email us at support@aitaskflo.com.`,
+              body: `Questions? Email us at aitaskflo@gmail.com.`,
             },
           ].map(({ title, body }) => (
             <section key={title}>
