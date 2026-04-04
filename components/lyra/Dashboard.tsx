@@ -593,7 +593,12 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                         {msg.content === "" && isLoading ? (
                           <CrystalBallLoader />
                         ) : (
-                          <MessageRenderer content={msg.content} />
+                          <MessageRenderer
+                            content={msg.content}
+                            isGameContext={messages.some(m =>
+                              /\b(game|platformer|rpg|shooter|sprite|asset|level|player|enemy|boss)\b/i.test(m.content)
+                            )}
+                          />
                         )}
                       </div>
                     </div>
