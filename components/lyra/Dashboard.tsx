@@ -262,9 +262,9 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
     } catch { /* ignore */ }
   }, []);
 
-  async function sendMessage() {
-    if (!input.trim() || isLoading) return;
-    const text = input.trim();
+  async function sendMessage(overrideText?: string) {
+    const text = (overrideText ?? input).trim();
+    if (!text || isLoading) return;
     setInput("");
     if (textareaRef.current) textareaRef.current.style.height = "52px";
 
@@ -403,10 +403,38 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
   };
 
   const QUICK_PROMPTS = [
-    { icon: "⚡", text: "How can I automate my email workflow?" },
-    { icon: "✍️", text: "Write a blog post about AI automation" },
-    { icon: "🎙️", text: "Create a podcast script about productivity" },
+    { icon: "🎮", text: "Build me a browser game", label: "Game Engine" },
+    { icon: "🖼️", text: "Generate a cinematic image of a cyberpunk city at night", label: "Image Gen" },
+    { icon: "🔍", text: "Search the web for the latest AI news today", label: "Web Search" },
+    { icon: "✍️", text: "Write a cold email to get my first SaaS customer", label: "Writing" },
+    { icon: "📊", text: "Help me build a simple business plan", label: "Strategy" },
+    { icon: "⚡", text: "How can I automate my email workflow?", label: "Automation" },
   ];
+
+  // ── Activity toast ──────────────────────────────────────────────────────────
+  const ACTIVITY_EVENTS = [
+    { user: "Marcus", action: "just built a 2D platformer game" },
+    { user: "Sofia", action: "generated 12 product images" },
+    { user: "James", action: "automated their entire email workflow" },
+    { user: "Priya", action: "just upgraded to Pro" },
+    { user: "Alex", action: "exported a game physics template" },
+    { user: "Diego", action: "wrote a full pitch deck with Lyra" },
+    { user: "Zoe", action: "searched 40 job listings in 3 seconds" },
+    { user: "Kai", action: "built a horror roguelike game" },
+  ];
+  const [activityToast, setActivityToast] = useState<{ user: string; action: string } | null>(null);
+  useEffect(() => {
+    const show = () => {
+      const event = ACTIVITY_EVENTS[Math.floor(Math.random() * ACTIVITY_EVENTS.length)];
+      setActivityToast(event);
+      setTimeout(() => setActivityToast(null), 4000);
+    };
+    const delay = 8000 + Math.random() * 4000;
+    const first = setTimeout(show, delay);
+    const interval = setInterval(show, 45000 + Math.random() * 20000);
+    return () => { clearTimeout(first); clearInterval(interval); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex flex-col text-white" style={{ height: "100dvh", background: "#09090f" }}>
@@ -424,6 +452,12 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
         <span className="text-sm font-medium text-white/70 truncate">{activeAgent.name}</span>
         <span className="text-[10px] px-1.5 py-0.5 rounded font-mono flex-shrink-0" style={{ color: "rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.05)" }}>
           gen {activeAgent.generation}
+        </span>
+
+        {/* Status indicator */}
+        <span className="hidden sm:flex items-center gap-1.5 text-[10px] flex-shrink-0" style={{ color: "rgba(255,255,255,0.22)" }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" style={{ boxShadow: "0 0 6px rgb(52,211,153)", animation: "pulse 2s ease-in-out infinite" }} />
+          online · Llama 3.3
         </span>
 
         {/* Evolution ready — small inline chip instead of a banner */}
@@ -501,25 +535,26 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                   </p>
                 </div>
 
-                {/* Quick prompt cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-lg">
+                {/* Quick prompt cards — click to instantly send */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 w-full max-w-xl">
                   {QUICK_PROMPTS.map((p) => (
                     <button
                       key={p.text}
-                      onClick={() => { setInput(p.text); textareaRef.current?.focus(); }}
-                      className="p-4 rounded-xl text-left transition-all"
+                      onClick={() => { setInput(p.text); setTimeout(() => sendMessage(p.text), 0); }}
+                      className="p-3.5 rounded-xl text-left transition-all group"
                       style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}
                       onMouseEnter={(e) => {
                         (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(109,40,217,0.4)";
-                        (e.currentTarget as HTMLButtonElement).style.background = "rgba(109,40,217,0.06)";
+                        (e.currentTarget as HTMLButtonElement).style.background = "rgba(109,40,217,0.07)";
                       }}
                       onMouseLeave={(e) => {
                         (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.07)";
                         (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.025)";
                       }}
                     >
-                      <div className="text-xl mb-2.5">{p.icon}</div>
-                      <p className="text-xs leading-relaxed" style={{ color: "rgba(255,255,255,0.4)" }}>{p.text}</p>
+                      <div className="text-lg mb-2">{p.icon}</div>
+                      <p className="text-[11px] font-medium mb-0.5" style={{ color: "rgba(255,255,255,0.65)" }}>{p.label}</p>
+                      <p className="text-[10px] leading-relaxed" style={{ color: "rgba(255,255,255,0.3)" }}>{p.text}</p>
                     </button>
                   ))}
                 </div>
@@ -621,7 +656,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                   />
                 </div>
                 <button
-                  onClick={sendMessage}
+                  onClick={() => sendMessage()}
                   disabled={!input.trim() || isLoading}
                   className="text-white p-3.5 rounded-2xl transition-all flex-shrink-0 disabled:opacity-25"
                   style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 4px 16px rgba(109,40,217,0.3)" }}
@@ -783,6 +818,29 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
       >
         <SlidersHorizontal className="w-4 h-4 text-white" />
       </button>
+
+      {/* ── Activity toast (social proof) ────────────────────── */}
+      <AnimatePresence>
+        {activityToast && (
+          <motion.div
+            initial={{ opacity: 0, x: 40, scale: 0.95 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 40, scale: 0.95 }}
+            transition={{ type: "spring", damping: 20, stiffness: 300 }}
+            className="fixed bottom-20 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl max-w-xs"
+            style={{ background: "rgba(15,15,25,0.97)", border: "1px solid rgba(109,40,217,0.25)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}
+          >
+            <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))" }}>
+              {activityToast.user[0]}
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-white/80">{activityToast.user}</p>
+              <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.4)" }}>{activityToast.action}</p>
+            </div>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0 ml-1" style={{ boxShadow: "0 0 6px rgb(52,211,153)" }} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Toast notification ───────────────────────────────── */}
       <AnimatePresence>
