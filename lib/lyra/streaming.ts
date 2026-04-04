@@ -65,7 +65,10 @@ async function runOpenAIToolLoop(
       signal: AbortSignal.timeout(60_000),
     });
 
-    if (!res.ok) return;
+    if (!res.ok) {
+      const errText = await res.text().catch(() => `status ${res.status}`);
+      throw new Error(`API ${res.status}: ${errText.slice(0, 200)}`);
+    }
 
     const data = await res.json() as {
       choices?: Array<{
