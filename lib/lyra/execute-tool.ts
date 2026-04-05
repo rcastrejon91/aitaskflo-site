@@ -612,6 +612,7 @@ export async function executeTool(
         const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
         pdfCard = `\n📥 **[Download PDF — KDP Ready](${baseUrl}/downloads/${filename})**`;
       } catch (e) {
+        console.error("[pdfgen] ERROR:", e instanceof Error ? e.stack : String(e));
         pdfCard = `\n⚠️ PDF export failed: ${e instanceof Error ? e.message : String(e)}`;
       }
     }
