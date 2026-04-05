@@ -144,10 +144,13 @@ const bookStyles = StyleSheet.create({
 });
 
 function BookCoverPage({ book }: { book: GeneratedBook }) {
+  const title = String(book.title ?? "Untitled");
+  const subtitle = book.subtitle ? String(book.subtitle) : "";
+  const author = String(book.author ?? "Lyra");
   const overlayChildren = [
-    React.createElement(Text, { key: "title", style: bookStyles.coverTitle }, book.title),
-    ...(book.subtitle ? [React.createElement(Text, { key: "sub", style: bookStyles.coverSubtitle }, book.subtitle)] : []),
-    React.createElement(Text, { key: "author", style: bookStyles.coverAuthor }, `by ${book.author}`),
+    React.createElement(Text, { key: "title", style: bookStyles.coverTitle }, title),
+    ...(subtitle ? [React.createElement(Text, { key: "sub", style: bookStyles.coverSubtitle }, subtitle)] : []),
+    React.createElement(Text, { key: "author", style: bookStyles.coverAuthor }, `by ${author}`),
   ];
   return React.createElement(Page, { size: [BOOK_W, BOOK_H], style: bookStyles.coverPage },
     book.coverUrl
@@ -159,10 +162,10 @@ function BookCoverPage({ book }: { book: GeneratedBook }) {
 
 function BookCopyrightPage({ book }: { book: GeneratedBook }) {
   return React.createElement(Page, { size: [BOOK_W, BOOK_H], style: bookStyles.copyrightPage },
-    React.createElement(Text, { style: bookStyles.copyrightText }, book.title),
-    React.createElement(Text, { style: bookStyles.copyrightText }, book.subtitle || ""),
+    React.createElement(Text, { style: bookStyles.copyrightText }, String(book.title ?? "")),
+    React.createElement(Text, { style: bookStyles.copyrightText }, String(book.subtitle ?? "")),
     React.createElement(Text, { style: { ...bookStyles.copyrightText, marginTop: 16 } },
-      `Copyright © ${new Date().getFullYear()} ${book.author}`),
+      `Copyright © ${new Date().getFullYear()} ${String(book.author ?? "Lyra")}`),
     React.createElement(Text, { style: bookStyles.copyrightText },
       "All rights reserved. No part of this publication may be reproduced, distributed, or transmitted in any form or by any means without the prior written permission of the author."),
     React.createElement(Text, { style: { ...bookStyles.copyrightText, marginTop: 16 } },
@@ -178,8 +181,8 @@ function BookTocPage({ book }: { book: GeneratedBook }) {
     ...book.chapters.map((ch, i) =>
       React.createElement(View, { key: i, style: bookStyles.tocRow },
         React.createElement(Text, { style: bookStyles.tocChapter },
-          `${ch.number}. ${ch.title}`),
-        React.createElement(Text, { style: bookStyles.tocPage_ }, `${i + 4}`),
+          `${String(ch.number ?? i + 1)}. ${String(ch.title ?? "")}`),
+        React.createElement(Text, { style: bookStyles.tocPage_ }, String(i + 4)),
       )
     )
   );
@@ -192,13 +195,16 @@ function BookChapterPage({ chapter, bookTitle, pageNum }: {
 }) {
   const paragraphs = chapter.content.split("\n").filter(p => p.trim().length > 0);
 
+  const safeTitle = String(bookTitle ?? "");
+  const safeChTitle = String(chapter.title ?? "");
+  const safeChNum = String(chapter.number ?? "");
   const pageChildren = [
     React.createElement(View, { key: "hdr", style: bookStyles.pageHeader },
-      React.createElement(Text, { key: "hdr-book", style: bookStyles.headerText }, bookTitle.toUpperCase()),
-      React.createElement(Text, { key: "hdr-ch", style: bookStyles.headerText }, chapter.title.toUpperCase()),
+      React.createElement(Text, { key: "hdr-book", style: bookStyles.headerText }, safeTitle.toUpperCase()),
+      React.createElement(Text, { key: "hdr-ch", style: bookStyles.headerText }, safeChTitle.toUpperCase()),
     ),
-    React.createElement(Text, { key: "chnum", style: bookStyles.chapterNumber }, `Chapter ${chapter.number}`),
-    React.createElement(Text, { key: "chtitle", style: bookStyles.chapterTitle }, chapter.title),
+    React.createElement(Text, { key: "chnum", style: bookStyles.chapterNumber }, `Chapter ${safeChNum}`),
+    React.createElement(Text, { key: "chtitle", style: bookStyles.chapterTitle }, safeChTitle),
     React.createElement(View, { key: "divider", style: bookStyles.chapterDivider }),
     ...(chapter.imageUrl ? [React.createElement(Image, { key: "chimg", src: chapter.imageUrl, style: bookStyles.chapterImage })] : []),
     ...paragraphs.slice(0, 8).map((p, i) =>
