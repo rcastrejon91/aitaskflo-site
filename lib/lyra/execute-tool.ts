@@ -571,6 +571,38 @@ export async function executeTool(
     return "Computer task timed out — agent may not be running.";
   }
 
+  // ── Autonomous web browsing (server-side Playwright) ─────────────────────
+  if (name === "browse_web") {
+    const { url, task } = input as { url: string; task: string };
+    controller.enqueue(encoder.encode(`\n🌐 Opening **${url}**…\n`));
+
+    const { runWebTask } = await import("@/lib/lyra/browser");
+    const result = await runWebTask(url, task, (step, action) => {
+      controller.enqueue(encoder.encode(`\n  → Step ${step}: ${action}`));
+    });
+
+    controller.enqueue(encoder.encode(`\n\n✅ **Done browsing.**\n`));
+    return result;
+  }
+
+  // ── Game walkthrough (Playwright plays the game) ─────────────────────────
+  if (name === "game_walkthrough") {
+    const { gameUrl, gameName } = input as { gameUrl: string; gameName: string };
+    controller.enqueue(encoder.encode(`\n🎮 Loading **${gameName}** for walkthrough…\n`));
+    controller.enqueue(encoder.encode(`\n> Lyra is opening the game in a real browser and playing through it.\n`));
+
+    const { runGameWalkthrough } = await import("@/lib/lyra/browser");
+    const steps = await runGameWalkthrough(gameUrl, gameName, (step) => {
+      controller.enqueue(encoder.encode(`\n---\n**Step ${step.step}** *(${step.action})*\n\n${step.narration}\n`));
+    });
+
+    const summary = steps.map(s =>
+      `**Step ${s.step}** — ${s.narration}`
+    ).join("\n\n");
+
+    return `## 🎮 ${gameName} — Walkthrough\n\n${summary}`;
+  }
+
   if (name === "write_book") {
     const concept = input.concept || input.topic || "an epic adventure";
     const genre = input.genre ?? "fantasy";

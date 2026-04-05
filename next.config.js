@@ -28,6 +28,7 @@ const nextConfig = {
     "@react-pdf/font",
     "@react-pdf/fns",
     "@react-pdf/pdfkit",
+    "playwright",
   ],
   // Godot web exports require SharedArrayBuffer → needs COOP + COEP on both
   // the host page (/play) and the static game files (/game/*).

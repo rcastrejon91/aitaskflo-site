@@ -968,6 +968,32 @@ ACTIONS:
     },
   },
 
+  // ── Autonomous browser ───────────────────────────────────────────────────
+  {
+    name: "browse_web",
+    description: "Autonomously browse any website — click, fill forms, search, log in, scrape data, navigate pages. Runs entirely on the server, no setup needed. Use for: researching a site, filling out a form, checking prices, reading an article, signing up for something, or any multi-step web task.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        url:  { type: "string", description: "Full URL to open, e.g. https://google.com" },
+        task: { type: "string", description: "What to accomplish, e.g. 'Search for the latest iPhone price and return the result'" },
+      },
+      required: ["url", "task"],
+    },
+  },
+  {
+    name: "game_walkthrough",
+    description: "Open a game in a real browser, play through it, and generate a step-by-step walkthrough with screenshots. Works with Godot web games and any browser-based game. Use when asked to play, guide through, or explain how to beat a game.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        gameUrl:  { type: "string", description: "Full URL of the game to play" },
+        gameName: { type: "string", description: "Name of the game" },
+      },
+      required: ["gameUrl", "gameName"],
+    },
+  },
+
   // ── Computer control ─────────────────────────────────────────────────────
   {
     name: "computer_use",

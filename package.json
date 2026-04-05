@@ -19,6 +19,7 @@
     "@types/react-syntax-highlighter": "^15.5.13",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.8.0",
+    "playwright": "^1.52.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
