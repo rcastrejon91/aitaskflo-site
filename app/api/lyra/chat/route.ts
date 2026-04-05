@@ -312,6 +312,12 @@ export async function POST(req: NextRequest) {
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
       async start(controller) {
+        // Global keep-alive: send a space every 20s so Cloudflare never 524-times out
+        // This must run from the very start, before any API call
+        const globalKeepAlive = setInterval(() => {
+          try { controller.enqueue(encoder.encode(" ")); } catch { /* stream closed */ }
+        }, 20_000);
+
         try {
           const anthropicKey = process.env.ANTHROPIC_API_KEY;
           const flatMessages = messages as Array<{ role: string; content: string }>;
@@ -539,6 +545,7 @@ export async function POST(req: NextRequest) {
             }
           }
         } finally {
+          clearInterval(globalKeepAlive);
           try { controller.close(); } catch { /* already closed */ }
         }
       },
