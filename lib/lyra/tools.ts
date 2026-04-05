@@ -302,15 +302,30 @@ ACTIONS:
   {
     name: "write_book",
     description:
-      "Write a complete book with chapters and AI-generated illustrations. Use whenever the user asks to write, create, or generate a book, story, or novel.",
+      "Write a complete book with chapters and AI-generated illustrations. Use immediately whenever the user asks to write, create, or generate a book, story, or novel — do NOT ask for clarification, invent a compelling concept from context. Also exports as Amazon KDP-ready PDF.",
     input_schema: {
       type: "object" as const,
       properties: {
-        concept: { type: "string", description: "The story concept or premise" },
+        concept: { type: "string", description: "The story concept or premise — invent one if not specified" },
         genre: { type: "string", description: "Genre: fantasy, sci-fi, romance, thriller, mystery, adventure, horror, children's" },
         chapters: { type: "string", description: "Number of chapters (3, 5, 7, or 10)" },
+        export_pdf: { type: "string", description: "Set to 'true' to export as Amazon KDP-ready PDF for publishing" },
       },
-      required: ["concept"],
+      required: [],
+    },
+  },
+  {
+    name: "make_comic",
+    description: "Create a complete comic book with AI-generated panel illustrations, dialogue, captions, and a cover. Exports as Amazon KDP-ready PDF. Use immediately when the user asks to make a comic, graphic novel, manga, or illustrated story — do NOT ask for details, invent a concept from context.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        concept: { type: "string", description: "The comic story concept — invent one if not specified" },
+        genre: { type: "string", description: "Genre: action, superhero, horror, romance, sci-fi, fantasy, slice-of-life, manga" },
+        pages: { type: "string", description: "Number of pages (4, 8, 12, or 16)" },
+        art_style: { type: "string", description: "Art style: american comic book, manga, noir, watercolor, pixel art, cartoon" },
+      },
+      required: [],
     },
   },
   {
@@ -932,6 +947,37 @@ ACTIONS:
         negative_prompt: { type: "string", description: "Things to exclude from the image (optional)" },
       },
       required: ["prompt"],
+    },
+  },
+
+  // ── Publishing suite ─────────────────────────────────────────────────
+  {
+    name: "make_document",
+    description: "Create a professional, print-ready document: textbook, workbook, report, manual, newsletter, proposal, novel, children's book, or recipe book. Generates full content with AI, produces a PDF, and can email or upload to Google Drive. Use immediately when the user asks to write, create, or publish any kind of professional document, book, or guide — do NOT ask for clarification, invent or infer the topic from context.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        topic: { type: "string", description: "The subject or title of the document — infer from context or invent if not stated" },
+        template: { type: "string", description: "Document type: textbook, workbook, report, manual, newsletter, proposal, novel, children, recipe. Default: report" },
+        notes: { type: "string", description: "User's own words, notes, or content to incorporate (optional)" },
+        sections: { type: "string", description: "Number of sections/chapters (1–12). Default: 5" },
+        author: { type: "string", description: "Author name to put on the document. Default: the user's name or 'Lyra AI'" },
+        deliver: { type: "string", description: "Delivery method after PDF creation: 'download' (default), 'email:user@example.com', 'gdrive'" },
+      },
+      required: [],
+    },
+  },
+
+  // ── Computer control ─────────────────────────────────────────────────────
+  {
+    name: "computer_use",
+    description: "Control the user's computer — move the mouse, click, type, open apps, browse websites, fill forms, and do anything a human could do on screen. User must have the Lyra Desktop Agent running. Use this when asked to do something on their computer, open an app, automate a task, or control their screen.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        task: { type: "string", description: "Clear description of what to do on the computer, e.g. 'Open Chrome and go to gmail.com, then draft an email to john@example.com saying hello'" },
+      },
+      required: ["task"],
     },
   },
 

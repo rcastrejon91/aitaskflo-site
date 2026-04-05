@@ -224,6 +224,18 @@ function initSchema(db: BetterSqlite3Db) {
       CREATE INDEX IF NOT EXISTS idx_marketplace_trending ON marketplace_games(play_count DESC, avg_rating DESC);
       CREATE INDEX IF NOT EXISTS idx_marketplace_newest ON marketplace_games(created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_game_ratings_slug ON game_ratings(game_slug);
+
+      CREATE TABLE IF NOT EXISTS computer_sessions (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL,
+        task        TEXT NOT NULL,
+        status      TEXT NOT NULL DEFAULT 'pending',
+        screenshot  TEXT,
+        action      TEXT,
+        result      TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
     `);
   } catch { /* ignore */ }
 
@@ -968,4 +980,56 @@ export function getFeaturedGame(): MarketplaceGame | null {
   } catch {
     return null;
   }
+}
+
+// ── Computer control sessions ─────────────────────────────────────────────────
+
+export interface ComputerSession {
+  id: string;
+  user_id: string;
+  task: string;
+  status: "pending" | "running" | "waiting_screenshot" | "done" | "error";
+  screenshot: string | null;
+  action: string | null;
+  result: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export function createComputerSession(userId: string, task: string): string {
+  const db = getDb();
+  if (!db) throw new Error("DB unavailable");
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(
+    "INSERT INTO computer_sessions (id, user_id, task, status, created_at, updated_at) VALUES (?, ?, ?, 'pending', ?, ?)"
+  ).run(id, userId, task, now, now);
+  return id;
+}
+
+export function getComputerSession(id: string): ComputerSession | null {
+  const db = getDb();
+  if (!db) return null;
+  try { return db.prepare("SELECT * FROM computer_sessions WHERE id = ?").get(id) as ComputerSession | null; }
+  catch { return null; }
+}
+
+export function getPendingComputerSession(userId: string): ComputerSession | null {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    return db.prepare(
+      "SELECT * FROM computer_sessions WHERE user_id = ? AND status IN ('pending','running','waiting_screenshot') ORDER BY created_at DESC LIMIT 1"
+    ).get(userId) as ComputerSession | null;
+  } catch { return null; }
+}
+
+export function updateComputerSession(id: string, fields: Partial<ComputerSession>): void {
+  const db = getDb();
+  if (!db) return;
+  const now = new Date().toISOString();
+  const sets = Object.keys(fields).map(k => `${k} = ?`).join(", ");
+  const vals = [...Object.values(fields), now, id];
+  try { db.prepare(`UPDATE computer_sessions SET ${sets}, updated_at = ? WHERE id = ?`).run(...vals); }
+  catch { /* ignore */ }
 }

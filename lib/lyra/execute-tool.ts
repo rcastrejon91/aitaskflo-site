@@ -362,19 +362,29 @@ export async function executeTool(
     const engineLabel = engine === "phaser" ? "Phaser 3 browser" : engine === "threejs" ? "Three.js browser" : engine === "babylon" ? "Babylon.js browser" : engine === "godot3d" ? "Godot 4 3D" : "Godot 4 2D";
     controller.enqueue(encoder.encode(`\n🎮 Starting ${isComplex ? "complex " : ""}${engineLabel} game build for **${rawConcept}** (${genre})…\n`));
 
-    const result = await buildGame(concept, genre, gameDir, (progress) => {
-      try {
-        if (progress.type === "file") {
-          controller.enqueue(encoder.encode(`\n📄 ${progress.message}`));
-        } else if (progress.type === "status") {
-          controller.enqueue(encoder.encode(`\n⚡ ${progress.message}`));
-        } else if (progress.type === "phase") {
-          controller.enqueue(encoder.encode(`\n\n**Phase: ${progress.message}**\n`));
-        } else if (progress.type === "art") {
-          controller.enqueue(encoder.encode(`\n🎨 Concept art generated`));
-        }
-      } catch { /* stream closed */ }
-    }, maxTurns, engine);
+    // Keep-alive: send a space every 15s so Cloudflare doesn't 524-timeout during long builds
+    const keepAlive = setInterval(() => {
+      try { controller.enqueue(encoder.encode(" ")); } catch { /* stream closed */ }
+    }, 15_000);
+
+    let result!: Awaited<ReturnType<typeof buildGame>>;
+    try {
+      result = await buildGame(concept, genre, gameDir, (progress) => {
+        try {
+          if (progress.type === "file") {
+            controller.enqueue(encoder.encode(`\n📄 ${progress.message}`));
+          } else if (progress.type === "status") {
+            controller.enqueue(encoder.encode(`\n⚡ ${progress.message}`));
+          } else if (progress.type === "phase") {
+            controller.enqueue(encoder.encode(`\n\n**Phase: ${progress.message}**\n`));
+          } else if (progress.type === "art") {
+            controller.enqueue(encoder.encode(`\n🎨 Concept art generated`));
+          }
+        } catch { /* stream closed */ }
+      }, maxTurns, engine);
+    } finally {
+      clearInterval(keepAlive);
+    }
 
     const card = JSON.stringify({
       tool: "game_build",
@@ -424,12 +434,21 @@ export async function executeTool(
 
     controller.enqueue(encoder.encode(`\n🔧 Improving **${slug}**: ${improvement}…\n`));
 
-    const result = await improveGame(gameDir, improvement, (progress) => {
-      try {
-        if (progress.type === "file") controller.enqueue(encoder.encode(`\n📄 ${progress.message}`));
-        else if (progress.type === "status") controller.enqueue(encoder.encode(`\n⚡ ${progress.message}`));
-      } catch { /* closed */ }
-    });
+    const keepAliveImprove = setInterval(() => {
+      try { controller.enqueue(encoder.encode(" ")); } catch { /* stream closed */ }
+    }, 15_000);
+
+    let result!: Awaited<ReturnType<typeof improveGame>>;
+    try {
+      result = await improveGame(gameDir, improvement, (progress) => {
+        try {
+          if (progress.type === "file") controller.enqueue(encoder.encode(`\n📄 ${progress.message}`));
+          else if (progress.type === "status") controller.enqueue(encoder.encode(`\n⚡ ${progress.message}`));
+        } catch { /* closed */ }
+      });
+    } finally {
+      clearInterval(keepAliveImprove);
+    }
 
     const card = JSON.stringify({
       tool: "game_build",
@@ -461,12 +480,21 @@ export async function executeTool(
 
     const improvement = `${needsMulti ? `Add full Godot 4 ENet multiplayer (up to ${input.max_players ?? "4"} players): NetworkManager autoload, lobby, player spawning with MultiplayerSpawner, position sync with MultiplayerSynchronizer, server-authoritative damage RPCs, chat system. ` : ""}${needsAI ? `Add an AI-controlled ${mode.replace("ai_", "")} character (AIPlayer.gd) that calls the game-ai endpoint every 0.15s for decisions. Difficulty: ${input.ai_difficulty ?? "medium"}, Personality: ${input.ai_personality ?? "adaptive"}. Also add GameGuide.gd so Lyra watches and advises the player in real time. Server URL: ${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}.` : ""}\n\nGDScript patterns to use:\n${multiContext}`;
 
-    const result = await improveGame(gameDir, improvement, (progress) => {
-      try {
-        if (progress.type === "file") controller.enqueue(encoder.encode(`\n📄 ${progress.message}`));
-        else if (progress.type === "status") controller.enqueue(encoder.encode(`\n⚡ ${progress.message}`));
-      } catch { /* closed */ }
-    });
+    const keepAliveMulti = setInterval(() => {
+      try { controller.enqueue(encoder.encode(" ")); } catch { /* stream closed */ }
+    }, 15_000);
+
+    let result!: Awaited<ReturnType<typeof improveGame>>;
+    try {
+      result = await improveGame(gameDir, improvement, (progress) => {
+        try {
+          if (progress.type === "file") controller.enqueue(encoder.encode(`\n📄 ${progress.message}`));
+          else if (progress.type === "status") controller.enqueue(encoder.encode(`\n⚡ ${progress.message}`));
+        } catch { /* closed */ }
+      });
+    } finally {
+      clearInterval(keepAliveMulti);
+    }
 
     const card = JSON.stringify({
       tool: "game_build",
@@ -483,22 +511,235 @@ export async function executeTool(
     return `${mode} added to "${slug}" — ${result.files.length} files written.`;
   }
 
+  if (name === "computer_use") {
+    const task = input.task ?? "do something on the computer";
+    if (!userId) return "⚠️ Computer control requires a logged-in account.";
+
+    controller.enqueue(encoder.encode(`\n🖥️ Starting computer control task: **${task}**\n`));
+    controller.enqueue(encoder.encode(`\n⚡ Connecting to your Lyra Desktop Agent…`));
+
+    const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+
+    // Create session
+    const startRes = await fetch(`${baseUrl}/api/lyra/computer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "start", userId, task }),
+    });
+    const { sessionId } = await startRes.json() as { sessionId: string };
+
+    controller.enqueue(encoder.encode(`\n✅ Session started — waiting for Desktop Agent to connect…`));
+    controller.enqueue(encoder.encode(`\n\n> **Session ID:** \`${sessionId}\``));
+    controller.enqueue(encoder.encode(`\n> Make sure the Lyra Desktop Agent is running on your computer.`));
+    controller.enqueue(encoder.encode(`\n> \`python lyra-agent.py --url ${baseUrl} --user ${userId} --key YOUR_KEY\``));
+
+    // Poll for completion (max 3 minutes)
+    const maxWait = 180_000;
+    const start = Date.now();
+    let lastStatus = "";
+
+    while (Date.now() - start < maxWait) {
+      await new Promise(r => setTimeout(r, 3000));
+      try {
+        const res = await fetch(`${baseUrl}/api/lyra/computer?sessionId=${sessionId}`, {
+          headers: { "x-agent-key": process.env.COMPUTER_AGENT_KEY ?? process.env.ADMIN_PASSWORD ?? "" },
+        });
+        const { session } = await res.json() as { session: { status: string; action?: string; result?: string } | null };
+        if (!session) break;
+
+        if (session.status !== lastStatus) {
+          lastStatus = session.status;
+          if (session.status === "running") controller.enqueue(encoder.encode(`\n⚡ Agent is working…`));
+          else if (session.status === "waiting_screenshot") {
+            const cmd = session.action ? JSON.parse(session.action) as Record<string, unknown> : {};
+            controller.enqueue(encoder.encode(`\n🖱️ ${cmd.action ?? "executing"}${cmd.coordinate ? ` at (${(cmd.coordinate as number[]).join(", ")})` : ""}`));
+          }
+        }
+
+        if (session.status === "done") {
+          controller.enqueue(encoder.encode(`\n\n✅ **Done!** ${session.result ?? ""}`));
+          return `Computer task complete: ${session.result ?? task}`;
+        }
+        if (session.status === "error") {
+          controller.enqueue(encoder.encode(`\n\n❌ Error: ${session.result}`));
+          return `Computer task failed: ${session.result}`;
+        }
+      } catch { /* keep polling */ }
+    }
+
+    return "Computer task timed out — agent may not be running.";
+  }
+
   if (name === "write_book") {
-    const concept = input.concept ?? "an epic adventure";
+    const concept = input.concept || input.topic || "an epic adventure";
     const genre = input.genre ?? "fantasy";
     const chapterCount = Math.min(10, Math.max(1, parseInt(input.chapters ?? "5", 10) || 5));
+    const exportPdf = input.export_pdf === "true";
 
-    // Stream progress messages into the chat
     const progress = (msg: string) => {
       try { controller.enqueue(encoder.encode(`\n✨ ${msg}`)); } catch { /* closed */ }
     };
 
-    const book = await generateBook(concept, genre, chapterCount, progress);
+    const keepAlive = setInterval(() => {
+      try { controller.enqueue(encoder.encode(" ")); } catch { /* closed */ }
+    }, 15_000);
 
-    // Emit a book card that the frontend will render
-    const card = JSON.stringify({ tool: "book", ...book });
+    let book!: Awaited<ReturnType<typeof generateBook>>;
+    try {
+      book = await generateBook(concept, genre, chapterCount, progress);
+    } catch (e) {
+      clearInterval(keepAlive);
+      const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e);
+      controller.enqueue(encoder.encode(`\n❌ **Book failed:** ${msg}`));
+      return `Book generation error: ${msg}`;
+    }
+    clearInterval(keepAlive);
+
+    // Generate PDF if requested
+    let pdfCard = "";
+    if (exportPdf) {
+      try {
+        progress("Generating Amazon KDP PDF…");
+        const { generateBookPdf } = await import("@/lib/lyra/pdfgen");
+        const pdfBuf = await generateBookPdf(book);
+        // Save to public for download
+        const fsp = await import("fs/promises");
+        const nodePath = await import("path");
+        const pdfDir = nodePath.default.join(process.cwd(), "public", "downloads");
+        await fsp.default.mkdir(pdfDir, { recursive: true });
+        const filename = `${book.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}-lyra.pdf`;
+        await fsp.default.writeFile(nodePath.default.join(pdfDir, filename), pdfBuf);
+        const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+        pdfCard = `\n📥 **[Download PDF — KDP Ready](${baseUrl}/downloads/${filename})**`;
+      } catch (e) {
+        pdfCard = `\n⚠️ PDF export failed: ${e instanceof Error ? e.message : String(e)}`;
+      }
+    }
+
+    const card = JSON.stringify({ tool: "book", ...book, pdfExported: exportPdf });
     controller.enqueue(encoder.encode(`\n${card}`));
-    return `Book "${book.title}" is ready! ${book.chapters.length} chapters generated.`;
+    if (pdfCard) controller.enqueue(encoder.encode(pdfCard));
+    return `Book "${book.title}" is ready! ${book.chapters.length} chapters generated.${exportPdf ? " PDF exported for Amazon KDP." : ""}`;
+  }
+
+  if (name === "make_comic") {
+    const concept = input.concept ?? "a superhero adventure";
+    const genre = input.genre ?? "action";
+    const pageCount = Math.min(16, Math.max(4, parseInt(input.pages ?? "8", 10) || 8));
+    const artStyle = input.art_style ?? "american comic book";
+
+    const progress = (msg: string) => {
+      try { controller.enqueue(encoder.encode(`\n🎨 ${msg}`)); } catch { /* closed */ }
+    };
+
+    progress(`Writing ${pageCount}-page ${genre} comic script…`);
+
+    const { generateComic } = await import("@/lib/lyra/comicgen");
+    const { generateComicPdf } = await import("@/lib/lyra/pdfgen");
+
+    const comicKeepAlive = setInterval(() => {
+      try { controller.enqueue(encoder.encode(" ")); } catch { /* closed */ }
+    }, 15_000);
+
+    let comic!: Awaited<ReturnType<typeof generateComic>>;
+    try {
+      comic = await generateComic(concept, genre, pageCount, artStyle, progress);
+    } catch (e) {
+      clearInterval(comicKeepAlive);
+      const msg = e instanceof Error ? e.message : String(e);
+      controller.enqueue(encoder.encode(`\n❌ Comic generation failed: ${msg}`));
+      return `Comic generation failed: ${msg}`;
+    }
+    clearInterval(comicKeepAlive);
+
+    // Generate PDF
+    let downloadUrl = "";
+    try {
+      progress("Generating Amazon KDP comic PDF…");
+      const pdfBuf = await generateComicPdf(comic);
+      const fsp = await import("fs/promises");
+      const nodePath = await import("path");
+      const pdfDir = nodePath.default.join(process.cwd(), "public", "downloads");
+      await fsp.default.mkdir(pdfDir, { recursive: true });
+      const filename = `${comic.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}-comic-lyra.pdf`;
+      await fsp.default.writeFile(nodePath.default.join(pdfDir, filename), pdfBuf);
+      const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+      downloadUrl = `${baseUrl}/downloads/${filename}`;
+    } catch { /* non-fatal */ }
+
+    const card = JSON.stringify({
+      tool: "comic",
+      title: comic.title,
+      genre: comic.genre,
+      author: comic.author,
+      synopsis: comic.synopsis,
+      coverUrl: comic.coverUrl,
+      pageCount: comic.pages.length,
+      downloadUrl,
+    });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    if (downloadUrl) controller.enqueue(encoder.encode(`\n📥 **[Download Comic PDF — KDP Ready](${downloadUrl})**`));
+    return `Comic "${comic.title}" complete — ${comic.pages.length} pages, ${comic.pages.reduce((a, p) => a + p.panels.length, 0)} panels.`;
+  }
+
+  if (name === "make_document") {
+    const topic = input.topic || input.concept || "A Professional Guide";
+    const template = (input.template ?? "report") as import("@/lib/lyra/publishgen").DocTemplate;
+    const notes = input.notes ?? "";
+    const sectionCount = Math.min(12, Math.max(1, parseInt(input.sections ?? "5", 10) || 5));
+    const author = input.author || "Lyra AI";
+    const deliver = input.deliver ?? "download";
+
+    const progress = (msg: string) => {
+      try { controller.enqueue(encoder.encode(`\n📄 ${msg}`)); } catch { /* closed */ }
+    };
+
+    const keepAlive = setInterval(() => {
+      try { controller.enqueue(encoder.encode(" ")); } catch { /* closed */ }
+    }, 15_000);
+
+    let doc!: import("@/lib/lyra/publishgen").PublishedDoc;
+    try {
+      const { generateDocument, generateDocPdf } = await import("@/lib/lyra/publishgen");
+      doc = await generateDocument(topic, template, notes, sectionCount, author, progress);
+
+      progress("Generating PDF…");
+      const pdfBuf = await generateDocPdf(doc);
+      const fsp = await import("fs/promises");
+      const nodePath = await import("path");
+      const pdfDir = nodePath.default.join(process.cwd(), "public", "downloads");
+      await fsp.default.mkdir(pdfDir, { recursive: true });
+      const filename = `${doc.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}-lyra.pdf`;
+      await fsp.default.writeFile(nodePath.default.join(pdfDir, filename), pdfBuf);
+      const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+      const downloadUrl = `${baseUrl}/downloads/${filename}`;
+
+      // Handle delivery
+      if (deliver.startsWith("email:")) {
+        const email = deliver.replace("email:", "").trim();
+        progress(`Emailing PDF to ${email}…`);
+        const { deliverDocument } = await import("@/lib/lyra/publishgen");
+        await deliverDocument({ pdfBuffer: pdfBuf, filename, method: "email", destination: email });
+        progress(`PDF emailed to ${email}!`);
+      }
+
+      const card = JSON.stringify({
+        tool: "document",
+        title: doc.title,
+        subtitle: doc.subtitle,
+        author: doc.author,
+        template: doc.template,
+        description: doc.description,
+        coverUrl: doc.coverUrl,
+        sectionCount: doc.sections.length,
+        downloadUrl,
+      });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      controller.enqueue(encoder.encode(`\n📥 **[Download PDF](${downloadUrl})**`));
+      return `"${doc.title}" is ready — ${doc.sections.length} sections, professional ${doc.template} format.`;
+    } finally {
+      clearInterval(keepAlive);
+    }
   }
 
   if (name === "analyze_image") {

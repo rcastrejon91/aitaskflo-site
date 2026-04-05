@@ -237,6 +237,17 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Listen for quick-edit events fired from GameBuildCard buttons
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const msg = (e as CustomEvent<string>).detail;
+      if (msg) sendMessage(msg);
+    };
+    window.addEventListener("lyra:quicksend", handler);
+    return () => window.removeEventListener("lyra:quicksend", handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function showNotification(type: "success" | "error", msg: string) {
     setNotification({ type, msg });
     setTimeout(() => setNotification(null), 4000);
@@ -288,7 +299,13 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
         const chunk = decoder.decode(value, { stream: true });
         setMessages((prev) => {
           const updated = [...prev];
-          updated[updated.length - 1] = { role: "assistant", content: updated[updated.length - 1].content + chunk };
+          const accumulated = updated[updated.length - 1].content + chunk;
+          // Filter out raw Cloudflare/nginx error HTML pages
+          if (accumulated.includes("<!DOCTYPE html") || accumulated.includes("error code: 524") || accumulated.includes("error code: 502") || accumulated.includes("<html")) {
+            updated[updated.length - 1] = { role: "assistant", content: "⚠️ **Connection timed out.** The game is still building on the server — it takes 2–5 minutes. Ask me \"is my game ready?\" in a minute and I'll check on it for you." };
+          } else {
+            updated[updated.length - 1] = { role: "assistant", content: accumulated };
+          }
           return updated;
         });
       }

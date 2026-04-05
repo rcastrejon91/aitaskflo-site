@@ -107,14 +107,21 @@ async function runOpenAIToolLoop(
 
       try {
         const result = await executeTool(tc.function.name, toolInput, encoder, controller, userId, clientIp);
+        // If the tool returned an error string, stream it and stop — don't let the model write a fallback
+        if (result.startsWith("Book generation error:") || result.startsWith("Comic generation failed:") || result.startsWith("make_document failed:")) {
+          return;
+        }
         loopMessages.push({
           role: "tool",
           content: result,
           tool_call_id: tc.id,
           name: tc.function.name,
         });
-      } catch {
-        loopMessages.push({ role: "tool", content: "Tool execution failed.", tool_call_id: tc.id, name: tc.function.name });
+      } catch (toolErr) {
+        const errMsg = toolErr instanceof Error ? toolErr.message : String(toolErr);
+        console.error(`[tool:${tc.function.name}] error:`, errMsg);
+        try { controller.enqueue(encoder.encode(`\n❌ **${tc.function.name} error:** ${errMsg}`)); } catch { /* stream closed */ }
+        return;
       }
     }
   }

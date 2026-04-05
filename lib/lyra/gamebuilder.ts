@@ -16,6 +16,163 @@ import { getGenrePatterns, get3DGenrePatterns, getBabylonPatterns, getPhaserPatt
 const execAsync = promisify(_exec);
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// ── Production wrapper ────────────────────────────────────────────────────────
+// Injects loading screen, mobile controls, OG tags, and share button into any
+// raw browser game index.html before publishing to /public/games/{slug}/
+
+function wrapGameForProduction(html: string, title: string, genre: string, slug: string): string {
+  const baseUrl = process.env.NEXTAUTH_URL ?? "https://aitaskflo.com";
+  const gameUrl = `${baseUrl}/games/${slug}/`;
+  const thumbUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(title + " " + genre + " game title screen, pixel art, vibrant")}?width=1200&height=630&nologo=true&model=flux`;
+
+  const ogTags = `
+  <meta property="og:title" content="${title.replace(/"/g, "&quot;")}" />
+  <meta property="og:description" content="Play ${title.replace(/"/g, "&quot;")} — a ${genre} game built by Lyra AI. Free to play in your browser." />
+  <meta property="og:image" content="${thumbUrl}" />
+  <meta property="og:url" content="${gameUrl}" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${title.replace(/"/g, "&quot;")}" />
+  <meta name="twitter:image" content="${thumbUrl}" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />`;
+
+  const loadingOverlay = `
+<style>
+#lyra-loader {
+  position: fixed; inset: 0; z-index: 99999;
+  background: #080810;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; font-family: system-ui, sans-serif;
+  transition: opacity 0.6s ease;
+}
+#lyra-loader.hidden { opacity: 0; pointer-events: none; }
+#lyra-loader .title { color: #fff; font-size: 28px; font-weight: 700; text-align: center; }
+#lyra-loader .genre { color: rgba(139,92,246,0.9); font-size: 13px; text-transform: uppercase; letter-spacing: 0.15em; }
+#lyra-loader .spinner {
+  width: 36px; height: 36px; border: 3px solid rgba(139,92,246,0.2);
+  border-top-color: rgb(139,92,246); border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+#lyra-loader .hint { color: rgba(255,255,255,0.3); font-size: 11px; margin-top: 8px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Share button */
+#lyra-share {
+  position: fixed; bottom: 16px; right: 16px; z-index: 9999;
+  background: rgba(139,92,246,0.85); backdrop-filter: blur(8px);
+  border: 1px solid rgba(139,92,246,0.6); border-radius: 20px;
+  color: #fff; font-size: 12px; font-family: system-ui, sans-serif;
+  padding: 7px 14px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+  opacity: 0; transition: opacity 0.4s ease 1s;
+  box-shadow: 0 4px 16px rgba(139,92,246,0.35);
+}
+#lyra-share.visible { opacity: 1; }
+#lyra-share:hover { background: rgba(139,92,246,1); }
+
+/* Mobile controls */
+#lyra-controls {
+  display: none; position: fixed; bottom: 0; left: 0; right: 0;
+  padding: 12px 20px 20px; z-index: 9998;
+  background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+  justify-content: space-between; align-items: flex-end;
+  touch-action: none; user-select: none;
+}
+@media (pointer: coarse) { #lyra-controls { display: flex; } }
+.lyra-dpad { display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px); gap: 3px; }
+.lyra-btn {
+  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 10px; color: #fff; font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background 0.1s;
+}
+.lyra-btn:active, .lyra-btn.pressed { background: rgba(139,92,246,0.5); }
+.lyra-btn.empty { background: none; border: none; pointer-events: none; }
+.lyra-actions { display: flex; flex-direction: column; gap: 8px; }
+.lyra-action-btn {
+  width: 54px; height: 54px; border-radius: 50%;
+  background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.25);
+  color: #fff; font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.lyra-action-btn:active { background: rgba(139,92,246,0.5); }
+</style>
+
+<div id="lyra-loader">
+  <div class="spinner"></div>
+  <div class="title">${title}</div>
+  <div class="genre">${genre}</div>
+  <div class="hint">Built by Lyra AI · aitaskflo.com</div>
+</div>
+
+<button id="lyra-share" onclick="(function(){
+  if(navigator.share){navigator.share({title:'${title.replace(/'/g, "\\'")}',url:'${gameUrl}'});}
+  else{navigator.clipboard.writeText('${gameUrl}').then(function(){var b=document.getElementById('lyra-share');b.textContent='✓ Copied!';setTimeout(function(){b.innerHTML='↗ Share'},1500);});}
+})()">↗ Share</button>
+
+<div id="lyra-controls">
+  <div class="lyra-dpad">
+    <div class="lyra-btn empty"></div>
+    <div class="lyra-btn" data-key="ArrowUp">▲</div>
+    <div class="lyra-btn empty"></div>
+    <div class="lyra-btn" data-key="ArrowLeft">◀</div>
+    <div class="lyra-btn empty"></div>
+    <div class="lyra-btn" data-key="ArrowRight">▶</div>
+    <div class="lyra-btn empty"></div>
+    <div class="lyra-btn" data-key="ArrowDown">▼</div>
+    <div class="lyra-btn empty"></div>
+  </div>
+  <div class="lyra-actions">
+    <div class="lyra-action-btn" data-key=" ">Jump</div>
+    <div class="lyra-action-btn" data-key="z">A</div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Hide loader when canvas appears or after 4s max
+  var loader = document.getElementById('lyra-loader');
+  var share = document.getElementById('lyra-share');
+  function hideLoader() {
+    if (loader) { loader.classList.add('hidden'); setTimeout(function(){ loader.remove(); }, 700); }
+    if (share) { share.classList.add('visible'); }
+  }
+  var observer = new MutationObserver(function() {
+    if (document.querySelector('canvas')) { hideLoader(); observer.disconnect(); }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  setTimeout(hideLoader, 4000);
+
+  // Mobile controls — fire keyboard events
+  document.querySelectorAll('[data-key]').forEach(function(btn) {
+    var key = btn.getAttribute('data-key');
+    var held = false;
+    function fireKey(type) {
+      document.dispatchEvent(new KeyboardEvent(type, { key: key, code: key === ' ' ? 'Space' : key, bubbles: true }));
+      window.dispatchEvent(new KeyboardEvent(type, { key: key, code: key === ' ' ? 'Space' : key, bubbles: true }));
+    }
+    btn.addEventListener('touchstart', function(e) { e.preventDefault(); held = true; btn.classList.add('pressed'); fireKey('keydown'); }, { passive: false });
+    btn.addEventListener('touchend', function(e) { e.preventDefault(); held = false; btn.classList.remove('pressed'); fireKey('keyup'); }, { passive: false });
+  });
+})();
+</script>`;
+
+  // Inject OG tags into <head> and overlay right after <body>
+  let result = html;
+  if (result.includes("</head>")) {
+    result = result.replace("</head>", `${ogTags}\n</head>`);
+  } else {
+    result = ogTags + "\n" + result;
+  }
+  if (result.includes("<body")) {
+    result = result.replace(/<body[^>]*>/, (match) => match + "\n" + loadingOverlay);
+  } else {
+    result = result + "\n" + loadingOverlay;
+  }
+  return result;
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface BuildProgress {
@@ -630,7 +787,7 @@ progressive_web_app/background_color=Color(0, 0, 0, 1)
 }
 
 async function tryHtml5Export(gameDir: string, slug: string): Promise<string | undefined> {
-  const publicDir = process.env.NEXT_PUBLIC_GAME_HOST_DIR ?? "/var/www/aitaskflo/public/games";
+  const publicDir = process.env.NEXT_PUBLIC_GAME_HOST_DIR ?? nodePath.join(process.cwd(), "public", "games");
   const exportDir = nodePath.join(publicDir, slug);
   const exportPath = nodePath.join(exportDir, "index.html");
 
@@ -832,17 +989,19 @@ async function buildBrowserGame(
 
   // Copy final index.html to public games dir
   const slug = nodePath.basename(gameDir);
-  const publicDir = process.env.NEXT_PUBLIC_GAME_HOST_DIR ?? "/var/www/aitaskflo/public/games";
+  const publicDir = process.env.NEXT_PUBLIC_GAME_HOST_DIR ?? nodePath.join(process.cwd(), "public", "games");
   const exportDir = nodePath.join(publicDir, slug);
   let exportUrl: string | undefined;
   try {
     await fsp.mkdir(exportDir, { recursive: true });
     const localIndexPath = nodePath.join(gameDir, "index.html");
-    const html = await fsp.readFile(localIndexPath, "utf-8");
-    await fsp.writeFile(nodePath.join(exportDir, "index.html"), html, "utf-8");
+    const rawHtml = await fsp.readFile(localIndexPath, "utf-8");
+    const title = concept.split(" ").slice(0, 4).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    const prodHtml = wrapGameForProduction(rawHtml, title, genre, slug);
+    await fsp.writeFile(nodePath.join(exportDir, "index.html"), prodHtml, "utf-8");
     const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
     exportUrl = `${baseUrl}/games/${slug}/`;
-    onProgress({ type: "status", message: `Game ready! Play at: ${exportUrl}` });
+    onProgress({ type: "status", message: `Game live! Play at: ${exportUrl}` });
   } catch {
     // Public dir may not exist in dev — that's fine
   }

@@ -134,6 +134,8 @@ function ToolCard({ raw }: { raw: string }) {
 
     // Specialized cards
     if (tool === "book") return <BookCard raw={raw} />;
+    if (tool === "comic") return <ComicCard raw={raw} />;
+    if (tool === "document") return <DocumentCard raw={raw} />;
     if (tool === "game_build") return <GameBuildCard raw={raw} />;
     if (tool === "fal_video") return <VideoCard raw={raw} />;
     if (tool === "fal_audio") return <AudioCard raw={raw} />;
@@ -181,6 +183,17 @@ function ToolCard({ raw }: { raw: string }) {
 
 // ── Game Build Card ───────────────────────────────────────────────────────────
 
+const QUICK_EDITS = [
+  { label: "⚡ Faster enemies", prompt: "make the enemies faster and more aggressive" },
+  { label: "💥 Add power-ups", prompt: "add power-ups that drop from enemies" },
+  { label: "🎵 Add sound effects", prompt: "add sound effects and background music" },
+  { label: "👾 New enemy type", prompt: "add a new enemy type with unique behavior" },
+  { label: "🏆 Add leaderboard", prompt: "add a high score leaderboard" },
+  { label: "🌈 New color theme", prompt: "change the visual theme to look more polished" },
+  { label: "📱 Mobile controls", prompt: "improve mobile touch controls" },
+  { label: "💀 Add boss fight", prompt: "add an epic boss fight at the end" },
+];
+
 function GameBuildCard({ raw }: { raw: string }) {
   const [showFiles, setShowFiles] = useState(false);
   const [artIdx, setArtIdx] = useState(0);
@@ -192,6 +205,12 @@ function GameBuildCard({ raw }: { raw: string }) {
   const artUrls = obj.art ? obj.art.split(",").filter(Boolean) : [];
   const exportUrl = obj.export_url && obj.export_url.length > 0 ? obj.export_url : null;
   const isImprovement = !!obj.improvement;
+  const gameName = obj.name ?? "";
+
+  const sendQuickEdit = (prompt: string) => {
+    const msg = `improve_game "${gameName}": ${prompt}`;
+    window.dispatchEvent(new CustomEvent("lyra:quicksend", { detail: msg }));
+  };
 
   return (
     <div className="mt-3 rounded-2xl overflow-hidden border border-emerald-500/25 bg-gradient-to-br from-emerald-950/60 to-teal-950/30">
@@ -199,9 +218,9 @@ function GameBuildCard({ raw }: { raw: string }) {
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-emerald-500/20">
         <span className="flex items-center gap-2 text-xs font-semibold tracking-wide text-emerald-300">
           <Gamepad2 className="w-3.5 h-3.5" />
-          {isImprovement ? `Improved: ${obj.improvement}` : "Game Built"} · {obj.file_count ?? files.length} files
+          {isImprovement ? `✓ Improved` : "🎮 Game Ready"} · {obj.file_count ?? files.length} files
         </span>
-        <span className="text-[10px] text-white/25">{obj.name}</span>
+        <span className="text-[10px] text-white/25">{gameName}</span>
       </div>
 
       {/* Concept art carousel */}
@@ -242,22 +261,42 @@ function GameBuildCard({ raw }: { raw: string }) {
       <div className="px-4 py-4 space-y-3">
         <p className="text-sm text-white/85 leading-relaxed">{obj.summary}</p>
 
-        {/* Play in browser button */}
+        {/* Play + share buttons */}
         {exportUrl && (
           <div className="flex gap-2">
             <a href={exportUrl} target="_blank" rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all"
               style={{ background: "linear-gradient(135deg, rgb(16,185,129), rgb(5,150,105))", color: "white" }}>
               <Gamepad2 className="w-4 h-4" />
-              Play Now
+              ▶ Play Now
             </a>
-            <a href={`/games/${obj.name}`}
+            <a href={`/games/${gameName}`}
               className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
               style={{ background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.4)", color: "rgb(167,139,250)" }}>
-              🏪 Marketplace
+              🏪 Gallery
             </a>
+            <button
+              onClick={() => { navigator.clipboard?.writeText(exportUrl); }}
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm transition-all"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}>
+              ↗
+            </button>
           </div>
         )}
+
+        {/* Quick edit buttons */}
+        <div>
+          <p className="text-[10px] text-white/30 uppercase tracking-widest mb-2">Keep editing</p>
+          <div className="flex flex-wrap gap-1.5">
+            {QUICK_EDITS.map((e) => (
+              <button key={e.label} onClick={() => sendQuickEdit(e.prompt)}
+                className="text-[11px] px-2.5 py-1 rounded-lg transition-all hover:scale-105"
+                style={{ background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.2)", color: "rgb(110,231,183)" }}>
+                {e.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="rounded-xl bg-black/30 border border-white/[0.06] px-3 py-2.5">
           <p className="text-[10px] text-white/35 uppercase tracking-wide mb-1.5">How to play</p>
@@ -279,6 +318,113 @@ function GameBuildCard({ raw }: { raw: string }) {
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Comic Card ────────────────────────────────────────────────────────────────
+
+function ComicCard({ raw }: { raw: string }) {
+  let obj: Record<string, string>;
+  try { obj = JSON.parse(raw); } catch { return null; }
+  if (obj.tool !== "comic") return null;
+
+  return (
+    <div className="mt-3 rounded-2xl overflow-hidden border border-violet-500/25 bg-gradient-to-br from-violet-950/60 to-fuchsia-950/30">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-violet-500/20">
+        <span className="flex items-center gap-2 text-xs font-semibold tracking-wide text-violet-300">
+          <BookOpen className="w-3.5 h-3.5" />
+          Comic Created · {obj.pageCount ?? "?"} pages
+        </span>
+        <span className="text-[10px] text-white/25">{obj.genre}</span>
+      </div>
+
+      {obj.coverUrl && (
+        <img src={obj.coverUrl} alt="Comic cover"
+          className="w-full object-cover" style={{ maxHeight: 280 }} />
+      )}
+
+      <div className="px-4 py-4 space-y-3">
+        <div>
+          <h3 className="text-base font-bold text-white mb-1">{obj.title}</h3>
+          <p className="text-xs text-violet-300/70">by {obj.author}</p>
+        </div>
+        <p className="text-sm text-white/70 leading-relaxed">{obj.synopsis}</p>
+
+        {obj.downloadUrl && (
+          <a href={obj.downloadUrl} target="_blank" rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
+            style={{ background: "linear-gradient(135deg, rgb(139,92,246), rgb(168,85,247))" }}>
+            <Download className="w-4 h-4" />
+            Download PDF — Amazon KDP Ready
+          </a>
+        )}
+
+        <div className="rounded-xl px-3 py-2 text-xs text-white/40" style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.05)" }}>
+          📦 Ready to upload to Amazon KDP · 6.625×10.25" comic format
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Document Card ─────────────────────────────────────────────────────────────
+
+const TEMPLATE_COLORS: Record<string, { from: string; to: string; badge: string; label: string }> = {
+  textbook:   { from: "from-blue-950/60",   to: "to-indigo-950/30",  badge: "text-blue-300",   label: "Textbook" },
+  workbook:   { from: "from-emerald-950/60",to: "to-green-950/30",   badge: "text-emerald-300",label: "Workbook" },
+  report:     { from: "from-slate-950/60",  to: "to-gray-950/30",    badge: "text-slate-300",  label: "Report" },
+  manual:     { from: "from-orange-950/60", to: "to-amber-950/30",   badge: "text-orange-300", label: "Manual" },
+  newsletter: { from: "from-purple-950/60", to: "to-violet-950/30",  badge: "text-purple-300", label: "Newsletter" },
+  proposal:   { from: "from-sky-950/60",    to: "to-cyan-950/30",    badge: "text-sky-300",    label: "Proposal" },
+  novel:      { from: "from-rose-950/60",   to: "to-pink-950/30",    badge: "text-rose-300",   label: "Novel" },
+  children:   { from: "from-fuchsia-950/60",to: "to-purple-950/30",  badge: "text-fuchsia-300",label: "Children's Book" },
+  recipe:     { from: "from-yellow-950/60", to: "to-amber-950/30",   badge: "text-yellow-300", label: "Recipe Book" },
+};
+
+function DocumentCard({ raw }: { raw: string }) {
+  let obj: Record<string, string>;
+  try { obj = JSON.parse(raw); } catch { return null; }
+  if (obj.tool !== "document") return null;
+
+  const cfg = TEMPLATE_COLORS[obj.template] ?? TEMPLATE_COLORS.report;
+
+  return (
+    <div className={`mt-3 rounded-2xl overflow-hidden border border-white/10 bg-gradient-to-br ${cfg.from} ${cfg.to}`}>
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10">
+        <span className={`flex items-center gap-2 text-xs font-semibold tracking-wide ${cfg.badge}`}>
+          <BookOpen className="w-3.5 h-3.5" />
+          {cfg.label} · {obj.sectionCount ?? "?"} sections
+        </span>
+        <span className="text-[10px] text-white/25">by {obj.author}</span>
+      </div>
+
+      {obj.coverUrl && (
+        <img src={obj.coverUrl} alt="Document cover"
+          className="w-full object-cover" style={{ maxHeight: 220 }} />
+      )}
+
+      <div className="px-4 py-4 space-y-3">
+        <div>
+          <h3 className="text-base font-bold text-white mb-0.5">{obj.title}</h3>
+          {obj.subtitle && <p className="text-xs text-white/50 italic">{obj.subtitle}</p>}
+        </div>
+        {obj.description && (
+          <p className="text-sm text-white/70 leading-relaxed">{obj.description}</p>
+        )}
+
+        {obj.downloadUrl && (
+          <a href={obj.downloadUrl} target="_blank" rel="noopener noreferrer"
+            className={`flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all bg-white/10 hover:bg-white/20 border border-white/15`}>
+            <Download className="w-4 h-4" />
+            Download PDF
+          </a>
+        )}
+
+        <div className="rounded-xl px-3 py-2 text-xs text-white/40" style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.05)" }}>
+          📄 Professional {cfg.label} · Print-ready PDF · Works with Amazon KDP
+        </div>
       </div>
     </div>
   );

@@ -7,12 +7,17 @@ function pollinationsUrl(prompt: string): string {
 }
 
 async function generateWithClaude(prompt: string): Promise<string> {
-  const msg = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 4096,
-    messages: [{ role: "user", content: prompt }],
-  });
-  return msg.content[0].type === "text" ? msg.content[0].text : "";
+  try {
+    const msg = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 4096,
+      messages: [{ role: "user", content: prompt }],
+    });
+    return msg.content[0].type === "text" ? msg.content[0].text : "";
+  } catch (e) {
+    console.error("[bookgen] Claude API error:", e instanceof Error ? e.message : String(e));
+    throw e;
+  }
 }
 
 export interface BookChapter {
@@ -65,15 +70,36 @@ Return ONLY valid JSON, no markdown:
   ]
 }`);
 
-  const jsonMatch = outlineRaw.match(/\{[\s\S]*\}/);
-  const outline = JSON.parse(jsonMatch?.[0] ?? "{}");
+  const cleaned = outlineRaw.replace(/```json\n?/g, "").replace(/```\n?/g, "");
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  let outline: Record<string, unknown> = {};
+  try { outline = JSON.parse(jsonMatch?.[0] ?? "{}"); } catch { outline = {}; }
+
+  // If JSON parse failed or chapters missing, build a minimal fallback outline
+  if (!Array.isArray(outline.chapters) || (outline.chapters as unknown[]).length === 0) {
+    outline = {
+      title: concept,
+      subtitle: "",
+      author: "Lyra",
+      description: `A ${genre} story about ${concept}.`,
+      coverImagePrompt: `${concept}, ${genre} book cover, dramatic professional artwork`,
+      chapters: Array.from({ length: chapterCount }, (_, i) => ({
+        number: i + 1,
+        title: `Chapter ${i + 1}`,
+        summary: `Events of chapter ${i + 1} in the story of ${concept}.`,
+        imagePrompt: `${concept} chapter ${i + 1} scene, ${genre} illustration`,
+      })),
+    };
+  }
 
   notify("Generating cover…");
-  const coverUrl = pollinationsUrl(outline.coverImagePrompt ?? `${concept} book cover, professional artwork`);
+  const coverUrl = pollinationsUrl((outline.coverImagePrompt as string | undefined) ?? `${concept} book cover, professional artwork`);
 
   const chapters: BookChapter[] = [];
 
-  for (const ch of (outline.chapters ?? []).slice(0, chapterCount)) {
+  type ChapterOutline = { number: number; title: string; summary: string; imagePrompt?: string };
+  const chapterOutlines = (outline.chapters as ChapterOutline[] | undefined) ?? [];
+  for (const ch of chapterOutlines.slice(0, chapterCount)) {
     notify(`Writing Chapter ${ch.number}: ${ch.title}…`);
 
     const content = await generateWithClaude(`You are a bestselling ${genre} author.
@@ -91,11 +117,12 @@ Write this chapter in full. Vivid, immersive prose. At least 600 words. No chapt
     chapters.push({ number: ch.number, title: ch.title, content, imageUrl });
   }
 
+  const o = outline as Record<string, string>;
   return {
-    title: outline.title ?? concept,
-    subtitle: outline.subtitle ?? "",
-    author: outline.author ?? "Lyra",
-    description: outline.description ?? "",
+    title: o.title ?? concept,
+    subtitle: o.subtitle ?? "",
+    author: o.author ?? "Lyra",
+    description: o.description ?? "",
     coverUrl,
     genre,
     chapters,

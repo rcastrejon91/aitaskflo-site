@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
-import { ArrowLeft, Sparkles, User, CreditCard, LogOut, ExternalLink, CheckCircle, AlertCircle, Crown } from "lucide-react";
+import { ArrowLeft, Sparkles, User, CreditCard, LogOut, ExternalLink, CheckCircle, AlertCircle, Crown, Monitor, Copy, Check } from "lucide-react";
 
 interface Props {
   user: { name?: string | null; email?: string | null; image?: string | null };
@@ -23,9 +23,18 @@ const STATUS_COLOR: Record<string, string> = {
   trialing: "text-violet-400",
 };
 
-export default function AccountClient({ user, subscription }: Props) {
+export default function AccountClient({ user, subscription, userId }: Props & { userId?: string }) {
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalError, setPortalError] = useState("");
+  const [copied, setCopied] = useState<string | null>(null);
+
+  function copyText(text: string, key: string) {
+    navigator.clipboard.writeText(text);
+    setCopied(key);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  const agentKey = process.env.NEXT_PUBLIC_AGENT_KEY_HINT ?? "Get key from admin";
 
   async function openPortal() {
     setPortalLoading(true);
@@ -154,6 +163,46 @@ export default function AccountClient({ user, subscription }: Props) {
                 Upgrade to Pro
               </Link>
             )}
+          </div>
+        </div>
+
+        {/* Lyra Desktop Agent */}
+        <div className="rounded-2xl p-6 mb-4" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(109,40,217,0.15)", border: "1px solid rgba(109,40,217,0.25)" }}>
+              <Monitor className="w-4 h-4 text-violet-300" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-white">Lyra Desktop Agent</h2>
+              <p className="text-xs text-white/35">Let Lyra control your browser</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {userId && (
+              <div>
+                <p className="text-[10px] text-white/35 uppercase tracking-widest mb-1.5">Your User ID</p>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <code className="text-xs text-violet-300 flex-1 truncate">{userId}</code>
+                  <button onClick={() => copyText(userId, "uid")} className="text-white/30 hover:text-white/60 transition-colors">
+                    {copied === "uid" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="p-3 rounded-xl text-xs" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.2)" }}>
+              <p className="text-white/50 mb-2 leading-relaxed">Install the Chrome Extension to let Lyra control your browser, click around, fill forms, and work autonomously.</p>
+              <a
+                href="https://chrome.google.com/webstore"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-violet-300 hover:text-violet-200 transition-colors font-medium"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Install Lyra Extension
+              </a>
+            </div>
           </div>
         </div>
 
