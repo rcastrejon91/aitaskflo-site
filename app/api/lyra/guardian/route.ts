@@ -199,7 +199,68 @@ async function checkConversations(): Promise<{ compressed: number }> {
   return { compressed };
 }
 
+// ── Command safety review ─────────────────────────────────────────────────────
+
+const BLOCKED_PATTERNS = [
+  /rm\s+-rf?\s+[\/~]/, /rm\s+-rf?\s+\*/, // rm -rf / or *
+  /\bdd\b.*of=\/dev/, // dd to block device
+  /mkfs/, /fdisk/, /parted/,             // disk formatting
+  />\s*\/dev\/(sd|nvme|hd)/,             // overwrite disk
+  /chmod\s+[0-7]*7[0-7]*\s+\/etc\/passwd/, // chmod passwd
+  /curl.*\|\s*(bash|sh|zsh)/,            // curl | bash
+  /wget.*\|\s*(bash|sh|zsh)/,            // wget | bash
+  /:(){ :|:& };:/,                       // fork bomb
+  /base64.*\|\s*(bash|sh)/,              // base64 decode + exec
+  /\/etc\/shadow/, /\/etc\/passwd/,      // sensitive system files
+  /git\s+push\s+--force/,               // force push
+  /npm\s+publish/,                       // publish to npm
+];
+
+const SAFE_PREFIXES = [
+  "echo ", "date", "hostname", "whoami", "uptime", "pwd",
+  "ls ", "cat ", "head ", "tail ", "grep ", "find ",
+  "ps ", "top ", "df ", "free ", "uname",
+  "pm2 status", "pm2 list", "pm2 logs",
+  "git status", "git log", "git diff", "git fetch",
+  "npm outdated", "npm list",
+  "curl -s http://localhost",
+];
+
+function reviewCommand(command: string): { approved: boolean; reason: string; riskLevel: string } {
+  const cmd = command.trim();
+
+  // Block dangerous patterns
+  for (const pattern of BLOCKED_PATTERNS) {
+    if (pattern.test(cmd)) {
+      return { approved: false, reason: `Matches dangerous pattern: ${pattern}`, riskLevel: "critical" };
+    }
+  }
+
+  // Auto-approve known safe commands
+  for (const prefix of SAFE_PREFIXES) {
+    if (cmd.startsWith(prefix) || cmd === prefix) {
+      return { approved: true, reason: "Matches safe command whitelist", riskLevel: "safe" };
+    }
+  }
+
+  // Everything else needs caution — approve but flag
+  return { approved: true, reason: "Command not in whitelist — proceed with caution", riskLevel: "medium" };
+}
+
 // ── Route ─────────────────────────────────────────────────────────────────────
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  try {
+    const body = await req.json();
+    if (body.action === "review_command") {
+      const result = reviewCommand(body.command ?? "");
+      return NextResponse.json({ ...result, command: body.command, reviewed: true });
+    }
+    return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: "Bad request" }, { status: 400 });
+  }
+}
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const adminKey = process.env.ADMIN_PASSWORD ?? process.env.ADMIN_KEY;
