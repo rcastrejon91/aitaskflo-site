@@ -18,6 +18,16 @@ const nextConfig = {
     "@panva/hkdf",
     "openid-client",
     "oauth4webapi",
+    // react-pdf uses its own React reconciler with Symbol comparisons that
+    // break when Turbopack bundles it — must load directly from node_modules.
+    "@react-pdf/renderer",
+    "@react-pdf/reconciler",
+    "@react-pdf/layout",
+    "@react-pdf/render",
+    "@react-pdf/primitives",
+    "@react-pdf/font",
+    "@react-pdf/fns",
+    "@react-pdf/pdfkit",
   ],
   // Godot web exports require SharedArrayBuffer → needs COOP + COEP on both
   // the host page (/play) and the static game files (/game/*).
