@@ -109,7 +109,7 @@ Chapter ${ch.number}: "${ch.title}"
 Summary: ${ch.summary}
 ${chapters.length > 0 ? `Previous chapter ended: "${chapters[chapters.length - 1].content.slice(-200)}"` : ""}
 
-Write this chapter in full. Vivid, immersive prose. At least 600 words. No chapter title header — just the story.`);
+Write this chapter in full. Vivid, immersive prose. 300-400 words. No chapter title header — just the story.`);
 
     notify(`Illustrating Chapter ${ch.number}…`);
     const imageUrl = pollinationsUrl(ch.imagePrompt ?? `${ch.title} scene, ${genre} illustration`);

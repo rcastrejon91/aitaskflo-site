@@ -573,7 +573,7 @@ export async function executeTool(
   if (name === "write_book") {
     const concept = input.concept || input.topic || "an epic adventure";
     const genre = input.genre ?? "fantasy";
-    const chapterCount = Math.min(10, Math.max(1, parseInt(input.chapters ?? "5", 10) || 5));
+    const chapterCount = Math.min(5, Math.max(1, parseInt(input.chapters ?? "3", 10) || 3));
     const exportPdf = input.export_pdf === "true";
 
     const progress = (msg: string) => {

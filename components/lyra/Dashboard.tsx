@@ -301,8 +301,8 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
           const updated = [...prev];
           const accumulated = updated[updated.length - 1].content + chunk;
           // Filter out raw Cloudflare/nginx error HTML pages
-          if (accumulated.includes("<!DOCTYPE html") || accumulated.includes("error code: 524") || accumulated.includes("error code: 502") || accumulated.includes("<html")) {
-            updated[updated.length - 1] = { role: "assistant", content: "⚠️ **Connection timed out.** The game is still building on the server — it takes 2–5 minutes. Ask me \"is my game ready?\" in a minute and I'll check on it for you." };
+          if (accumulated.includes("<!DOCTYPE html") || accumulated.includes("error code: 524") || accumulated.includes("error code: 502") || accumulated.includes("<html") || accumulated.includes("A timeout occurred") || accumulated.includes("524: A timeout") || accumulated.includes("cf-error-details")) {
+            updated[updated.length - 1] = { role: "assistant", content: "⚠️ **Connection timed out** — the book takes 3–5 minutes to write and Cloudflare cut it short. Try asking for fewer chapters, e.g. \"write a 3-chapter horror story about Lira\"." };
           } else {
             updated[updated.length - 1] = { role: "assistant", content: accumulated };
           }
