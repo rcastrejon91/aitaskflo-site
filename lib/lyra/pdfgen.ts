@@ -144,17 +144,16 @@ const bookStyles = StyleSheet.create({
 });
 
 function BookCoverPage({ book }: { book: GeneratedBook }) {
+  const overlayChildren = [
+    React.createElement(Text, { key: "title", style: bookStyles.coverTitle }, book.title),
+    ...(book.subtitle ? [React.createElement(Text, { key: "sub", style: bookStyles.coverSubtitle }, book.subtitle)] : []),
+    React.createElement(Text, { key: "author", style: bookStyles.coverAuthor }, `by ${book.author}`),
+  ];
   return React.createElement(Page, { size: [BOOK_W, BOOK_H], style: bookStyles.coverPage },
     book.coverUrl
-      ? React.createElement(Image, { src: book.coverUrl, style: bookStyles.coverImage })
-      : React.createElement(View, { style: { ...bookStyles.coverImage, backgroundColor: "#1a0a2e" } }),
-    React.createElement(View, { style: bookStyles.coverOverlay },
-      React.createElement(Text, { style: bookStyles.coverTitle }, book.title),
-      book.subtitle
-        ? React.createElement(Text, { style: bookStyles.coverSubtitle }, book.subtitle)
-        : null,
-      React.createElement(Text, { style: bookStyles.coverAuthor }, `by ${book.author}`),
-    )
+      ? React.createElement(Image, { key: "img", src: book.coverUrl, style: bookStyles.coverImage })
+      : React.createElement(View, { key: "imgbg", style: { ...bookStyles.coverImage, backgroundColor: "#1a0a2e" } }),
+    React.createElement(View, { key: "overlay", style: bookStyles.coverOverlay }, ...overlayChildren),
   );
 }
 
@@ -193,27 +192,21 @@ function BookChapterPage({ chapter, bookTitle, pageNum }: {
 }) {
   const paragraphs = chapter.content.split("\n").filter(p => p.trim().length > 0);
 
-  return React.createElement(Page, { size: [BOOK_W, BOOK_H], style: bookStyles.chapterPage },
-    // Header
-    React.createElement(View, { style: bookStyles.pageHeader },
-      React.createElement(Text, { style: bookStyles.headerText }, bookTitle.toUpperCase()),
-      React.createElement(Text, { style: bookStyles.headerText }, chapter.title.toUpperCase()),
+  const pageChildren = [
+    React.createElement(View, { key: "hdr", style: bookStyles.pageHeader },
+      React.createElement(Text, { key: "hdr-book", style: bookStyles.headerText }, bookTitle.toUpperCase()),
+      React.createElement(Text, { key: "hdr-ch", style: bookStyles.headerText }, chapter.title.toUpperCase()),
     ),
-    // Chapter label
-    React.createElement(Text, { style: bookStyles.chapterNumber }, `Chapter ${chapter.number}`),
-    React.createElement(Text, { style: bookStyles.chapterTitle }, chapter.title),
-    React.createElement(View, { style: bookStyles.chapterDivider }),
-    // Illustration
-    chapter.imageUrl
-      ? React.createElement(Image, { src: chapter.imageUrl, style: bookStyles.chapterImage })
-      : null,
-    // Body text
+    React.createElement(Text, { key: "chnum", style: bookStyles.chapterNumber }, `Chapter ${chapter.number}`),
+    React.createElement(Text, { key: "chtitle", style: bookStyles.chapterTitle }, chapter.title),
+    React.createElement(View, { key: "divider", style: bookStyles.chapterDivider }),
+    ...(chapter.imageUrl ? [React.createElement(Image, { key: "chimg", src: chapter.imageUrl, style: bookStyles.chapterImage })] : []),
     ...paragraphs.slice(0, 8).map((p, i) =>
-      React.createElement(Text, { key: i, style: bookStyles.bodyText }, p)
+      React.createElement(Text, { key: `p${i}`, style: bookStyles.bodyText }, p)
     ),
-    // Page number
-    React.createElement(Text, { style: bookStyles.pageNumber }, String(pageNum)),
-  );
+    React.createElement(Text, { key: "pgnum", style: bookStyles.pageNumber }, String(pageNum)),
+  ];
+  return React.createElement(Page, { size: [BOOK_W, BOOK_H], style: bookStyles.chapterPage }, ...pageChildren);
 }
 
 export async function generateBookPdf(book: GeneratedBook): Promise<Buffer> {
@@ -338,19 +331,18 @@ function ComicCoverPage({ comic }: { comic: GeneratedComic }) {
 
 function ComicPageEl({ comicPage, title }: { comicPage: ComicPage; title: string }) {
   return React.createElement(Page, { size: [COMIC_W, COMIC_H], style: comicStyles.comicPage },
-    ...comicPage.panels.map((panel, i) =>
-      React.createElement(View, { key: i, style: comicStyles.panel2x3 },
+    ...comicPage.panels.map((panel, i) => {
+      const panelChildren = [
         panel.imageUrl
-          ? React.createElement(Image, { src: panel.imageUrl, style: comicStyles.panelImage })
-          : React.createElement(View, { style: { ...comicStyles.panelImage, backgroundColor: "#ddd" } }),
-        panel.dialogue
-          ? React.createElement(View, { style: comicStyles.dialogueBubble },
-              React.createElement(Text, { style: comicStyles.dialogueText }, panel.dialogue),
-            )
-          : null,
-        React.createElement(Text, { style: comicStyles.panelCaption }, panel.caption),
-      )
-    ),
+          ? React.createElement(Image, { key: "img", src: panel.imageUrl, style: comicStyles.panelImage })
+          : React.createElement(View, { key: "imgbg", style: { ...comicStyles.panelImage, backgroundColor: "#ddd" } }),
+        ...(panel.dialogue ? [React.createElement(View, { key: "dlg", style: comicStyles.dialogueBubble },
+          React.createElement(Text, { style: comicStyles.dialogueText }, panel.dialogue),
+        )] : []),
+        React.createElement(Text, { key: "cap", style: comicStyles.panelCaption }, panel.caption),
+      ];
+      return React.createElement(View, { key: i, style: comicStyles.panel2x3 }, ...panelChildren);
+    }),
     React.createElement(Text, { style: comicStyles.comicPageNumber }, String(comicPage.pageNumber)),
   );
 }
@@ -358,9 +350,9 @@ function ComicPageEl({ comicPage, title }: { comicPage: ComicPage; title: string
 export async function generateComicPdf(comic: GeneratedComic): Promise<Buffer> {
   const doc = React.createElement(Document,
     { title: comic.title, author: comic.author },
-    React.createElement(ComicCoverPage, { comic }),
+    ComicCoverPage({ comic }),
     ...comic.pages.map((p, i) =>
-      React.createElement(ComicPageEl, { key: i, comicPage: p, title: comic.title })
+      ComicPageEl({ comicPage: p, title: comic.title })
     ),
   );
 
