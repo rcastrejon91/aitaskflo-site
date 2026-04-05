@@ -219,11 +219,11 @@ function BookChapterPage({ chapter, bookTitle, pageNum }: {
 export async function generateBookPdf(book: GeneratedBook): Promise<Buffer> {
   const doc = React.createElement(Document,
     { title: book.title, author: book.author, subject: book.description },
-    React.createElement(BookCoverPage, { book }),
-    React.createElement(BookCopyrightPage, { book }),
-    React.createElement(BookTocPage, { book }),
+    BookCoverPage({ book }),
+    BookCopyrightPage({ book }),
+    BookTocPage({ book }),
     ...book.chapters.map((ch, i) =>
-      React.createElement(BookChapterPage, { key: i, chapter: ch, bookTitle: book.title, pageNum: i + 4 })
+      BookChapterPage({ chapter: ch, bookTitle: book.title, pageNum: i + 4 })
     ),
   );
 
