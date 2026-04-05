@@ -494,7 +494,9 @@ ${ch.content.split("\n").filter(Boolean).map((p) => `<p>${p}</p>`).join("")}
         <div className="flex flex-col sm:flex-row gap-5 p-5">
           <img src={book.coverUrl} alt="Cover"
             className="w-full sm:w-36 rounded-xl object-cover flex-shrink-0"
-            style={{ aspectRatio: "3/4", boxShadow: "0 6px 24px rgba(0,0,0,0.5)" }} />
+            loading="lazy"
+            style={{ aspectRatio: "3/4", boxShadow: "0 6px 24px rgba(0,0,0,0.5)" }}
+            onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.2"; }} />
           <div className="flex flex-col justify-center min-w-0">
             <p className="text-[10px] text-violet-400 uppercase tracking-widest mb-1">{book.genre}</p>
             <h3 className="text-lg font-bold text-white mb-0.5 leading-tight">{book.title}</h3>
@@ -523,9 +525,15 @@ ${ch.content.split("\n").filter(Boolean).map((p) => `<p>${p}</p>`).join("")}
         <div className="p-5">
           <p className="text-[10px] text-violet-400 uppercase tracking-widest mb-1">Chapter {ch.number}</p>
           <h3 className="text-base font-bold text-white mb-4">{ch.title}</h3>
-          <img src={ch.imageUrl} alt={ch.title}
-            className="w-full max-w-sm mx-auto rounded-xl object-cover mb-5"
-            style={{ aspectRatio: "16/9", boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }} />
+          {ch.imageUrl && (
+            <div className="w-full max-w-sm mx-auto rounded-xl mb-5 overflow-hidden bg-white/5"
+              style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }}>
+              <img src={ch.imageUrl} alt={ch.title}
+                className="w-full object-cover"
+                loading="lazy"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+            </div>
+          )}
           <div className="space-y-2 max-h-72 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10">
             {ch.content.split("\n").filter(Boolean).map((p, i) => (
               <p key={i} className="text-xs text-white/75 leading-relaxed">{p}</p>
