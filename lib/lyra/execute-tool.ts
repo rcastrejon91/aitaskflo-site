@@ -7,6 +7,7 @@ import { scoreAts, formatAtsScore, buildTailorPrompt } from "@/lib/lyra/resume";
 import { executeHsAction } from "@/lib/lyra/hubspot";
 import { detectEngine } from "@/lib/lyra/gamedev";
 import { generateBook } from "@/lib/lyra/bookgen";
+import { generateBookPdf, generateComicPdf } from "@/lib/lyra/pdfgen";
 import { savePendingAction } from "@/lib/lyra/pending-actions";
 import {
   pollinationsUrl,
@@ -600,7 +601,6 @@ export async function executeTool(
     if (exportPdf) {
       try {
         progress("Generating Amazon KDP PDF…");
-        const { generateBookPdf } = await import("@/lib/lyra/pdfgen");
         const pdfBuf = await generateBookPdf(book);
         // Save to public for download
         const fsp = await import("fs/promises");
@@ -636,7 +636,6 @@ export async function executeTool(
     progress(`Writing ${pageCount}-page ${genre} comic script…`);
 
     const { generateComic } = await import("@/lib/lyra/comicgen");
-    const { generateComicPdf } = await import("@/lib/lyra/pdfgen");
 
     const comicKeepAlive = setInterval(() => {
       try { controller.enqueue(encoder.encode(" ")); } catch { /* closed */ }
