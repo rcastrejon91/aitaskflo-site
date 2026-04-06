@@ -968,6 +968,63 @@ ACTIONS:
     },
   },
 
+  // ── Trading (Alpaca) ─────────────────────────────────────────────────────
+  {
+    name: "trading_account",
+    description: "Get the current trading account status — cash, equity, buying power, today's P&L, and all open positions. Use when asked about portfolio, account balance, or how trades are doing.",
+    input_schema: { type: "object" as const, properties: {}, required: [] },
+  },
+  {
+    name: "trading_analyze",
+    description: "Analyze a stock symbol — price, trend, RSI, moving averages, 20-day range. Use before placing a trade or when asked to analyze a stock.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        symbol: { type: "string", description: "Stock ticker, e.g. AAPL, NVDA, TSLA" },
+      },
+      required: ["symbol"],
+    },
+  },
+  {
+    name: "trading_buy",
+    description: "Buy a stock. Use notional to buy a dollar amount (e.g. $50 worth) or qty for number of shares. Always analyze first. Always confirm with user before buying with real money.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        symbol:     { type: "string", description: "Stock ticker e.g. AAPL" },
+        notional:   { type: "number", description: "Dollar amount to buy, e.g. 50 for $50 worth" },
+        qty:        { type: "number", description: "Number of shares (use notional instead for dollar-based buying)" },
+        limitPrice: { type: "number", description: "Limit price — only buy at this price or lower" },
+        reason:     { type: "string", description: "Why Lyra is buying this (shown to user)" },
+      },
+      required: ["symbol"],
+    },
+  },
+  {
+    name: "trading_sell",
+    description: "Sell a stock position. Use qty to sell specific shares or omit to sell entire position.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        symbol: { type: "string", description: "Stock ticker to sell" },
+        qty:    { type: "number", description: "Shares to sell — omit to sell entire position" },
+        reason: { type: "string", description: "Why selling" },
+      },
+      required: ["symbol"],
+    },
+  },
+  {
+    name: "trading_orders",
+    description: "List recent orders — pending, filled, cancelled.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        status: { type: "string", description: "Filter: all, open, closed, cancelled" },
+      },
+      required: [],
+    },
+  },
+
   // ── Autonomous browser ───────────────────────────────────────────────────
   {
     name: "browse_web",

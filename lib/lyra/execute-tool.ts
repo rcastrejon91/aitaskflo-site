@@ -571,6 +571,88 @@ export async function executeTool(
     return "Computer task timed out — agent may not be running.";
   }
 
+  // ── Trading (Alpaca) ─────────────────────────────────────────────────────
+  if (name === "trading_account") {
+    const { getPortfolioSummary } = await import("@/lib/lyra/trading");
+    return await getPortfolioSummary();
+  }
+
+  if (name === "trading_analyze") {
+    const { analyzeSymbol } = await import("@/lib/lyra/trading");
+    const symbol = String(input.symbol ?? "").toUpperCase();
+    controller.enqueue(encoder.encode(`\n📊 Analyzing **${symbol}**…\n`));
+    return await analyzeSymbol(symbol);
+  }
+
+  if (name === "trading_buy") {
+    const { placeOrder, analyzeSymbol } = await import("@/lib/lyra/trading");
+    const symbol = String(input.symbol ?? "").toUpperCase();
+    const notional = input.notional ? Number(input.notional) : undefined;
+    const qty      = input.qty      ? Number(input.qty)      : undefined;
+    const reason   = String(input.reason ?? "Lyra buy signal");
+
+    if (!notional && !qty) return "⚠️ Specify notional (dollar amount) or qty (shares).";
+
+    controller.enqueue(encoder.encode(`\n📈 Analyzing ${symbol} before buying…\n`));
+    const analysis = await analyzeSymbol(symbol);
+    controller.enqueue(encoder.encode(`\n${analysis}\n`));
+    controller.enqueue(encoder.encode(`\n💰 Placing **BUY** order for **${symbol}**${notional ? ` ($${notional})` : ` (${qty} shares)`}…\n`));
+
+    const order = await placeOrder({
+      symbol, side: "buy",
+      type: input.limitPrice ? "limit" : "market",
+      notional, qty,
+      limitPrice: input.limitPrice ? Number(input.limitPrice) : undefined,
+      note: reason,
+    });
+
+    return `✅ **BUY order placed** — ${order.paper ? "📝 PAPER" : "💵 LIVE"}
+Symbol: **${order.symbol}**
+Amount: ${order.notional ? `$${order.notional}` : `${order.qty} shares`}
+Type: ${order.type}
+Status: ${order.status}
+Order ID: \`${order.id}\`
+Reason: ${reason}`;
+  }
+
+  if (name === "trading_sell") {
+    const { placeOrder, getPositions } = await import("@/lib/lyra/trading");
+    const symbol = String(input.symbol ?? "").toUpperCase();
+    const reason = String(input.reason ?? "Lyra sell signal");
+
+    // If no qty, sell entire position
+    let qty = input.qty ? Number(input.qty) : undefined;
+    if (!qty) {
+      const positions = await getPositions();
+      const pos = positions.find(p => p.symbol === symbol);
+      if (!pos) return `⚠️ No open position in **${symbol}**.`;
+      qty = pos.qty;
+    }
+
+    controller.enqueue(encoder.encode(`\n📉 Selling **${qty} shares of ${symbol}**…\n`));
+
+    const order = await placeOrder({
+      symbol, side: "sell", type: "market", qty, note: reason,
+    });
+
+    return `✅ **SELL order placed** — ${order.paper ? "📝 PAPER" : "💵 LIVE"}
+Symbol: **${order.symbol}**
+Qty: ${order.qty} shares
+Status: ${order.status}
+Order ID: \`${order.id}\`
+Reason: ${reason}`;
+  }
+
+  if (name === "trading_orders") {
+    const { getOrders } = await import("@/lib/lyra/trading");
+    const status = String(input.status ?? "all");
+    const orders = await getOrders(status, 10);
+    if (orders.length === 0) return "No orders found.";
+    return orders.map(o =>
+      `• **${o.symbol}** ${o.side.toUpperCase()} ${o.qty ?? `$${o.notional}`} @ ${o.filled ? `$${o.filled}` : o.type} — ${o.status}`
+    ).join("\n");
+  }
+
   // ── Autonomous web browsing (server-side Playwright) ─────────────────────
   if (name === "browse_web") {
     const { url, task } = input as { url: string; task: string };
