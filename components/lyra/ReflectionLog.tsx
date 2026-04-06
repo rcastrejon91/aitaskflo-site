@@ -83,8 +83,8 @@ function ReflectionCard({ reflection, index }: { reflection: Reflection; index: 
         {reflection.lessonsLearned.length > 0 && (
           <div>
             <div className="flex items-center gap-1 mb-1">
-              <BookOpen className="w-3 h-3 text-purple-400" />
-              <span className="text-purple-400 text-xs font-medium">Lessons</span>
+              <BookOpen className="w-3 h-3 text-teal-400" />
+              <span className="text-teal-400 text-xs font-medium">Lessons</span>
             </div>
             <ul className="space-y-0.5">
               {reflection.lessonsLearned.map((item, i) => (
@@ -124,14 +124,16 @@ export function ReflectionLog({ reflections, agentId }: Props) {
       {avgScore > 0 && (
         <div className="flex justify-end mb-2">
           <span className="text-[10px] text-white/35">
-            avg <span className="text-purple-400 font-semibold">{avgScore.toFixed(1)}/10</span>
+            avg <span className="text-teal-400 font-semibold">{avgScore.toFixed(1)}/10</span>
           </span>
         </div>
       )}
       <div className="flex-1 overflow-y-auto">
         {sorted.length === 0 ? (
-          <div className="text-center text-white/25 text-xs py-8 leading-relaxed">
-            No reflections yet.<br />End a conversation to generate one.
+          <div className="text-center py-10 px-4">
+            <div className="text-2xl mb-3">🧠</div>
+            <p className="text-white/40 text-xs font-medium mb-1">No reflections yet</p>
+            <p className="text-white/20 text-[11px] leading-relaxed">Lyra reflects after each conversation — analyzing what went well, what to improve, and what she learned.</p>
           </div>
         ) : (
           sorted.map((r, i) => (

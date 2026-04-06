@@ -43,14 +43,14 @@ function CrystalBallLoader() {
       <span className="relative flex-shrink-0" style={{ width: 36, height: 36 }}>
         {/* Glow behind ball */}
         <span className="absolute inset-0 rounded-full animate-pulse" style={{
-          background: "radial-gradient(circle, rgba(139,92,246,0.4) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(20,184,166,0.3) 0%, transparent 70%)",
           transform: "scale(1.4)",
         }} />
         {/* Crystal ball body */}
         <span className="absolute inset-0 rounded-full" style={{
-          background: "radial-gradient(circle at 35% 35%, rgba(255,255,255,0.18) 0%, rgba(139,92,246,0.35) 40%, rgba(76,29,149,0.7) 100%)",
-          boxShadow: "0 0 16px rgba(139,92,246,0.5), inset 0 1px 2px rgba(255,255,255,0.15)",
-          border: "1px solid rgba(139,92,246,0.4)",
+          background: "radial-gradient(circle at 35% 35%, rgba(255,255,255,0.18) 0%, rgba(20,184,166,0.25) 40%, rgba(76,29,149,0.7) 100%)",
+          boxShadow: "0 0 16px rgba(20,184,166,0.35), inset 0 1px 2px rgba(255,255,255,0.15)",
+          border: "1px solid rgba(20,184,166,0.3)",
         }} />
         {/* Inner swirl */}
         <span className="absolute rounded-full" style={{
@@ -61,7 +61,7 @@ function CrystalBallLoader() {
         {/* Base */}
         <span className="absolute bottom-0 left-1/2 -translate-x-1/2" style={{
           width: 20, height: 4,
-          background: "linear-gradient(90deg, transparent, rgba(139,92,246,0.4), transparent)",
+          background: "linear-gradient(90deg, transparent, rgba(20,184,166,0.3), transparent)",
           borderRadius: "50%",
         }} />
 
@@ -85,14 +85,14 @@ function CrystalBallLoader() {
       </span>
 
       <span className="flex flex-col gap-0.5">
-        <span className="text-xs text-violet-300/70 animate-pulse" style={{ letterSpacing: "0.05em" }}>
+        <span className="text-xs text-teal-300/70 animate-pulse" style={{ letterSpacing: "0.05em" }}>
           Lyra is thinking…
         </span>
         <span className="flex gap-1">
           {[0, 1, 2].map((i) => (
             <span key={i} className="rounded-full" style={{
               width: 4, height: 4,
-              background: "rgba(139,92,246,0.6)",
+              background: "rgba(20,184,166,0.5)",
               animation: `bounce 1.2s ${i * 0.2}s ease-in-out infinite`,
             }} />
           ))}
@@ -115,11 +115,11 @@ function ReflectionChatCard({ reflection }: { reflection: any }) {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: "spring", damping: 18, stiffness: 260 }}
       className="my-3 rounded-2xl overflow-hidden"
-      style={{ border: "1px solid rgba(139,92,246,0.25)", background: "linear-gradient(135deg, rgba(88,28,235,0.12) 0%, rgba(109,40,217,0.06) 100%)" }}
+      style={{ border: "1px solid rgba(139,92,246,0.25)", background: "linear-gradient(135deg, rgba(15,118,110,0.08) 0%, rgba(109,40,217,0.06) 100%)" }}
     >
       <div className="flex items-center gap-2.5 px-4 py-2.5" style={{ borderBottom: "1px solid rgba(139,92,246,0.15)" }}>
         <span className="text-base">🔮</span>
-        <span className="text-xs font-semibold text-violet-300 tracking-wide">Reflection</span>
+        <span className="text-xs font-semibold text-teal-300 tracking-wide">Reflection</span>
         <span className="ml-auto text-xs font-bold tabular-nums" style={{ color }}>{score}/10</span>
         <span className="text-xs" style={{ color, letterSpacing: "-1px" }}>{stars}</span>
       </div>
@@ -160,14 +160,14 @@ function EvolutionChatCard({ agent }: { agent: any }) {
       animate={{ opacity: 1, scale: 1 }}
       transition={{ type: "spring", damping: 15, stiffness: 200 }}
       className="my-3 rounded-2xl overflow-hidden text-center py-5 px-4"
-      style={{ border: "1px solid rgba(217,70,239,0.3)", background: "linear-gradient(135deg, rgba(134,25,143,0.15) 0%, rgba(88,28,235,0.1) 100%)" }}
+      style={{ border: "1px solid rgba(20,184,166,0.25)", background: "linear-gradient(135deg, rgba(15,118,110,0.12) 0%, rgba(6,182,212,0.06) 100%)" }}
     >
       <motion.div
         animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.15, 1] }}
         transition={{ duration: 1.2, ease: "easeInOut" }}
         className="text-4xl mb-2"
       >✨</motion.div>
-      <p className="text-xs font-semibold text-fuchsia-300 tracking-widest uppercase mb-1">Evolution</p>
+      <p className="text-xs font-semibold text-cyan-300 tracking-widest uppercase mb-1">Evolution</p>
       <p className="text-sm font-bold text-white">{agent?.name ?? "New generation"}</p>
       {agent?.evolutionNotes && (
         <p className="text-xs text-white/45 mt-1.5 leading-relaxed">{agent.evolutionNotes}</p>
@@ -493,7 +493,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                 onClick={triggerEvolution}
                 disabled={evolving}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all disabled:opacity-40"
-                style={{ background: "rgba(109,40,217,0.15)", border: "1px solid rgba(109,40,217,0.3)", color: "rgb(196,181,253)" }}
+                style={{ background: "rgba(20,184,166,0.12)", border: "1px solid rgba(20,184,166,0.25)", color: "rgb(153,246,228)" }}
               >
                 {evolving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
                 {evolving ? "Evolving…" : "Evolve"}
@@ -546,7 +546,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
               <div className="flex flex-col items-center justify-center h-full text-center px-4 gap-8">
                 {/* Hero icon + greeting */}
                 <div>
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xl" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 8px 32px rgba(109,40,217,0.35)" }}>
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xl" style={{ background: "linear-gradient(135deg, rgb(15,118,110), rgb(6,182,212))", boxShadow: "0 8px 32px rgba(109,40,217,0.35)" }}>
                     <Sparkles className="w-8 h-8 text-white" />
                   </div>
                   <h2 className="text-xl font-semibold text-white mb-1">{activeAgent.name}</h2>
@@ -564,8 +564,8 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                       className="p-3.5 rounded-xl text-left transition-all group"
                       style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}
                       onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(109,40,217,0.4)";
-                        (e.currentTarget as HTMLButtonElement).style.background = "rgba(109,40,217,0.07)";
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(20,184,166,0.3)";
+                        (e.currentTarget as HTMLButtonElement).style.background = "rgba(20,184,166,0.06)";
                       }}
                       onMouseLeave={(e) => {
                         (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.07)";
@@ -593,7 +593,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                   return (
                     <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                       {msg.role === "assistant" && (
-                        <div className="w-7 h-7 rounded-xl flex items-center justify-center mr-2.5 flex-shrink-0 mt-0.5" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 2px 10px rgba(109,40,217,0.3)" }}>
+                        <div className="w-7 h-7 rounded-xl flex items-center justify-center mr-2.5 flex-shrink-0 mt-0.5" style={{ background: "linear-gradient(135deg, rgb(15,118,110), rgb(6,182,212))", boxShadow: "0 2px 10px rgba(20,184,166,0.25)" }}>
                           <Sparkles className="w-3.5 h-3.5 text-white" />
                         </div>
                       )}
@@ -601,7 +601,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                         className={`max-w-[80%] sm:max-w-xl rounded-2xl px-4 py-3 ${msg.role === "user" ? "text-sm text-white" : "text-[15px] text-white/90"}`}
                         style={msg.role === "user" ? {
                           background: "linear-gradient(135deg, rgba(109,40,217,0.9), rgba(134,25,143,0.85))",
-                          border: "1px solid rgba(109,40,217,0.3)",
+                          border: "1px solid rgba(20,184,166,0.25)",
                           boxShadow: "0 4px 20px rgba(109,40,217,0.2)",
                         } : {
                           background: "rgba(255,255,255,0.04)",
@@ -642,7 +642,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                       className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] transition-all"
                       style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.38)" }}
                       onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(109,40,217,0.4)";
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(20,184,166,0.3)";
                         (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.7)";
                       }}
                       onMouseLeave={(e) => {
@@ -684,7 +684,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                   onClick={() => sendMessage()}
                   disabled={!input.trim() || isLoading}
                   className="text-white p-3.5 rounded-2xl transition-all flex-shrink-0 disabled:opacity-25"
-                  style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 4px 16px rgba(109,40,217,0.3)" }}
+                  style={{ background: "linear-gradient(135deg, rgb(15,118,110), rgb(6,182,212))", boxShadow: "0 4px 16px rgba(20,184,166,0.25)" }}
                 >
                   {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                 </button>
@@ -753,7 +753,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                         </div>
                         {agent.id !== activeAgent.id && (
                           <button onClick={() => switchAgent(agent.id)} className="text-[10px] transition-colors" style={{ color: "rgb(167,139,250)" }}
-                            onMouseEnter={(e) => (e.currentTarget.style.color = "rgb(196,181,253)")}
+                            onMouseEnter={(e) => (e.currentTarget.style.color = "rgb(153,246,228)")}
                             onMouseLeave={(e) => (e.currentTarget.style.color = "rgb(167,139,250)")}
                           >
                             Switch →
@@ -797,7 +797,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                       onClick={() => setRightPanel(tab)}
                       className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                       style={rightPanel === tab
-                        ? { background: tab === "reflection" ? "rgba(161,98,7,0.15)" : "rgba(134,25,143,0.15)", color: tab === "reflection" ? "rgb(252,211,77)" : "rgb(240,171,252)" }
+                        ? { background: tab === "reflection" ? "rgba(161,98,7,0.15)" : "rgba(15,118,110,0.12)", color: tab === "reflection" ? "rgb(252,211,77)" : "rgb(240,171,252)" }
                         : { color: "rgba(255,255,255,0.38)" }
                       }
                     >
@@ -839,7 +839,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
       <button
         onClick={() => setMobileRightOpen(true)}
         className="fixed bottom-20 right-4 z-30 lg:hidden w-11 h-11 rounded-full flex items-center justify-center transition-all"
-        style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 4px 20px rgba(109,40,217,0.4)" }}
+        style={{ background: "linear-gradient(135deg, rgb(15,118,110), rgb(6,182,212))", boxShadow: "0 4px 20px rgba(20,184,166,0.3)" }}
       >
         <SlidersHorizontal className="w-4 h-4 text-white" />
       </button>
@@ -855,7 +855,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
             className="fixed bottom-20 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl max-w-xs"
             style={{ background: "rgba(15,15,25,0.97)", border: "1px solid rgba(109,40,217,0.25)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}
           >
-            <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))" }}>
+            <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, rgb(15,118,110), rgb(6,182,212))" }}>
               {activityToast.user[0]}
             </div>
             <div>
