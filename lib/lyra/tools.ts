@@ -983,14 +983,14 @@ ACTIONS:
   },
   {
     name: "game_walkthrough",
-    description: "Open a game in a real browser, play through it, and generate a step-by-step walkthrough with screenshots. Works with Godot web games and any browser-based game. Use when asked to play, guide through, or explain how to beat a game.",
+    description: "Read a game's source code and generate a complete player walkthrough guide — controls, objectives, enemy strategies, tips and secrets. Works for any game built with Lyra (Godot GDScript). Use when asked to walk through, guide, explain, or help beat a game.",
     input_schema: {
       type: "object" as const,
       properties: {
-        gameUrl:  { type: "string", description: "Full URL of the game to play" },
-        gameName: { type: "string", description: "Name of the game" },
+        gameUrl:  { type: "string", description: "Game slug or URL, e.g. 'the-covenant' or '/games/the-covenant'" },
+        gameName: { type: "string", description: "Display name of the game, e.g. 'The Covenant'" },
       },
-      required: ["gameUrl", "gameName"],
+      required: ["gameName"],
     },
   },
 

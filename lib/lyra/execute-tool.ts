@@ -585,22 +585,104 @@ export async function executeTool(
     return result;
   }
 
-  // ── Game walkthrough (Playwright plays the game) ─────────────────────────
+  // ── Game walkthrough (reads source code, generates real guide) ──────────
   if (name === "game_walkthrough") {
     const { gameUrl, gameName } = input as { gameUrl: string; gameName: string };
-    controller.enqueue(encoder.encode(`\n🎮 Loading **${gameName}** for walkthrough…\n`));
-    controller.enqueue(encoder.encode(`\n> Lyra is opening the game in a real browser and playing through it.\n`));
+    controller.enqueue(encoder.encode(`\n🎮 Analyzing **${gameName}** source code for walkthrough…\n`));
 
-    const { runGameWalkthrough } = await import("@/lib/lyra/browser");
-    const steps = await runGameWalkthrough(gameUrl, gameName, (step) => {
-      controller.enqueue(encoder.encode(`\n---\n**Step ${step.step}** *(${step.action})*\n\n${step.narration}\n`));
+    // Derive slug from gameName or gameUrl
+    const slugFromUrl = gameUrl ? gameUrl.split("/").filter(Boolean).pop() ?? "" : "";
+    const slugFromName = gameName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const slug = slugFromUrl || slugFromName;
+
+    // Find game files on disk
+    const fsp = await import("fs/promises");
+    const nodePath = await import("path");
+    const GAMES_ROOT = process.env.GAMES_ROOT ?? "/home/aitaskflo/game";
+
+    // Try slug directly, then fuzzy match
+    let gameDir = nodePath.join(GAMES_ROOT, slug);
+    try {
+      await fsp.access(gameDir);
+    } catch {
+      // Try to find any folder containing the name
+      try {
+        const dirs = await fsp.readdir(GAMES_ROOT);
+        const match = dirs.find(d => d.toLowerCase().includes(slugFromName.split("-")[0]));
+        if (match) gameDir = nodePath.join(GAMES_ROOT, match);
+      } catch { /* no games dir */ }
+    }
+
+    // Collect all .gd and .tscn files
+    const codeFiles: string[] = [];
+    async function walk(dir: string) {
+      try {
+        const entries = await fsp.readdir(dir, { withFileTypes: true });
+        for (const e of entries) {
+          const full = nodePath.join(dir, e.name);
+          if (e.isDirectory() && !e.name.startsWith(".")) await walk(full);
+          else if (e.name.endsWith(".gd") || e.name === "project.godot") codeFiles.push(full);
+        }
+      } catch { /* skip unreadable */ }
+    }
+    await walk(gameDir);
+
+    // Read up to 12 files (prioritise Player, GameManager, enemies)
+    const priority = ["Player", "GameManager", "Game", "Main", "Enemy", "Boss", "HUD", "project.godot"];
+    codeFiles.sort((a, b) => {
+      const ai = priority.findIndex(p => a.includes(p));
+      const bi = priority.findIndex(p => b.includes(p));
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
     });
 
-    const summary = steps.map(s =>
-      `**Step ${s.step}** — ${s.narration}`
-    ).join("\n\n");
+    const snippets: string[] = [];
+    let totalChars = 0;
+    for (const f of codeFiles.slice(0, 12)) {
+      try {
+        const rel = f.replace(gameDir, "").replace(/\\/g, "/");
+        const content = await fsp.readFile(f, "utf-8");
+        const trimmed = content.slice(0, 3000);
+        snippets.push(`### ${rel}\n\`\`\`gdscript\n${trimmed}${content.length > 3000 ? "\n// ...truncated" : ""}\n\`\`\``);
+        totalChars += trimmed.length;
+        if (totalChars > 20000) break;
+      } catch { /* skip */ }
+    }
 
-    return `## 🎮 ${gameName} — Walkthrough\n\n${summary}`;
+    if (snippets.length === 0) {
+      return `⚠️ Could not find source files for **${gameName}** (looked in \`${gameDir}\`). Make sure the game folder exists on the server.`;
+    }
+
+    controller.enqueue(encoder.encode(`\n📂 Read ${snippets.length} source files — generating walkthrough…\n`));
+
+    // Use Claude to write a real walkthrough
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const ai = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const msg = await ai.messages.create({
+      model: "claude-opus-4-6",
+      max_tokens: 3000,
+      messages: [{
+        role: "user",
+        content: `You are Lyra, a witty and knowledgeable game guide. Read the following source code from the game "${gameName}" and write a comprehensive, fun, player-friendly walkthrough guide.
+
+Include:
+- **Overview** — what kind of game it is, the vibe
+- **Controls** — exact keys/buttons from the Player script
+- **Objective** — what the player must do to win
+- **Step-by-step guide** — how to progress, survive, beat enemies
+- **Pro tips** — hidden mechanics, tricks, optimal strategies
+- **Enemy guide** — if there are enemies, how to fight them
+- **Secrets/Easter eggs** — anything cool you spot in the code
+
+Be enthusiastic and helpful. Use emoji. Reference specific mechanics you found in the code.
+
+---
+${snippets.join("\n\n")}`,
+      }],
+    });
+
+    const walkthrough = msg.content[0].type === "text" ? msg.content[0].text : "Could not generate walkthrough.";
+    return `## 🎮 ${gameName} — Complete Walkthrough\n\n${walkthrough}`;
   }
 
   if (name === "write_book") {
