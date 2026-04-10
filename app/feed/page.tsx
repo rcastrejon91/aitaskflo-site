@@ -11,8 +11,7 @@ export const metadata: Metadata = {
   },
 };
 
-// Revalidate every 5 minutes so the feed stays fresh
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export default function FeedPage() {
   return <FeedClient />;
