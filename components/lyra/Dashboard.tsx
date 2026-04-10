@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Send, Loader2, Lightbulb, GitBranch,
   Zap, ArrowLeft, CheckCircle, AlertCircle, X, LogOut, SlidersHorizontal, Settings,
-  MessageSquare, Truck, Gamepad2, BookOpen, Play, Building2, Briefcase, Users, TrendingUp, GraduationCap, Rss, FlaskConical, Brain,
+  MessageSquare, Truck, Gamepad2, BookOpen, Play, Building2, Briefcase, Users, TrendingUp, GraduationCap, Rss, FlaskConical, Brain, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
@@ -412,6 +412,10 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
   }
 
   const pathname = usePathname();
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const scrollTabs = (dir: "left" | "right") => {
+    tabsRef.current?.scrollBy({ left: dir === "right" ? 160 : -160, behavior: "smooth" });
+  };
 
   const NAV_TABS = [
     { href: "/lyra",      icon: MessageSquare, label: "Chat"      },
@@ -555,14 +559,18 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
       </header>
 
       {/* ── Tab bar ─────────────────────────────────────────────── */}
-      <div className="relative flex-shrink-0 sticky top-0 z-30" style={{ background: "rgba(0,0,0,0.6)", borderBottom: "1px solid rgba(255,255,255,0.06)", backdropFilter: "blur(12px)" }}>
-        <nav className="flex overflow-x-auto scrollbar-none">
+      <div className="relative flex-shrink-0" style={{ background: "rgba(0,0,0,0.6)", borderBottom: "1px solid rgba(255,255,255,0.06)", backdropFilter: "blur(12px)" }}>
+        {/* Left arrow */}
+        <button onClick={() => scrollTabs("left")}
+          className="absolute left-0 top-0 bottom-0 z-10 flex items-center px-1.5"
+          style={{ background: "linear-gradient(to right, rgba(0,0,0,0.8) 60%, transparent)" }}>
+          <ChevronLeft className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.4)" }} />
+        </button>
+        <nav ref={tabsRef} className="flex overflow-x-auto px-5" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
           {NAV_TABS.map(({ href, icon: Icon, label }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
             return (
-              <Link
-                key={href}
-                href={href}
+              <Link key={href} href={href}
                 className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all relative flex-shrink-0"
                 style={{ color: active ? "rgb(20,184,166)" : "rgba(255,255,255,0.3)" }}
                 onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.6)"; }}
@@ -570,16 +578,17 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
               >
                 <Icon className="w-3.5 h-3.5" />
                 {label}
-                {active && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5" style={{ background: "rgb(20,184,166)" }} />
-                )}
+                {active && <span className="absolute bottom-0 left-0 right-0 h-0.5" style={{ background: "rgb(20,184,166)" }} />}
               </Link>
             );
           })}
         </nav>
-        {/* Right fade — signals more tabs exist */}
-        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-12"
-          style={{ background: "linear-gradient(to left, rgba(0,0,0,0.6), transparent)" }} />
+        {/* Right arrow */}
+        <button onClick={() => scrollTabs("right")}
+          className="absolute right-0 top-0 bottom-0 z-10 flex items-center px-1.5"
+          style={{ background: "linear-gradient(to left, rgba(0,0,0,0.8) 60%, transparent)" }}>
+          <ChevronRight className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.4)" }} />
+        </button>
       </div>
 
       {/* ── Body ─────────────────────────────────────────────────── */}

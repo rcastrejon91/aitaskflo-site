@@ -1,10 +1,11 @@
 "use client";
 
+import { useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
-  ArrowLeft, Settings, LogOut,
+  ArrowLeft, Settings, LogOut, ChevronLeft, ChevronRight,
   MessageSquare, GraduationCap, Truck, Gamepad2, Play, BookOpen,
   Briefcase, Building2, Users, TrendingUp, Rss, FlaskConical, Sparkles, Brain,
 } from "lucide-react";
@@ -27,6 +28,11 @@ const NAV_TABS = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const tabsRef = useRef<HTMLDivElement>(null);
+
+  const scrollTabs = (dir: "left" | "right") => {
+    tabsRef.current?.scrollBy({ left: dir === "right" ? 160 : -160, behavior: "smooth" });
+  };
 
   return (
     <div className="flex flex-col text-white" style={{ minHeight: "100dvh", background: "#09090f" }}>
@@ -67,9 +73,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Tab bar with fade hint */}
-      <div className="relative flex-shrink-0 sticky top-12 z-40" style={{ background: "rgba(0,0,0,0.5)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        <nav className="flex overflow-x-auto scrollbar-none">
+      {/* Tab bar with arrow scroll buttons */}
+      <div className="relative flex-shrink-0 sticky top-12 z-40"
+        style={{ background: "rgba(0,0,0,0.6)", borderBottom: "1px solid rgba(255,255,255,0.06)", backdropFilter: "blur(12px)" }}>
+
+        {/* Left arrow */}
+        <button onClick={() => scrollTabs("left")}
+          className="absolute left-0 top-0 bottom-0 z-10 flex items-center px-1.5"
+          style={{ background: "linear-gradient(to right, rgba(0,0,0,0.85) 60%, transparent)" }}>
+          <ChevronLeft className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.4)" }} />
+        </button>
+
+        <nav ref={tabsRef} className="flex overflow-x-auto px-5"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
           {NAV_TABS.map(({ href, icon: Icon, label }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
             return (
@@ -86,9 +102,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        {/* Right fade — signals more tabs exist */}
-        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-12"
-          style={{ background: "linear-gradient(to left, rgba(0,0,0,0.7), transparent)" }} />
+
+        {/* Right arrow */}
+        <button onClick={() => scrollTabs("right")}
+          className="absolute right-0 top-0 bottom-0 z-10 flex items-center px-1.5"
+          style={{ background: "linear-gradient(to left, rgba(0,0,0,0.85) 60%, transparent)" }}>
+          <ChevronRight className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.4)" }} />
+        </button>
       </div>
 
       {/* Page content */}
