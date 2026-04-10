@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Loader2, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { Starfield } from "@/components/lyra/Starfield";
 
 // ── Mini demo window (reused from landing page) ───────────────────────────────
 
@@ -142,14 +143,11 @@ function LoginForm() {
       className="min-h-screen flex items-center justify-center px-4 py-12"
       style={{ background: "#080810" }}
     >
-      {/* Background blobs */}
+      {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <Starfield className="absolute inset-0 w-full h-full opacity-60" />
         <div className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[700px] h-[500px] rounded-full blur-[130px]" style={{ background: "rgba(109,40,217,0.1)" }} />
         <div className="absolute bottom-[-10%] right-[-10%] w-[400px] h-[400px] rounded-full blur-[110px]" style={{ background: "rgba(134,25,143,0.07)" }} />
-        <div className="absolute inset-0" style={{
-          backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.02) 1px, transparent 0)",
-          backgroundSize: "44px 44px",
-        }} />
       </div>
 
       {/* Back */}

@@ -10,6 +10,7 @@ import {
   CheckCircle, Users, Globe, ChevronRight, Star, Terminal, Check,
 } from "lucide-react";
 import DemoMode from "@/components/lyra/DemoMode";
+import { Starfield } from "@/components/lyra/Starfield";
 
 // ── Demo window typing animation ─────────────────────────────────────────────
 
@@ -140,6 +141,7 @@ export default function Home() {
 
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <Starfield className="absolute inset-0 w-full h-full opacity-60" />
         <div className="absolute top-[-15%] left-1/2 -translate-x-1/2 w-[900px] h-[600px] rounded-full blur-[140px]" style={{ background: "rgba(109,40,217,0.12)" }} />
         <div className="absolute top-[30%] left-[-15%] w-[500px] h-[500px] rounded-full blur-[120px]" style={{ background: "rgba(134,25,143,0.07)" }} />
         <div className="absolute top-[50%] right-[-15%] w-[500px] h-[500px] rounded-full blur-[120px]" style={{ background: "rgba(79,70,229,0.07)" }} />
