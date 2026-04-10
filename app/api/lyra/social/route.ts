@@ -7,7 +7,8 @@ import { getAllLearnings } from "@/lib/lyra/weblearner";
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const view = searchParams.get("view") ?? "feed";
-  const limit = Math.min(parseInt(searchParams.get("limit") ?? "30"), 100);
+  const limitRaw = parseInt(searchParams.get("limit") ?? "30", 10);
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 100) : 30;
 
   if (view === "queue") {
     const session = await auth();

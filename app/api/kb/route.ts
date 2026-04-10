@@ -29,10 +29,9 @@ export async function POST(req: NextRequest) {
   if (!slug || !file) return NextResponse.json({ error: "Missing slug or file" }, { status: 400 });
   if (file.size > MAX_FILE_SIZE) return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 400 });
 
-  // Allow text/* types + json
   const fileType = file.type || "text/plain";
-  if (!ALLOWED_TYPES.some(t => fileType.startsWith(t.split("/")[0]) || fileType === t)) {
-    // Still try to process as text
+  if (!ALLOWED_TYPES.includes(fileType) && !fileType.startsWith("text/")) {
+    return NextResponse.json({ error: "File type not allowed" }, { status: 400 });
   }
 
   let content: string;

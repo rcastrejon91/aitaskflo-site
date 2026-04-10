@@ -22,12 +22,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
   const { message, history } = await req.json();
 
-  // Inject knowledge base context if available
-  const { buildKbContext } = await import("@/lib/lyra/knowledge-base");
-  const kbContext = await buildKbContext(slug, message);
   if (!message || typeof message !== "string") {
     return new Response("Invalid message", { status: 400 });
   }
+  if (message.length > 32_000) {
+    return new Response("Message too long", { status: 400 });
+  }
+
+  // Inject knowledge base context if available
+  const { buildKbContext } = await import("@/lib/lyra/knowledge-base");
+  const kbContext = await buildKbContext(slug, message);
 
   const agent = getActiveAgent();
   if (!agent) return new Response("Agent not found", { status: 404 });
