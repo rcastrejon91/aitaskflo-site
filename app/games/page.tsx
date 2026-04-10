@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { AppShell } from "@/components/lyra/AppShell";
 
 interface Game {
   id: number;
@@ -179,12 +180,12 @@ export default function GamesPage() {
   ];
 
   return (
+    <AppShell>
     <div style={{ minHeight: "100vh", background: "#080810", color: "#f1f5f9", fontFamily: "system-ui, sans-serif" }}>
       {/* Header */}
       <div style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "20px 24px 0" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
-            <Link href="/lyra" style={{ color: "#64748b", textDecoration: "none", fontSize: 14 }}>← Back to Lyra</Link>
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 20 }}>
             <div>
@@ -279,15 +280,45 @@ export default function GamesPage() {
         {loading ? (
           <div style={{ display: "flex", justifyContent: "center", padding: 80, color: "#64748b" }}>Loading games…</div>
         ) : games.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 80 }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🎮</div>
-            <p style={{ color: "#64748b", fontSize: 16 }}>No games yet. Ask Lyra to build one!</p>
+          <div style={{ textAlign: "center", padding: "60px 24px" }}>
+            <div style={{ fontSize: 52, marginBottom: 16 }}>🎮</div>
+            <h2 style={{ margin: "0 0 8px", fontSize: 22, fontWeight: 600, color: "#f1f5f9" }}>No games yet</h2>
+            <p style={{ color: "#64748b", fontSize: 15, marginBottom: 32 }}>
+              Tell Lyra what to build — it generates playable games in seconds.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, maxWidth: 800, margin: "0 auto 32px" }}>
+              {[
+                { emoji: "🚀", label: "Space shooter", prompt: "Build me a space shooter game with enemies and a boss fight" },
+                { emoji: "🏃", label: "Endless runner", prompt: "Build an endless runner game with obstacles and a high score" },
+                { emoji: "🧩", label: "Puzzle game", prompt: "Build a block puzzle game like Tetris" },
+                { emoji: "⚔️", label: "RPG combat", prompt: "Build a top-down RPG with combat and items" },
+                { emoji: "🐍", label: "Snake game", prompt: "Build a classic snake game with levels" },
+                { emoji: "🏰", label: "Tower defense", prompt: "Build a tower defense game with waves of enemies" },
+              ].map(g => (
+                <Link key={g.label} href={`/lyra?q=${encodeURIComponent(g.prompt)}`} style={{ textDecoration: "none" }}>
+                  <div style={{
+                    padding: "16px", borderRadius: 12, cursor: "pointer",
+                    border: "1px solid rgba(255,255,255,0.07)",
+                    background: "rgba(255,255,255,0.03)",
+                    transition: "all 0.15s", textAlign: "left",
+                  }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(139,92,246,0.4)"; (e.currentTarget as HTMLElement).style.background = "rgba(139,92,246,0.08)"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.07)"; (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)"; }}
+                  >
+                    <div style={{ fontSize: 28, marginBottom: 8 }}>{g.emoji}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "#e2e8f0" }}>{g.label}</div>
+                    <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>Click to build →</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
             <Link href="/lyra" style={{
-              display: "inline-block", marginTop: 16, padding: "10px 24px",
-              background: "rgba(139,92,246,0.15)", border: "1px solid #8b5cf6",
-              borderRadius: 8, color: "#a78bfa", textDecoration: "none", fontSize: 14,
+              display: "inline-block", padding: "11px 28px",
+              background: "linear-gradient(135deg,rgb(109,40,217),rgb(134,25,143))",
+              borderRadius: 9, color: "#fff", textDecoration: "none", fontSize: 14, fontWeight: 500,
+              boxShadow: "0 0 24px rgba(109,40,217,0.4)",
             }}>
-              Build a game with Lyra →
+              Build any game with Lyra →
             </Link>
           </div>
         ) : (
@@ -305,5 +336,6 @@ export default function GamesPage() {
         a:hover .play-btn { opacity: 1 !important; }
       `}</style>
     </div>
+    </AppShell>
   );
 }

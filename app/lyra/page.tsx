@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { Dashboard } from "@/components/lyra/Dashboard";
@@ -38,9 +39,11 @@ export default async function LyraPage() {
   };
 
   return (
-    <Dashboard
-      initial={{ state, activeAgent, agents, lineage, memories, reflections, stats }}
-      userId={userId}
-    />
+    <Suspense>
+      <Dashboard
+        initial={{ state, activeAgent, agents, lineage, memories, reflections, stats }}
+        userId={userId}
+      />
+    </Suspense>
   );
 }

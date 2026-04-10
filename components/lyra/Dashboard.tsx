@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -223,7 +224,8 @@ function GoogleConnectButton({ userId }: { userId: string }) {
 export function Dashboard({ initial, userId }: { initial: DashboardData; userId: string }) {
   const [data, setData] = useState<DashboardData>(initial);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
+  const searchParams = useSearchParams();
+  const [input, setInput] = useState(() => searchParams.get("q") ?? "");
   const [isLoading, setIsLoading] = useState(false);
   const [rightPanel, setRightPanel] = useState<RightPanel>("reflection");
   const [conversationId] = useState(() => generateId());
