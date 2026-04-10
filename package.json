@@ -38,6 +38,9 @@
     "stripe": "^20.4.1",
     "tailwind-merge": "^2.5.2"
   },
+  "overrides": {
+    "picomatch": "^4.0.2"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^20.19.27",
