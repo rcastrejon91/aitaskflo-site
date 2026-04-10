@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Send, Loader2, Sparkles, BookOpen, Brain, Zap, Eye, Wrench, Leaf, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { MessageRenderer } from "@/components/lyra/MessageRenderer";
+import { AppShell } from "@/components/lyra/AppShell";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -172,7 +173,8 @@ export default function LearnClient({ userId }: { userId: string }) {
   const styleColor = profile ? (STYLE_COLORS[profile.dominantStyle] ?? STYLE_COLORS.balanced) : STYLE_COLORS.balanced;
 
   return (
-    <div className="flex text-white" style={{ height: "100dvh", background: "#09090f" }}>
+    <AppShell>
+    <div className="flex text-white" style={{ minHeight: "calc(100dvh - 88px)", background: "#09090f" }}>
 
       {/* ── Left sidebar ── */}
       <aside className="hidden md:flex flex-col w-60 flex-shrink-0 overflow-y-auto" style={{ borderRight: "1px solid rgba(255,255,255,0.06)", background: "rgba(0,0,0,0.3)" }}>
@@ -378,5 +380,6 @@ export default function LearnClient({ userId }: { userId: string }) {
         </div>
       </main>
     </div>
+    </AppShell>
   );
 }

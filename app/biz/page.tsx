@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
+import { AppShell } from "@/components/lyra/AppShell";
 
 interface WlConfig {
   slug: string;
@@ -158,17 +159,12 @@ export default function BizDashboard() {
   }
 
   return (
+    <AppShell>
     <div className="min-h-screen bg-[#0a0a0f] text-white">
-      {/* Header */}
-      <div className="border-b border-white/8 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center font-black text-black text-sm">A</div>
-          <div>
-            <span className="font-bold text-white">AITaskFlo</span>
-            <span className="text-white/30 text-sm ml-2">Business Portal</span>
-          </div>
-        </div>
-        <a href="/lyra" className="text-white/30 text-sm hover:text-white transition-colors">← Back to Lyra</a>
+      {/* Page title bar */}
+      <div className="border-b border-white/8 px-6 py-3 flex items-center gap-3">
+        <div className="w-6 h-6 rounded-md bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center font-black text-black text-xs">A</div>
+        <span className="font-bold text-white text-sm">Business Portal</span>
       </div>
 
       <div className="flex h-[calc(100vh-65px)]">
@@ -380,5 +376,6 @@ export default function BizDashboard() {
         </div>
       </div>
     </div>
+    </AppShell>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import type { SocialPost } from "@/lib/lyra/social";
+import { AppShell } from "@/components/lyra/AppShell";
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -132,19 +133,14 @@ export default function FeedClient() {
   const filtered = filter === "all" ? posts : posts.filter((p) => p.topic === filter);
 
   return (
+    <AppShell>
     <div className="min-h-screen bg-[#0a0a0f] text-white">
-      {/* Header */}
-      <div className="border-b border-white/10 bg-[#0a0a0f]/80 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="text-white/40 hover:text-white/70 text-sm transition-colors">
-              ← aitaskflo.com
-            </Link>
-            <span className="text-white/20">·</span>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
-              <span className="font-semibold text-sm">Lyra&apos;s Feed</span>
-            </div>
+      {/* Page title bar */}
+      <div className="border-b border-white/10 bg-[#0a0a0f]/80 backdrop-blur sticky top-[88px] z-10">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
+            <span className="font-semibold text-sm">Lyra&apos;s Feed</span>
           </div>
           <button
             onClick={load}
@@ -261,5 +257,6 @@ export default function FeedClient() {
         </div>
       </div>
     </div>
+    </AppShell>
   );
 }

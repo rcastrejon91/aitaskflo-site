@@ -554,27 +554,32 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
       </header>
 
       {/* ── Tab bar ─────────────────────────────────────────────── */}
-      <nav className="flex flex-shrink-0 overflow-x-auto scrollbar-none" style={{ background: "rgba(0,0,0,0.4)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        {NAV_TABS.map(({ href, icon: Icon, label }) => {
-          const active = pathname === href || pathname.startsWith(href + "/");
-          return (
-            <Link
-              key={href}
-              href={href}
-              className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all relative"
-              style={{ color: active ? "rgb(20,184,166)" : "rgba(255,255,255,0.3)" }}
-              onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.6)"; }}
-              onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.3)"; }}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {label}
-              {active && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5" style={{ background: "rgb(20,184,166)" }} />
-              )}
-            </Link>
-          );
-        })}
-      </nav>
+      <div className="relative flex-shrink-0" style={{ background: "rgba(0,0,0,0.4)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <nav className="flex overflow-x-auto scrollbar-none">
+          {NAV_TABS.map(({ href, icon: Icon, label }) => {
+            const active = pathname === href || pathname.startsWith(href + "/");
+            return (
+              <Link
+                key={href}
+                href={href}
+                className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all relative flex-shrink-0"
+                style={{ color: active ? "rgb(20,184,166)" : "rgba(255,255,255,0.3)" }}
+                onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.6)"; }}
+                onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.3)"; }}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {label}
+                {active && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5" style={{ background: "rgb(20,184,166)" }} />
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+        {/* Right fade — signals more tabs exist */}
+        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-12"
+          style={{ background: "linear-gradient(to left, rgba(0,0,0,0.6), transparent)" }} />
+      </div>
 
       {/* ── Body ─────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden min-h-0">

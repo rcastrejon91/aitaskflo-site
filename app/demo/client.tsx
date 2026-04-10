@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Send, Loader2, Sparkles, Lock } from "lucide-react";
+import { AppShell } from "@/components/lyra/AppShell";
 
 const DEMO_LIMIT = 6;
 const STORAGE_KEY = "lyra_demo_count";
@@ -262,37 +263,19 @@ export default function DemoClient() {
   const isEmpty = messages.length === 0 && !streaming;
 
   return (
+    <AppShell>
     <div className="min-h-screen bg-[#0a0a0f] text-white flex flex-col">
-      {/* Header */}
-      <header className="flex-shrink-0 border-b border-white/8 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="text-white/40 hover:text-white/70 text-sm transition-colors">
-            ← aitaskflo
-          </Link>
-          <span className="text-white/20">·</span>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-            <span className="text-sm font-semibold">Try Lyra</span>
-          </div>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
-            Demo
-          </span>
-        </div>
+      {/* Page title bar */}
+      <header className="flex-shrink-0 border-b border-white/8 px-4 py-2.5 flex items-center justify-between sticky top-[88px] z-10 bg-[#0a0a0f]/80 backdrop-blur">
         <div className="flex items-center gap-2">
-          <Link
-            href="/login"
-            className="text-xs px-3 py-1.5 rounded-lg text-white/60 hover:text-white transition-colors"
-          >
-            Sign in
-          </Link>
-          <Link
-            href="/login"
-            className="text-xs px-3 py-1.5 rounded-lg font-medium text-white transition-all hover:opacity-90"
-            style={{ background: "linear-gradient(135deg, #7c3aed, #14b8a6)" }}
-          >
-            Get Started Free
-          </Link>
+          <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+          <span className="text-sm font-semibold">Try Lyra</span>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">Demo</span>
         </div>
+        <Link href="/login" className="text-xs px-3 py-1.5 rounded-lg font-medium text-white transition-all hover:opacity-90"
+          style={{ background: "linear-gradient(135deg, #7c3aed, #14b8a6)" }}>
+          Get Started Free
+        </Link>
       </header>
 
       {/* Progress bar */}
@@ -433,5 +416,6 @@ export default function DemoClient() {
         </div>
       </div>
     </div>
+    </AppShell>
   );
 }
