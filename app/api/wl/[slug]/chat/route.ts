@@ -21,6 +21,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   }
 
   const { message, history } = await req.json();
+
+  // Inject knowledge base context if available
+  const { buildKbContext } = await import("@/lib/lyra/knowledge-base");
+  const kbContext = await buildKbContext(slug, message);
   if (!message || typeof message !== "string") {
     return new Response("Invalid message", { status: 400 });
   }
@@ -31,8 +35,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   // Filter tools to agency's allowed set
   const allowedTools = LYRA_TOOLS.filter((t) => config.allowedTools.includes(t.name));
 
-  // Build white-labeled system prompt
-  const systemPrompt = buildWhiteLabelSystemPrompt(config, agent.systemPrompt);
+  // Build white-labeled system prompt + inject KB context
+  const basePrompt = buildWhiteLabelSystemPrompt(config, agent.systemPrompt);
+  const systemPrompt = kbContext
+    ? `${basePrompt}\n\nYou have access to this business's internal knowledge base. Use it to answer questions accurately:\n${kbContext}`
+    : basePrompt;
 
   const rawHistory: Array<{ role: string; content: string }> = Array.isArray(history) ? history : [];
   const cleanHistory = rawHistory.filter((m) => {

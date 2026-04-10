@@ -572,6 +572,23 @@ export async function executeTool(
   }
 
   // ── Trading (Alpaca) ─────────────────────────────────────────────────────
+  if (name === "trading_backtest") {
+    const { backtestSymbol } = await import("@/lib/lyra/backtester");
+    const symbol = String(input.symbol ?? "").toUpperCase();
+    const strategy = (input.strategy ?? "all") as import("@/lib/lyra/backtester").Strategy;
+    const capital = input.capital ? Number(input.capital) : 1000;
+    const days = input.days ? Number(input.days) : 365;
+    controller.enqueue(encoder.encode(`\n📚 Running backtest on **${symbol}** (${days} days, $${capital} starting capital)…\n`));
+    return await backtestSymbol(symbol, strategy, capital, days);
+  }
+
+  if (name === "trading_oracle") {
+    const { consultOracle } = await import("@/lib/lyra/oracle");
+    const symbol = String(input.symbol ?? "").toUpperCase();
+    controller.enqueue(encoder.encode(`\n🔮 The Oracle is reading the signs for **${symbol}**…\n`));
+    return await consultOracle(symbol);
+  }
+
   if (name === "trading_account") {
     const { getPortfolioSummary } = await import("@/lib/lyra/trading");
     return await getPortfolioSummary();
@@ -579,9 +596,12 @@ export async function executeTool(
 
   if (name === "trading_analyze") {
     const { analyzeSymbol } = await import("@/lib/lyra/trading");
+    const { consultOracle } = await import("@/lib/lyra/oracle");
     const symbol = String(input.symbol ?? "").toUpperCase();
     controller.enqueue(encoder.encode(`\n📊 Analyzing **${symbol}**…\n`));
-    return await analyzeSymbol(symbol);
+    controller.enqueue(encoder.encode(`\n🔮 Consulting the Oracle…\n`));
+    const [analysis, oracle] = await Promise.all([analyzeSymbol(symbol), consultOracle(symbol)]);
+    return `${analysis}\n\n${oracle}`;
   }
 
   if (name === "trading_buy") {
@@ -1780,6 +1800,72 @@ ${snippets.join("\n\n")}`,
       return `Last 24hr: ${requests.toLocaleString()} requests (${cached.toLocaleString()} cached), ${threats} threats blocked.`;
     } catch (err) {
       return `Cloudflare error: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  // ── Google Ads (admin only) ───────────────────────────────────────────────────
+  if (name.startsWith("ads_")) {
+    if (!userId?.startsWith("admin-"))
+      return "You don't have permission to manage ads.";
+
+    if (name === "ads_overview") {
+      const { getAccountOverview } = await import("@/lib/lyra/ads");
+      return await getAccountOverview();
+    }
+
+    if (name === "ads_performance") {
+      const { getCampaignPerformance } = await import("@/lib/lyra/ads");
+      const days = input.days ? parseInt(String(input.days), 10) || 30 : 30;
+      controller.enqueue(encoder.encode(`\n📊 Fetching campaign performance (last ${days} days)…\n`));
+      return await getCampaignPerformance(days);
+    }
+
+    if (name === "ads_keywords") {
+      const { getTopKeywords } = await import("@/lib/lyra/ads");
+      const days = input.days ? parseInt(String(input.days), 10) || 30 : 30;
+      controller.enqueue(encoder.encode(`\n🔑 Fetching top keywords (last ${days} days)…\n`));
+      return await getTopKeywords(days);
+    }
+
+    if (name === "ads_spend") {
+      const { getAdSpendSummary } = await import("@/lib/lyra/ads");
+      const days = input.days ? parseInt(String(input.days), 10) || 7 : 7;
+      controller.enqueue(encoder.encode(`\n💰 Calculating ad spend…\n`));
+      return await getAdSpendSummary(days);
+    }
+
+    if (name === "ads_create_campaign") {
+      const { createSearchCampaign } = await import("@/lib/lyra/ads");
+      const keywords = (input.keywords ?? "").split(",").map((k: string) => k.trim()).filter(Boolean);
+      if (!keywords.length) return "⚠️ Please provide at least one keyword.";
+
+      controller.enqueue(encoder.encode(`\n🚀 Creating Google Ads campaign "${input.name}"…\n`));
+      const result = await createSearchCampaign({
+        name: input.name ?? "New Campaign",
+        dailyBudgetUsd: Number(input.daily_budget ?? 10),
+        targetUrl: input.target_url ?? "",
+        keywords,
+        headline1: input.headline1 ?? "",
+        headline2: input.headline2 ?? "Try it free today",
+        headline3: input.headline3 ?? "Get started now",
+        description1: input.description1 ?? "",
+        description2: input.description2 ?? "Sign up today and see results.",
+      });
+      const card = JSON.stringify({ tool: "ads_campaign", name: input.name, budget: String(input.daily_budget), keywords: String(keywords.length) });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return result;
+    }
+
+    if (name === "ads_pause_campaign") {
+      const { pauseCampaign } = await import("@/lib/lyra/ads");
+      controller.enqueue(encoder.encode(`\n⏸️ Pausing campaign "${input.campaign_name}"…\n`));
+      return await pauseCampaign(input.campaign_name ?? "");
+    }
+
+    if (name === "ads_enable_campaign") {
+      const { enableCampaign } = await import("@/lib/lyra/ads");
+      controller.enqueue(encoder.encode(`\n🟢 Enabling campaign "${input.campaign_name}"…\n`));
+      return await enableCampaign(input.campaign_name ?? "");
     }
   }
 

@@ -3,6 +3,7 @@ import { readStore, updateStore } from "./storage";
 import { storeMemory } from "./memories";
 import { updateLyraState, getLyraState } from "./agents";
 import type { LearningEntry } from "@/lib/types/lyra";
+import { queuePostFromLearning } from "./social";
 
 const LEARNINGS_FILE = "learnings.json";
 const MAX_LEARNINGS = 100;
@@ -176,6 +177,9 @@ Return ONLY valid JSON (no markdown):
   // Update global learning count
   const state = getLyraState();
   await updateLyraState({ totalLearnings: (state.totalLearnings ?? 0) + 1 });
+
+  // Auto-queue a social post if this learning is surprising
+  queuePostFromLearning(entry).catch(() => {}); // fire-and-forget
 
   return entry;
 }

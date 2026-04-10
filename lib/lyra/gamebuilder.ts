@@ -347,14 +347,37 @@ The file must be self-contained: CDN script, all CSS, all JS, all game logic inl
 REQUIRED SYSTEMS:
 ✓ CDN script tag at top of <head>
 ✓ Full game loop (requestAnimationFrame or engine loop)
-✓ Player movement and controls
-✓ Enemy/obstacle system with multiple types
-✓ Score tracking displayed on screen
-✓ Lives/health with visual indicator
+✓ Player movement — smooth acceleration/deceleration, NOT instant teleport velocity
+✓ Enemy system — at least 2 enemy TYPES with different behaviors (not just reskins)
+✓ Enemy AI state machine: IDLE → PATROL → CHASE → ATTACK (each state has distinct logic)
+✓ BOSS FIGHT — required for rpg/action/platformer/shooter genres:
+    - Phase 1 (100-60% HP): basic attack pattern
+    - Phase 2 (60-30% HP): new attack + faster
+    - Phase 3 (30-0% HP): all attacks, arena change
+    - Telegraphing: 500ms warning before each attack (red glow or warning symbol)
+    - Boss health bar at bottom of screen showing phase segments
+✓ Score/XP tracking displayed on screen
+✓ Lives/health with VISUAL health bar (not just a number)
 ✓ Collision detection
-✓ Increasing difficulty over time
-✓ Game Over screen: show score, restart button
-✓ Visual feedback on hits (flash, particles, or color change)
+✓ Increasing difficulty curve — not linear, use: difficulty = 1 + Math.floor(score/500) * 0.3
+✓ LEVEL DESIGN — at least 2 distinct areas/zones with different enemy configurations
+✓ Game Over screen: show score, personal best, restart button
+✓ Win screen or endless loop with difficulty cap
+✓ Visual feedback on hits: screen shake + flash + particle burst (all three)
+✓ HUD: health top-left, score top-right, minimal — only what player needs NOW
+✓ Sound effects via Web Audio API (NO external files):
+    const AC = new (window.AudioContext||window.webkitAudioContext)();
+    function beep(freq,dur,type='square'){const o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(0.2,AC.currentTime);g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+dur);o.start();o.stop(AC.currentTime+dur);}
+    // jump: beep(220,0.1,'sine')  hit: beep(80,0.15,'sawtooth')  collect: beep(440,0.08,'sine')  death: beep(100,0.4,'sawtooth')
+✓ Mobile touch support:
+    canvas.addEventListener('touchstart',e=>{e.preventDefault();handleTouch(e.touches[0]);},{passive:false});
+
+GAME FEEL REQUIREMENTS (non-negotiable):
+- Screen shake on damage: offset canvas render position ±4px for 200ms
+- Hitstop on hit: pause game loop for 50ms (enemies freeze briefly)
+- Player invincibility frames: 1.5s after taking damage (flash player sprite)
+- Squash/stretch on jump landing: briefly scale player 1.3x wide, 0.7x tall
+- Particle burst on enemy death: 8-12 colored squares flying outward
 
 Write the complete file, then call done().`;
 
@@ -363,19 +386,38 @@ Write the complete file, then call done().`;
 
 PHASE 3 — POLISH
 First call read_file with path "index.html" to see the current game.
-Then rewrite it with these improvements:
+Then rewrite it with ALL of these improvements (non-negotiable):
 
-1. Screen shake on damage (offset canvas or camera)
-2. Particle burst on enemy death (use canvas arcs or engine particles)
-3. Smooth acceleration/deceleration instead of instant velocity
-4. Sound effects via Web Audio API (short generated tones — no files needed):
-   const ctx = new AudioContext();
-   function playBeep(freq, duration) { const o=ctx.createOscillator(); const g=ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.value=freq; g.gain.setValueAtTime(0.3,ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+duration); o.start(); o.stop(ctx.currentTime+duration); }
-5. Power-ups or collectibles with visual pop
-6. Combo counter or multiplier system
-7. Better game feel: enemy variety, visual distinction, animations
+GAME FEEL (juiciness):
+1. Screen shake on damage — offset canvas render ±4px, decay over 200ms
+2. Hitstop on hit — pause gameloop 50ms, enemies briefly freeze
+3. Particle burst on enemy death — 8 colored squares fly outward, fade over 400ms
+4. Squash & stretch on jump — scaleX=1.3,scaleY=0.7 on land, tween back in 100ms
+5. Invincibility frames — player flashes for 1.5s after hit, cannot take damage
+6. Floating damage numbers — "+25 dmg" text rises and fades above enemy on hit
 
-Write the improved index.html. Call done() when complete.`;
+DIFFICULTY & PROGRESSION:
+7. Difficulty ramp — every 30 seconds add one more enemy spawn, increase speed 10%
+8. Power-up drops — enemies have 15% drop chance: speed boost, shield, damage boost
+9. Combo multiplier — consecutive hits without being hit increase score multiplier (x1→x2→x3→x4)
+10. High score persistence — localStorage.setItem('best', score) — show personal best on game over
+
+BOSS UPGRADE (if boss exists):
+11. Phase transition effect — screen flash white, brief pause, boss changes color/size
+12. Boss telegraphing — red warning glow 500ms before each attack
+13. Boss weak point — glowing spot, double damage when hit there
+
+AUDIO (Web Audio API — no external files):
+14. Background music loop — use oscillators for a simple repeating melody:
+    function startMusic(){const o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.type='triangle';g.gain.value=0.05;o.frequency.value=110;o.start();}
+15. Dynamic audio — speed up music tempo when boss phase 3 or low health
+
+UI/UX:
+16. Pause menu — ESC to pause, dim background, Resume/Restart/Quit options
+17. Tutorial overlay — first 5 seconds show control hints, then fade out
+18. Death recap — game over screen shows: score, enemies killed, time survived, best run
+
+Write the fully improved index.html. Call done() when complete.`;
 
     case "verify":
       return `${base}

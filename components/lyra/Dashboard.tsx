@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Send, Loader2, Lightbulb, GitBranch,
   Zap, ArrowLeft, CheckCircle, AlertCircle, X, LogOut, SlidersHorizontal, Settings,
+  MessageSquare, Truck, Gamepad2, BookOpen, Play, Building2, Briefcase, Users, TrendingUp, GraduationCap, Rss, FlaskConical,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
@@ -409,6 +411,23 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
     showNotification("success", `Switched to ${data.agents.find((a) => a.id === agentId)?.name}`);
   }
 
+  const pathname = usePathname();
+
+  const NAV_TABS = [
+    { href: "/lyra",      icon: MessageSquare, label: "Chat"      },
+    { href: "/learn",     icon: GraduationCap, label: "Learn"     },
+    { href: "/trucker",   icon: Truck,         label: "Trucker"   },
+    { href: "/games",     icon: Gamepad2,      label: "Games"     },
+    { href: "/play",      icon: Play,          label: "Play"      },
+    { href: "/book",      icon: BookOpen,      label: "Book"      },
+    { href: "/biz",       icon: Briefcase,     label: "Biz"       },
+    { href: "/agency",    icon: Building2,     label: "Agency"    },
+    { href: "/careers",   icon: Users,         label: "Careers"   },
+    { href: "/investors", icon: TrendingUp,    label: "Investors" },
+    { href: "/feed",      icon: Rss,           label: "Feed"      },
+    { href: "/demo",      icon: FlaskConical,  label: "Demo"      },
+  ];
+
   const activeAgent = data.activeAgent;
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -533,6 +552,29 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
           </button>
         </div>
       </header>
+
+      {/* ── Tab bar ─────────────────────────────────────────────── */}
+      <nav className="flex flex-shrink-0 overflow-x-auto scrollbar-none" style={{ background: "rgba(0,0,0,0.4)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        {NAV_TABS.map(({ href, icon: Icon, label }) => {
+          const active = pathname === href || pathname.startsWith(href + "/");
+          return (
+            <Link
+              key={href}
+              href={href}
+              className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all relative"
+              style={{ color: active ? "rgb(20,184,166)" : "rgba(255,255,255,0.3)" }}
+              onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.6)"; }}
+              onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.3)"; }}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+              {active && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5" style={{ background: "rgb(20,184,166)" }} />
+              )}
+            </Link>
+          );
+        })}
+      </nav>
 
       {/* ── Body ─────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden min-h-0">

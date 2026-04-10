@@ -970,6 +970,31 @@ ACTIONS:
 
   // ── Trading (Alpaca) ─────────────────────────────────────────────────────
   {
+    name: "trading_backtest",
+    description: "Backtest a trading strategy on historical data before risking real money. Tests RSI mean reversion, price momentum, and dual moving average crossover strategies. Use when asked to backtest, test a strategy, or before promoting to paper/live trading.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        symbol:   { type: "string", description: "Stock ticker to backtest, e.g. AAPL, NVDA, TSLA" },
+        strategy: { type: "string", description: "Strategy to test: 'rsi_mean_reversion', 'momentum', 'dual_ma', or 'all' (tests all three). Default: all" },
+        capital:  { type: "number", description: "Starting capital in USD. Default: 1000" },
+        days:     { type: "number", description: "How many days of history to test. Default: 365" },
+      },
+      required: ["symbol"],
+    },
+  },
+  {
+    name: "trading_oracle",
+    description: "Consult the Oracle before any trade — reads news sentiment, Fear & Greed index, earnings calendar, and analyst ratings for a stock. Use before buying or selling, or when asked 'what does the oracle say about X', 'should I buy X', 'is X a good trade right now'.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        symbol: { type: "string", description: "Stock ticker, e.g. AAPL, NVDA, TSLA" },
+      },
+      required: ["symbol"],
+    },
+  },
+  {
     name: "trading_account",
     description: "Get the current trading account status — cash, equity, buying power, today's P&L, and all open positions. Use when asked about portfolio, account balance, or how trades are doing.",
     input_schema: { type: "object" as const, properties: {}, required: [] },
@@ -1061,6 +1086,87 @@ ACTIONS:
         task: { type: "string", description: "Clear description of what to do on the computer, e.g. 'Open Chrome and go to gmail.com, then draft an email to john@example.com saying hello'" },
       },
       required: ["task"],
+    },
+  },
+
+  // ── Google Ads ──────────────────────────────────────────────────────────────
+  {
+    name: "ads_overview",
+    description: "Get Google Ads account overview — account name, currency, timezone. Use when asked about the Google Ads account or to check if ads are connected.",
+    input_schema: { type: "object" as const, properties: {}, required: [] },
+  },
+  {
+    name: "ads_performance",
+    description: "Get Google Ads campaign performance — impressions, clicks, CTR, spend, conversions for all campaigns. Use when asked about ads performance, which campaigns are running, or how ads are doing.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        days: { type: "number", description: "Number of days to look back. Default: 30" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "ads_keywords",
+    description: "Get the top performing keywords across all Google Ads campaigns — clicks, spend, conversions. Use when asked about keywords, which terms are working, or keyword performance.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        days: { type: "number", description: "Number of days to look back. Default: 30" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "ads_spend",
+    description: "Get a quick total ad spend summary — total spend, impressions, clicks, CTR, avg CPC for a time period. Use when asked 'how much did we spend on ads', 'what's the ad budget', or for a quick overview.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        days: { type: "number", description: "Number of days to look back. Default: 7" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "ads_create_campaign",
+    description: "Create a new Google Search Ads campaign with ad group, keywords, and a responsive search ad. Campaign starts PAUSED for review. Use when user wants to run Google Ads, advertise something, or promote a product/service.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        name:           { type: "string",  description: "Campaign name, e.g. 'aitaskflo - AI Tools Summer'" },
+        daily_budget:   { type: "number",  description: "Daily budget in USD, e.g. 20 for $20/day" },
+        target_url:     { type: "string",  description: "Landing page URL, e.g. https://aitaskflo.com" },
+        keywords:       { type: "string",  description: "Comma-separated list of target keywords, e.g. 'AI assistant, AI tools, AI chatbot'" },
+        headline1:      { type: "string",  description: "Ad headline 1 (max 30 chars)" },
+        headline2:      { type: "string",  description: "Ad headline 2 (max 30 chars)" },
+        headline3:      { type: "string",  description: "Ad headline 3 (max 30 chars)" },
+        description1:   { type: "string",  description: "Ad description 1 (max 90 chars)" },
+        description2:   { type: "string",  description: "Ad description 2 (max 90 chars)" },
+      },
+      required: ["name", "daily_budget", "target_url", "keywords", "headline1", "headline2", "description1"],
+    },
+  },
+  {
+    name: "ads_pause_campaign",
+    description: "Pause a running Google Ads campaign by name. Use when asked to stop, pause, or disable a campaign.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        campaign_name: { type: "string", description: "Exact campaign name to pause" },
+      },
+      required: ["campaign_name"],
+    },
+  },
+  {
+    name: "ads_enable_campaign",
+    description: "Enable (unpause) a paused Google Ads campaign by name. Use when asked to start, resume, or enable a campaign.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        campaign_name: { type: "string", description: "Exact campaign name to enable" },
+      },
+      required: ["campaign_name"],
     },
   },
 

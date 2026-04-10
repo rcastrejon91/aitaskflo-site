@@ -11,6 +11,7 @@ import { LYRA_TOOLS, getLunarPersonalityNote } from "@/lib/lyra/tools";
 import { streamGroqFallback, streamGrokFallback, streamOllamaFallback, streamOpenAIFallback, routeTask, streamParallelJudge } from "@/lib/lyra/streaming";
 import { executeTool } from "@/lib/lyra/execute-tool";
 import { buildMindContext } from "@/lib/lyra/mind";
+import { buildLearnerContext } from "@/lib/lyra/learner";
 import { detectPersona, getPersonaAddendum } from "@/lib/lyra/persona";
 import { getRecentMilestoneAnnouncement } from "@/lib/lyra/milestones";
 import { detectComposeIntent, designCompositeTool, saveCompositeTool, streamBuildSequence, executeCompositeTool, listCompositeTools } from "@/lib/lyra/composer";
@@ -260,7 +261,8 @@ export async function POST(req: NextRequest) {
     const milestoneNote = await getRecentMilestoneAnnouncement().catch(() => "");
     const userGamesContext = userId ? buildUserGamesContext(userId) : "";
     const adminContext = isAdmin ? "\n\n[ADMIN MODE] You are speaking with the platform admin (Ricky). You have access to the 'cloudflare' tool to manage aitaskflo.com's security, analytics, firewall, cache, and IP blocking. Use it directly when asked about Cloudflare, site security, traffic stats, blocking IPs, or purging cache. Do NOT search the web for Cloudflare info — use the tool." : "";
-    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + userGamesContext + buildLearningContext() + buildLyraTrendContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + gameOverride + mediaOverride + toolOverride + milestoneNote + adminContext;
+    const learnerContext = userId ? buildLearnerContext(userId, message) : "";
+    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + userGamesContext + buildLearningContext() + buildLyraTrendContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + learnerContext + gameOverride + mediaOverride + toolOverride + milestoneNote + adminContext;
 
     // ── 3. Build user content (text + optional images) ────────────────────
     type ImageBlock = { type: "image"; source: { type: "base64"; media_type: string; data: string } };

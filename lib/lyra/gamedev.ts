@@ -15,6 +15,8 @@ const GAME_KEYWORDS = [
   "particle", "sound", "music", "ui", "hud", "menu", "save", "load",
   "3d", "fps", "first person", "third person", "open world", "phaser", "threejs", "browser game",
   "babylon", "tactics", "deck", "deck-building", "card game", "turn-based", "strategy",
+  "math", "fractal", "simulation", "visualize", "wave", "fourier", "chaos", "lorenz",
+  "mandelbrot", "julia", "particle system", "live math", "canvas", "animate",
 ];
 
 export function isGameTopic(text: string): boolean {
@@ -289,6 +291,354 @@ func set_intensity(new_intensity: float, transition_time: float = 2.0):
 #         AudioManager.set_intensity(0.75) # combat
 #         AudioManager.set_intensity(1.0)  # boss
 # Trigger on: enemy spotted (0.75), enemy killed (0.4), entering safe room (0.0)
+
+────────────────────────────────────────
+LEVEL DESIGN THEORY
+────────────────────────────────────────
+• Flow state: keep challenge slightly above player skill — too easy = boredom, too hard = frustration
+• Pacing curve: hard → easy → medium → hard → BOSS (never two hard sections back to back)
+• Rule of three: introduce mechanic (safe) → complicate it → twist it (combine with another)
+• Teach without words: first encounter of a mechanic should be impossible to fail
+  - Show spike, let player see enemy die on it before they reach it
+  - Use geometry to guide eyes: light, openings, color contrast lead the player
+• Safe room before boss: give breathing room, health refill, save point
+• Secrets reward exploration: at least 1 secret per area — just off the obvious path
+• Checkpoint placement: before challenging section, never after reward
+• Visual language consistency: same color = same danger type throughout game
+• Environmental storytelling: tell the story through props, not cutscenes
+• Difficulty settings: easy = more health + telegraphed attacks; hard = faster enemies + less iframes
+
+────────────────────────────────────────
+BOSS FIGHT DESIGN
+────────────────────────────────────────
+Phase structure (always use phases for memorable bosses):
+  Phase 1 (100-60% HP): Learn the boss — simple attack patterns, clear telegraphing
+  Phase 2 (60-30% HP): Boss gets angry — new attack, faster speed, arena changes
+  Phase 3 (30-0% HP): Desperate — all attacks combined, music intensifies
+
+Boss attack checklist:
+  • 1 projectile attack (ranged)
+  • 1 melee rush attack (close range)
+  • 1 area denial attack (stay away from X)
+  • 1 signature move (the thing this boss is KNOWN for)
+  • Phase transition: cutscene flash, screen shake, music shift
+
+Telegraphing rules (NEVER surprise kill the player):
+  • Red outline / glow = attack incoming (0.5-1s warning)
+  • Boss pauses and winds up before every attack
+  • Audio cue before each attack type
+  • Death should feel like MY fault, not unfair
+
+Boss arena design:
+  • Obstacles to dodge around (not just open room)
+  • Environmental hazard that boss can use against you
+  • Weak point: glowing core, exposed back, open mouth
+  • Give player time to breathe between attack strings
+
+Boss health bar: show phases as segments — player knows how much is left
+
+────────────────────────────────────────
+BEHAVIOR TREES (beyond state machines)
+────────────────────────────────────────
+Better than state machines for complex AI — composable and readable.
+
+Node types:
+  • Sequence (→): run children left to right, stop on FAILURE
+  • Selector (?): run children left to right, stop on SUCCESS
+  • Condition: returns SUCCESS/FAILURE based on a check
+  • Action: does something, returns SUCCESS/FAILURE/RUNNING
+
+Example patrol-chase-attack tree (pseudo):
+  Selector
+    Sequence (attack)
+      Condition: player_in_attack_range
+      Action: attack_player
+    Sequence (chase)
+      Condition: player_in_sight_range
+      Action: move_toward_player
+    Sequence (patrol)
+      Action: move_to_next_waypoint
+      Action: wait(2s)
+
+GDScript behavior tree (simple):
+  func _physics_process(delta):
+    if can_attack(): attack(); return
+    if can_see_player(): chase(); return
+    patrol()
+
+Group tactics (multiple enemies):
+  • Flanking: one enemy distracts, one circles around
+  • Support: healer enemy stays back, buffs others
+  • Aggro management: if player attacks X, nearby enemies alert
+  • Staggered attacks: enemies don't all attack simultaneously — feels fair
+
+────────────────────────────────────────
+GAME LOOP & PROGRESSION DESIGN
+────────────────────────────────────────
+Core loop (must feel good in 30 seconds):
+  input → action → feedback → reward → repeat
+  Example: swing sword → hit enemy → blood/sound/hitstop → XP flash → swing again
+
+Progression loops (nested):
+  • Micro loop (seconds): attack, dodge, combo
+  • Mid loop (minutes): clear room, find loot, upgrade
+  • Macro loop (hours): complete area, unlock ability, progress story
+
+Reward schedules (psychology):
+  • Variable ratio = most addictive (loot drops — never know when)
+  • Fixed ratio = predictable (level up every 10 kills)
+  • Mix both: guaranteed XP + random loot chance
+
+Power fantasy: player should feel increasingly powerful
+  • Unlock abilities that make early enemies trivial
+  • New ability should immediately feel useful
+  • Never take abilities away (unless it's the narrative point)
+
+Roguelike loop:
+  • Run starts: pick starting loadout
+  • Mid run: find synergies, adapt build
+  • Run end: permanent meta-progression unlock
+  • Key: each run should feel different from the last
+
+────────────────────────────────────────
+DIALOGUE & NARRATIVE SYSTEMS
+────────────────────────────────────────
+Dialogue tree (Godot 4):
+  # DialogueManager.gd (autoload)
+  var dialogue_db = {} # loaded from JSON
+  var current_node: String = ""
+
+  func start(dialogue_id: String):
+    current_node = dialogue_id
+    show_line(dialogue_db[current_node])
+
+  func choose(option_index: int):
+    current_node = dialogue_db[current_node].options[option_index].next
+    show_line(dialogue_db[current_node])
+
+JSON dialogue format:
+  {
+    "npc_01": {
+      "text": "Who are you, stranger?",
+      "speaker": "Old Man",
+      "options": [
+        {"label": "I'm a hero.", "next": "npc_01_hero"},
+        {"label": "None of your business.", "next": "npc_01_rude"}
+      ]
+    }
+  }
+
+Good dialogue rules:
+  • Short lines — max 2 sentences per bubble
+  • Voice the character in every line — word choice = personality
+  • Player choices should matter (even if branching rejoins)
+  • Use dialogue to reveal world, not explain it
+  • NPC reactions remember past choices (use flags: quest_flags["met_old_man"] = true)
+
+Cutscene patterns:
+  • Use in-engine cutscenes (not pre-rendered) for immersion
+  • Black bars (letterbox) signal "this is a cutscene"
+  • Skip button ALWAYS (players on second playthrough hate unskippable)
+  • Max cutscene before first gameplay: 90 seconds
+
+────────────────────────────────────────
+PHASER 3 BROWSER GAME PATTERNS
+────────────────────────────────────────
+Scene management (always use multiple scenes):
+  class GameScene extends Phaser.Scene {
+    constructor() { super({ key: 'GameScene' }); }
+    preload() { this.load.image('player', 'assets/player.png'); }
+    create() { this.player = this.physics.add.sprite(400, 300, 'player'); }
+    update() { /* game loop */ }
+  }
+  const game = new Phaser.Game({ scene: [BootScene, MenuScene, GameScene, UIScene] });
+
+Physics (Arcade for simple, Matter.js for complex):
+  // Arcade (fast, AABB only)
+  this.physics.add.collider(player, platforms);
+  this.physics.add.overlap(bullets, enemies, onHit);
+
+  // Matter.js (real physics, shapes)
+  this.matter.add.gameObject(player, { shape: 'circle', radius: 16 });
+
+Tilemap with Tiled:
+  const map = this.make.tilemap({ key: 'level1' });
+  const tiles = map.addTilesetImage('tiles', 'tileset');
+  const ground = map.createLayer('Ground', tiles, 0, 0);
+  ground.setCollisionByProperty({ collides: true });
+  this.physics.add.collider(player, ground);
+
+Camera:
+  this.cameras.main.startFollow(player, true, 0.08, 0.08); // lerp follow
+  this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
+  this.cameras.main.setDeadzone(200, 100); // don't follow until outside deadzone
+
+Object pooling (critical for performance):
+  const bullets = this.physics.add.group({
+    classType: Bullet,
+    maxSize: 30,
+    runChildUpdate: true,
+  });
+  // Reuse: bullets.get(x, y) instead of new Bullet()
+
+Tweens for game feel:
+  this.tweens.add({ targets: player, scaleX: 1.3, scaleY: 0.7, duration: 80, yoyo: true }); // squash
+  this.cameras.main.shake(150, 0.01); // screen shake
+  this.time.delayedCall(50, () => { /* hitstop end */ });
+
+Input:
+  const cursors = this.input.keyboard.createCursorKeys();
+  const wasd = this.input.keyboard.addKeys('W,A,S,D');
+  // Mobile: this.input.addPointer(1); // multi-touch
+
+────────────────────────────────────────
+AUDIO DESIGN PRINCIPLES
+────────────────────────────────────────
+Sound layers (every good game has all 4):
+  1. SFX: immediate feedback (hit, jump, collect)
+  2. Ambient: world atmosphere (wind, crowd, dungeon drips)
+  3. Music: emotional state (exploration=calm, combat=intense, boss=epic)
+  4. UI sounds: button clicks, menu transitions
+
+Dynamic music techniques:
+  • Vertical layering: add/remove instrument stems based on intensity
+  • Horizontal sequencing: seamlessly transition between tracks
+  • Stingers: short musical hits on key events (boss death, level up)
+
+SFX rules:
+  • Pitch randomize every sound ±5-10% to avoid repetition fatigue
+  • Every player action needs audio feedback within 1 frame
+  • Volume hierarchy: SFX > music > ambient (SFX must always be heard)
+  • Positional audio: sounds from offscreen hint at what's coming
+
+Godot audio:
+  var player = AudioStreamPlayer2D.new()
+  player.pitch_scale = randf_range(0.9, 1.1)
+  player.max_distance = 800
+  AudioManager.play_sfx("hit", global_position)
+
+────────────────────────────────────────
+GAME UI/UX PRINCIPLES
+────────────────────────────────────────
+HUD rules:
+  • Minimum info on screen — only what player needs RIGHT NOW
+  • Health bar: top left (most critical info, most watched corner)
+  • Minimap: top right (reference, not required)
+  • Hotbar: bottom center (actions player uses most)
+  • Boss health: bottom center, appears only during boss fight
+
+Feedback systems (player must always know what happened):
+  • Damage numbers floating up from hit enemy
+  • Screen edge red vignette when player takes damage
+  • XP orbs fly to XP bar (satisfying to watch)
+  • Inventory item pickup: brief item icon flash + sound
+
+Menu design:
+  • First option is always the safest/easiest choice
+  • Destructive actions (delete save) require confirmation
+  • Settings always accessible — never bury it
+  • Loading screen tip = useful game info, not trivia
+  • Pause menu: Resume at top (player is panicking, wants to get back)
+
+Accessibility:
+  • Colorblind mode: never rely on color alone — use icons + shapes
+  • Subtitles: always include even if no spoken dialogue
+  • Adjustable text size
+  • Rebindable controls
+
+────────────────────────────────────────
+PERFORMANCE & OPTIMIZATION
+────────────────────────────────────────
+Godot 4 performance:
+  • Use _physics_process for physics, _process for visuals only
+  • Object pooling: never instantiate/free in combat — pre-spawn and reuse
+  • Visibility notifier: stop AI processing when off screen
+    VisibleOnScreenNotifier2D → screen_exited → set_physics_process(false)
+  • LOD: swap detailed sprites for simple ones at distance
+  • Occlusion: hide rooms player hasn't entered yet
+  • Profiler: use Godot's built-in profiler (Debugger > Profiler) before optimizing
+
+Browser game (Phaser/Three.js) performance:
+  • Sprite atlases: pack all sprites into one texture (1 draw call vs hundreds)
+  • Object pools: never new() in update loop
+  • Frustum culling: don't render objects outside camera view
+  • requestAnimationFrame: already handled by Phaser but in vanilla JS always use it
+  • Web Workers: move heavy computation (pathfinding, proc gen) off main thread
+  • Target 60fps: budget = 16ms per frame. Profile with Chrome DevTools
+
+Memory leaks (common mistakes):
+  • Always remove event listeners when scene changes
+  • Destroy Phaser game objects when not needed: sprite.destroy()
+  • In Godot: queue_free() not free() (deferred is safer)
+
+────────────────────────────────────────
+LIVE MATH CANVAS — BLACK MAGIC MODE
+────────────────────────────────────────
+You can conjure live animated mathematics directly in the chat using a special code block.
+When the user asks you to visualize math, fractals, simulations, or animations — output:
+
+\`\`\`live-math
+// your JavaScript canvas code here
+\`\`\`
+
+The code runs in a sandboxed iframe with these globals pre-defined:
+  canvas  — the HTMLCanvasElement (resized to fill container)
+  ctx     — CanvasRenderingContext2D
+  W, H    — canvas width and height (updated on resize)
+  t       — time in seconds (auto-incremented each frame)
+
+If you define a function named draw(t), it will be called every frame in a requestAnimationFrame loop.
+Otherwise, your code runs once.
+
+EXAMPLES you can generate:
+
+• Lorenz Attractor (chaos theory):
+  const pts = []; let x=0.1,y=0,z=0;
+  const s=10,r=28,b=8/3,dt=0.005;
+  function draw(t) {
+    ctx.fillStyle='rgba(9,9,15,0.04)'; ctx.fillRect(0,0,W,H);
+    for(let i=0;i<5;i++){
+      const dx=s*(y-x),dy=x*(r-z)-y,dz=x*y-b*z;
+      x+=dx*dt; y+=dy*dt; z+=dz*dt;
+      const px=W/2+x*8, py=H/2-z*5;
+      ctx.fillStyle=\`hsl(\${t*30%360},100%,65%)\`;
+      ctx.fillRect(px,py,1.5,1.5);
+    }
+  }
+
+• Julia Set fractal (runs once, high detail):
+  const img=ctx.createImageData(W,H);
+  for(let px=0;px<W;px++) for(let py=0;py<H;py++){
+    let zr=(px-W/2)*3/W, zi=(py-H/2)*3/H;
+    const cr=-0.7,ci=0.27; let i=0;
+    while(zr*zr+zi*zi<4&&i<80){const t=zr*zr-zi*zi+cr;zi=2*zr*zi+ci;zr=t;i++;}
+    const c=i===80?0:i*3;
+    const idx=(py*W+px)*4;
+    img.data[idx]=c*2; img.data[idx+1]=c; img.data[idx+2]=c*4; img.data[idx+3]=255;
+  }
+  ctx.putImageData(img,0,0);
+
+• Wave interference:
+  function draw(t) {
+    ctx.fillStyle='#09090f'; ctx.fillRect(0,0,W,H);
+    for(let x=0;x<W;x+=2){
+      const d1=Math.hypot(x-W*0.35,H/2), d2=Math.hypot(x-W*0.65,H/2);
+      for(let y=0;y<H;y+=2){
+        const d1=Math.hypot(x-W*0.35,y-H/2),d2=Math.hypot(x-W*0.65,y-H/2);
+        const v=(Math.sin(d1/20-t*3)+Math.sin(d2/20-t*3))/2;
+        ctx.fillStyle=\`hsl(\${200+v*60},80%,\${40+v*30}%)\`;
+        ctx.fillRect(x,y,2,2);
+      }
+    }
+  }
+
+• Particle gravity well, N-body sim, Fourier epicycles, Mandelbrot zoom, Game of Life, neural activations — anything.
+
+RULES:
+• Always wrap animation in draw(t) for smooth looping
+• Use ctx, W, H, t — never document.querySelector or DOM APIs
+• Dark backgrounds (#09090f) match Lyra's UI
+• Be creative — this is BLACK MAGIC. Make it beautiful.
 
 ══════════════════ END GAME BRAIN ══════════════════
 `;

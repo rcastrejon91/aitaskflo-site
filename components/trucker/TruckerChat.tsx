@@ -69,7 +69,7 @@ const TABS: { id: Tab; icon: string; label: string }[] = [
   { id: "obd",   icon: "🔌", label: "OBD"   },
 ];
 
-export default function TruckerChat() {
+export default function TruckerChat({ initialMessage }: { initialMessage?: string }) {
   const [activeTab, setActiveTab] = useState<Tab>("chat");
   const [messages, setMessages] = useState<Message[]>([{
     role: "assistant",
@@ -79,6 +79,16 @@ export default function TruckerChat() {
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const sentInitial = useRef(false);
+
+  // Auto-send initialMessage from landing page
+  useEffect(() => {
+    if (initialMessage && !sentInitial.current) {
+      sentInitial.current = true;
+      send(initialMessage);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Latest HOS data from messages for the HOS tab
   const latestHos = [...messages].reverse().find(m => m.hosData)?.hosData;

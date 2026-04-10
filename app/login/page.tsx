@@ -3,7 +3,7 @@
 import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Sparkles, Loader2, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Sparkles, Loader2, Eye, EyeOff, ArrowLeft, FlaskConical } from "lucide-react";
 import Link from "next/link";
 
 function LoginForm() {
@@ -221,7 +221,23 @@ function LoginForm() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-white/20 mt-6">
+        {/* Try demo CTA */}
+        <div className="mt-5 rounded-xl px-4 py-3 flex items-center justify-between gap-3" style={{ background: "rgba(139,92,246,0.07)", border: "1px solid rgba(139,92,246,0.15)" }}>
+          <div>
+            <p className="text-xs font-medium text-white/60">Not ready to sign up?</p>
+            <p className="text-[11px] text-white/30 mt-0.5">Try Lyra free — no account needed</p>
+          </div>
+          <Link
+            href="/demo"
+            className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg transition-all hover:opacity-90"
+            style={{ background: "linear-gradient(135deg, rgba(124,58,237,0.4), rgba(20,184,166,0.3))", border: "1px solid rgba(139,92,246,0.3)", color: "rgba(196,181,253,1)" }}
+          >
+            <FlaskConical className="w-3.5 h-3.5" />
+            Try Demo
+          </Link>
+        </div>
+
+        <p className="text-center text-xs text-white/20 mt-4">
           Your data is private and isolated to your account.
         </p>
       </div>

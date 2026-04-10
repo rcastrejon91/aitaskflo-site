@@ -33,6 +33,82 @@ function loadMd(): Promise<MdLib> {
 
 const CodeHighlight = dynamic(() => import("./CodeHighlight"), { ssr: false });
 
+// ── Live Math Canvas ──────────────────────────────────────────────────────────
+// Renders a sandboxed iframe that executes animated canvas code in real time.
+// Lyra outputs ```live-math blocks; this component brings them to life.
+
+function LiveMathCanvas({ code }: { code: string }) {
+  const srcDoc = `<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #09090f; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+let t = 0;
+let animId;
+
+// ── User code ──
+${code}
+// ── End user code ──
+
+// If user defined draw(), loop it. Otherwise run once.
+if (typeof draw === 'function') {
+  function loop() {
+    draw(t);
+    t += 0.016;
+    animId = requestAnimationFrame(loop);
+  }
+  loop();
+}
+</script>
+</body>
+</html>`;
+
+  return (
+    <div className="mt-3 rounded-2xl overflow-hidden" style={{
+      border: "1px solid rgba(139,92,246,0.3)",
+      background: "#09090f",
+      boxShadow: "0 0 40px rgba(139,92,246,0.15), inset 0 0 40px rgba(0,0,0,0.5)",
+    }}>
+      <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderBottom: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.06)" }}>
+        <span className="text-sm">✦</span>
+        <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: "rgba(196,181,253,0.8)", letterSpacing: "0.12em" }}>
+          Live Math
+        </span>
+        <span className="ml-auto flex gap-1">
+          {[0,1,2].map(i => (
+            <span key={i} className="w-1.5 h-1.5 rounded-full" style={{
+              background: "rgba(139,92,246,0.6)",
+              animation: `pulse 1.5s ${i * 0.3}s ease-in-out infinite`,
+            }} />
+          ))}
+        </span>
+      </div>
+      <iframe
+        srcDoc={srcDoc}
+        sandbox="allow-scripts"
+        style={{ width: "100%", height: "320px", border: "none", display: "block" }}
+        title="live-math"
+      />
+    </div>
+  );
+}
+
 // ── Tool Card ─────────────────────────────────────────────────────────────────
 
 const TOOL_CONFIG: Record<string, {
@@ -896,6 +972,7 @@ function buildMdComponents(CodeBlock: any) {
       const lang = /language-(\w+)/.exec(className ?? "")?.[1];
       const code = String(children).replace(/\n$/, "");
       const isBlock = !!lang || code.includes("\n");
+      if (lang === "live-math") return <LiveMathCanvas code={code} />;
       if (isBlock) return <CodeBlock language={lang ?? "text"}>{code}</CodeBlock>;
       return (
         <code className="px-1.5 py-0.5 rounded-md bg-white/[0.08] text-violet-300 text-[0.82em] font-mono border border-white/[0.06]">
