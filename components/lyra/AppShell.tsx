@@ -6,7 +6,7 @@ import { signOut } from "next-auth/react";
 import {
   ArrowLeft, Settings, LogOut,
   MessageSquare, GraduationCap, Truck, Gamepad2, Play, BookOpen,
-  Briefcase, Building2, Users, TrendingUp, Rss, FlaskConical, Sparkles,
+  Briefcase, Building2, Users, TrendingUp, Rss, FlaskConical, Sparkles, Brain,
 } from "lucide-react";
 
 const NAV_TABS = [
@@ -22,6 +22,7 @@ const NAV_TABS = [
   { href: "/investors", icon: TrendingUp,    label: "Investors" },
   { href: "/feed",      icon: Rss,           label: "Feed"      },
   { href: "/demo",      icon: FlaskConical,  label: "Demo"      },
+  { href: "/memory",    icon: Brain,         label: "Memory"    },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

@@ -253,6 +253,89 @@ function initSchema(db: BetterSqlite3Db) {
   try {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_importance ON facts(user_id, importance DESC)`);
   } catch { /* ignore */ }
+
+  // ── Skill Library (additive) ───────────────────────────────────────────────
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS skills (
+        id           TEXT PRIMARY KEY,
+        name         TEXT NOT NULL UNIQUE,
+        description  TEXT NOT NULL,
+        instructions TEXT NOT NULL DEFAULT '',
+        resources    TEXT NOT NULL DEFAULT '',
+        created_at   TEXT NOT NULL,
+        updated_at   TEXT NOT NULL,
+        usage_count  INTEGER NOT NULL DEFAULT 0,
+        success_rate REAL NOT NULL DEFAULT 0.0,
+        created_by   TEXT NOT NULL DEFAULT 'lyra',
+        status       TEXT NOT NULL DEFAULT 'active',
+        test_score   TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_skills_name   ON skills(name);
+      CREATE INDEX IF NOT EXISTS idx_skills_status ON skills(status);
+
+      CREATE TABLE IF NOT EXISTS skill_files (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        skill_id   TEXT NOT NULL,
+        level      INTEGER NOT NULL,
+        filename   TEXT NOT NULL,
+        content    TEXT NOT NULL,
+        FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE
+      );
+    `);
+  } catch { /* ignore */ }
+
+  // ── Dual Memory (additive) ─────────────────────────────────────────────────
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS ideation_memory (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL,
+        task        TEXT NOT NULL,
+        approaches  TEXT NOT NULL DEFAULT '[]',
+        decided_not TEXT NOT NULL DEFAULT '[]',
+        reasoning   TEXT NOT NULL DEFAULT '',
+        created_at  TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_ideation_user ON ideation_memory(user_id, created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS execution_memory (
+        id              TEXT PRIMARY KEY,
+        user_id         TEXT NOT NULL,
+        task            TEXT NOT NULL,
+        tool_sequence   TEXT NOT NULL DEFAULT '[]',
+        outcome         TEXT NOT NULL DEFAULT '',
+        success         INTEGER NOT NULL DEFAULT 1,
+        skill_used      TEXT,
+        duration_ms     INTEGER,
+        created_at      TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_execution_user ON execution_memory(user_id, created_at DESC);
+    `);
+  } catch { /* ignore */ }
+
+  // ── Agent Job Queue (additive) ─────────────────────────────────────────────
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS agent_jobs (
+        id              TEXT PRIMARY KEY,
+        user_id         TEXT NOT NULL,
+        task            TEXT NOT NULL,
+        assigned_agent  TEXT NOT NULL,
+        status          TEXT NOT NULL DEFAULT 'pending',
+        result          TEXT,
+        confidence      TEXT NOT NULL DEFAULT 'high',
+        checkpoint      TEXT,
+        iteration       INTEGER NOT NULL DEFAULT 0,
+        reflection      TEXT,
+        resume_attempts INTEGER NOT NULL DEFAULT 0,
+        created_at      TEXT NOT NULL,
+        updated_at      TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_jobs_user   ON agent_jobs(user_id, status);
+      CREATE INDEX IF NOT EXISTS idx_jobs_status ON agent_jobs(status, created_at DESC);
+    `);
+  } catch { /* ignore */ }
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────

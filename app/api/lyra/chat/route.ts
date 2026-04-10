@@ -15,6 +15,13 @@ import { buildLearnerContext } from "@/lib/lyra/learner";
 import { detectPersona, getPersonaAddendum } from "@/lib/lyra/persona";
 import { getRecentMilestoneAnnouncement } from "@/lib/lyra/milestones";
 import { detectComposeIntent, designCompositeTool, saveCompositeTool, streamBuildSequence, executeCompositeTool, listCompositeTools } from "@/lib/lyra/composer";
+import { buildSkillsL1Context, seedBuiltinSkills } from "@/lib/lyra/skills";
+import { buildIdeationContext, buildExecutionContext } from "@/lib/lyra/dualMemory";
+import { shouldOrchestrate, orchestrate, resumeInterruptedJobs } from "@/lib/lyra/orchestrator";
+import { logExecution } from "@/lib/lyra/observeLearnLoop";
+
+// Seed built-in skills once on cold start (no-op if already seeded)
+try { seedBuiltinSkills(); } catch { /* ignore */ }
 
 export async function POST(req: NextRequest) {
   try {
@@ -262,7 +269,45 @@ export async function POST(req: NextRequest) {
     const userGamesContext = userId ? buildUserGamesContext(userId) : "";
     const adminContext = isAdmin ? "\n\n[ADMIN MODE] You are speaking with the platform admin (Ricky). You have access to the 'cloudflare' tool to manage aitaskflo.com's security, analytics, firewall, cache, and IP blocking. Use it directly when asked about Cloudflare, site security, traffic stats, blocking IPs, or purging cache. Do NOT search the web for Cloudflare info — use the tool." : "";
     const learnerContext = userId ? buildLearnerContext(userId, message) : "";
-    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + userGamesContext + buildLearningContext() + buildLyraTrendContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + learnerContext + gameOverride + mediaOverride + toolOverride + milestoneNote + adminContext;
+
+    // ── Skill Library L1 context (always injected) ────────────────────────
+    const skillsContext = buildSkillsL1Context();
+
+    // ── Dual memory context (ideation + execution) ────────────────────────
+    const ideationCtx = userId ? buildIdeationContext(userId, message) : "";
+    const executionCtx = userId ? buildExecutionContext(userId, message) : "";
+
+    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + userGamesContext + buildLearningContext() + buildLyraTrendContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + learnerContext + skillsContext + ideationCtx + executionCtx + gameOverride + mediaOverride + toolOverride + milestoneNote + adminContext;
+
+    // ── Multi-agent orchestration check ───────────────────────────────────
+    if (userId && shouldOrchestrate(message)) {
+      // Check for interrupted jobs first
+      const resumed = await resumeInterruptedJobs(userId).catch(() => null);
+
+      const encoder2 = new TextEncoder();
+      const orchestratorStream = new ReadableStream({
+        async start(controller) {
+          try {
+            if (resumed) {
+              controller.enqueue(encoder2.encode(`🔄 **Resuming previous task:**\n\n${resumed}\n\n`));
+            }
+            controller.enqueue(encoder2.encode("🤖 Routing to specialized agents...\n\n"));
+            const result = await orchestrate(userId, message);
+            controller.enqueue(encoder2.encode(result.response));
+            if (result.hasLowConfidence) {
+              controller.enqueue(encoder2.encode("\n\n⚠️ *Some results had low confidence — please verify.*"));
+            }
+            // Log execution
+            logExecution(userId, message, result.usedAgents, !result.hasLowConfidence);
+          } catch (err) {
+            try { controller.enqueue(encoder2.encode(`⚠️ Orchestration failed: ${err instanceof Error ? err.message : String(err)}\n\nFalling through to Lyra directly.`)); } catch { /* closed */ }
+          } finally {
+            try { controller.close(); } catch { /* closed */ }
+          }
+        },
+      });
+      return new Response(orchestratorStream, { headers: { "Content-Type": "text/plain; charset=utf-8", "X-Accel-Buffering": "no" } });
+    }
 
     // ── 3. Build user content (text + optional images) ────────────────────
     type ImageBlock = { type: "image"; source: { type: "base64"; media_type: string; data: string } };
