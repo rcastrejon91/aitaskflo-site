@@ -186,7 +186,7 @@ ${testResult.details.map((d) => `- [${d.passed ? "✅" : "❌"}] "${d.input}"`).
 
 export interface SkillFactoryResult {
   skill: Skill | null;
-  status: "created" | "draft" | "failed";
+  status: "active" | "draft" | "failed";
   testResult: SkillTestResult | null;
   message: string;
 }

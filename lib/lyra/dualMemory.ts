@@ -159,11 +159,17 @@ export function getSuccessfulPatterns(userId: string, task: string, limit = 5): 
       SELECT * FROM execution_memory
       WHERE user_id = ? AND success = 1 AND task LIKE ?
       ORDER BY created_at DESC LIMIT ?
-    `).all(userId, `%${task}%`, limit) as Array<ExecutionEntry & { tool_sequence: string; success: number }>;
+    `).all(userId, `%${task}%`, limit) as Array<Record<string, unknown>>;
     return rows.map((r) => ({
-      ...r,
-      tool_sequence: JSON.parse(r.tool_sequence),
-      success: !!r.success,
+      id: r.id as string,
+      user_id: r.user_id as string,
+      task: r.task as string,
+      tool_sequence: JSON.parse(r.tool_sequence as string),
+      outcome: r.outcome as string,
+      success: !!(r.success as number),
+      skill_used: (r.skill_used as string | null) ?? null,
+      duration_ms: (r.duration_ms as number | null) ?? null,
+      created_at: r.created_at as string,
     }));
   } catch { return []; }
 }
