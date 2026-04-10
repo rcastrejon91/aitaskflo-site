@@ -1,15 +1,133 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Sparkles, Bot, Zap, ArrowRight, GitBranch, Brain, ShieldCheck, Play,
   Truck, Gamepad2, BookOpen, Building2, GraduationCap, TrendingUp,
-  CheckCircle, Users, Globe, ChevronRight,
+  CheckCircle, Users, Globe, ChevronRight, Star, Terminal, Check,
 } from "lucide-react";
 import DemoMode from "@/components/lyra/DemoMode";
+
+// ── Demo window typing animation ─────────────────────────────────────────────
+
+const DEMO_MESSAGES = [
+  { role: "user",  text: "Build me a space shooter game" },
+  { role: "lyra",  text: "On it. Generating Godot 4 scene with player ship, enemies, bullets, and a boss fight — with mobile controls." },
+  { role: "system", text: "⚡ game_build • SpaceShooter.gd • 340 lines generated" },
+  { role: "user",  text: "Now buy 5 shares of NVDA if it dips below $900" },
+  { role: "lyra",  text: "Oracle checking live price… $887.40. Executing market buy via Alpaca — 5 shares at $887.40. Order filled." },
+  { role: "system", text: "✅ trade_execute • NVDA × 5 • $4,437.00 filled" },
+  { role: "user",  text: "Summarize my Gmail and draft a reply to the investor thread" },
+  { role: "lyra",  text: "Found 3 unread investor emails. Drafting reply to Marcus at Gradient Ventures — referencing your $350K Google Cloud credit and Q1 traction." },
+];
+
+function DemoWindow() {
+  const [visible, setVisible] = useState(0);
+
+  useEffect(() => {
+    if (visible >= DEMO_MESSAGES.length) return;
+    const t = setTimeout(() => setVisible((v) => v + 1), visible === 0 ? 600 : 1800);
+    return () => clearTimeout(t);
+  }, [visible]);
+
+  return (
+    <div className="relative w-full max-w-2xl mx-auto rounded-2xl overflow-hidden shadow-2xl" style={{ border: "1px solid rgba(255,255,255,0.08)", background: "#0d0d1a" }}>
+      {/* Browser chrome */}
+      <div className="flex items-center gap-1.5 px-4 py-3" style={{ background: "rgba(255,255,255,0.04)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
+        <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
+        <div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
+        <div className="ml-3 flex-1 rounded-md px-3 py-1 text-xs" style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.25)" }}>
+          aitaskflo.com/lyra
+        </div>
+      </div>
+      {/* Chat */}
+      <div className="p-5 space-y-3 min-h-[320px]">
+        {DEMO_MESSAGES.slice(0, visible).map((msg, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {msg.role === "user" && (
+              <div className="flex justify-end">
+                <div className="px-3.5 py-2 rounded-2xl rounded-tr-sm text-sm max-w-xs" style={{ background: "rgba(109,40,217,0.35)", color: "rgba(255,255,255,0.9)" }}>
+                  {msg.text}
+                </div>
+              </div>
+            )}
+            {msg.role === "lyra" && (
+              <div className="flex items-start gap-2.5">
+                <div className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))" }}>
+                  <Sparkles className="w-3 h-3 text-white" />
+                </div>
+                <div className="px-3.5 py-2 rounded-2xl rounded-tl-sm text-sm max-w-sm" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.75)" }}>
+                  {msg.text}
+                </div>
+              </div>
+            )}
+            {msg.role === "system" && (
+              <div className="flex justify-center">
+                <div className="px-3 py-1 rounded-full text-xs font-mono" style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)", color: "rgb(110,231,183)" }}>
+                  {msg.text}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        ))}
+        {visible < DEMO_MESSAGES.length && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-1.5 pl-8">
+            {[0, 1, 2].map((i) => (
+              <motion.div key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: "rgba(196,181,253,0.5)" }}
+                animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }} />
+            ))}
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Pricing section ───────────────────────────────────────────────────────────
+
+const PLANS = [
+  {
+    key: "free",
+    name: "Free",
+    price: 0,
+    desc: "Try Lyra with no commitment.",
+    features: ["40 messages / day", "Image generation", "Web search", "Weather & news", "Basic memory"],
+    cta: "Start free",
+    href: "/login",
+    featured: false,
+  },
+  {
+    key: "pro",
+    name: "Pro",
+    price: 29,
+    desc: "For power users who want everything.",
+    features: ["Unlimited messages", "Full persistent memory", "Email & calendar", "CRM (HubSpot)", "Job search & resume tools", "Stock trading (Alpaca)", "Priority routing"],
+    cta: "Get Pro",
+    href: "/pricing",
+    featured: true,
+  },
+  {
+    key: "business",
+    name: "Business",
+    price: 49,
+    desc: "For teams and white-label deployments.",
+    features: ["Everything in Pro", "White-label chat embed", "Knowledge base (RAG)", "API access", "Multiple users", "Analytics dashboard", "Priority support"],
+    cta: "Get Business",
+    href: "/pricing",
+    featured: false,
+  },
+];
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Home() {
   const [showDemo, setShowDemo] = useState(false);
@@ -74,15 +192,15 @@ export default function Home() {
             </div>
 
             <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.05]">
-              <span className="text-white">Meet Lyra.</span>
+              <span className="text-white">The AI that builds,</span>
               <br />
               <span style={{ background: "linear-gradient(135deg, rgb(167,139,250), rgb(240,171,252), rgb(249,168,212))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                The AI that grows with you.
+                trades, and never forgets.
               </span>
             </h1>
 
             <p className="text-lg sm:text-xl mb-10 max-w-2xl mx-auto leading-relaxed" style={{ color: "rgba(255,255,255,0.45)" }}>
-              Not just a chatbot. An AI platform with persistent memory, adaptive learning, game building, trucking tools, and more — that gets smarter every time you use it.
+              Lyra is a multi-agent AI platform with persistent memory, real stock trading, game building, adaptive learning, and white-label deployment — all in one place.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-16">
@@ -103,8 +221,8 @@ export default function Home() {
               </Button>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 max-w-2xl mx-auto">
+            {/* Social proof bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 max-w-2xl mx-auto pt-8" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
               {[
                 { stat: "$350K", label: "Google Cloud Credits" },
                 { stat: "30+", label: "AI Tools Built-in" },
@@ -118,6 +236,30 @@ export default function Home() {
               ))}
             </div>
           </motion.div>
+        </div>
+      </section>
+
+      {/* Live demo window */}
+      <section className="relative py-20 px-6" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-4 text-xs font-medium" style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)", color: "rgb(110,231,183)" }}>
+              <Terminal className="w-3 h-3" />
+              Live Preview
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">Watch Lyra work in real time</h2>
+            <p className="text-lg max-w-xl mx-auto" style={{ color: "rgba(255,255,255,0.35)" }}>
+              One conversation. Game built, trade executed, email drafted.
+            </p>
+          </div>
+          <DemoWindow />
+          <div className="text-center mt-6">
+            <Link href="/demo">
+              <Button variant="ghost" className="text-white/40 hover:text-white text-sm gap-1.5">
+                Try the interactive demo <ChevronRight className="w-3.5 h-3.5" />
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -137,7 +279,7 @@ export default function Home() {
             ].map((s) => (
               <div key={s.step} className="rounded-2xl p-6 text-left" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}>
                 <div className="text-xs font-mono mb-3" style={{ color: "rgba(255,255,255,0.2)" }}>{s.step}</div>
-                <h3 className="font-semibold text-white mb-2" style={{ color: s.color }}>{s.title}</h3>
+                <h3 className="font-semibold mb-2" style={{ color: s.color }}>{s.title}</h3>
                 <p className="text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.4)" }}>{s.desc}</p>
               </div>
             ))}
@@ -187,7 +329,7 @@ export default function Home() {
               {
                 icon: <GraduationCap className="w-5 h-5" />,
                 title: "Learn Platform",
-                desc: "10 subjects from Math to AI. Lyra adapts her teaching style to you — shorter steps, visuals, gentle pacing, whatever you need.",
+                desc: "10 subjects from Math to AI. Lyra adapts her teaching style to you — shorter steps, visuals, gentle pacing.",
                 tag: null,
                 iconBg: "rgba(6,182,212,0.1)", iconBorder: "rgba(6,182,212,0.25)", iconColor: "rgb(103,232,249)",
                 href: "/learn",
@@ -201,10 +343,10 @@ export default function Home() {
                 href: "/agency",
               },
               {
-                icon: <GitBranch className="w-5 h-5" />,
-                title: "Agent Evolution",
-                desc: "Lyra evolves over time — improving her responses, building on what she's learned, tracked through a visual lineage graph.",
-                tag: null,
+                icon: <TrendingUp className="w-5 h-5" />,
+                title: "Stock Trading",
+                desc: "Live Alpaca trading, Oracle market intelligence, and strategy backtesting — all via natural language.",
+                tag: "Pro",
                 iconBg: "rgba(79,70,229,0.12)", iconBorder: "rgba(79,70,229,0.25)", iconColor: "rgb(165,180,252)",
                 href: "/lyra",
               },
@@ -237,7 +379,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Why Lyra vs others */}
+      {/* Why Lyra */}
       <section className="relative py-24 px-6" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-16">
@@ -248,15 +390,15 @@ export default function Home() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
-              { icon: <CheckCircle className="w-4 h-4" />, title: "Remembers you across sessions", desc: "No more re-explaining your projects, preferences, or context." },
-              { icon: <CheckCircle className="w-4 h-4" />, title: "Evolves and self-improves", desc: "Lyra reflects on every conversation and gets better over time." },
-              { icon: <CheckCircle className="w-4 h-4" />, title: "Learns how YOUR brain works", desc: "Adapts teaching style, pacing, and format to match you specifically." },
-              { icon: <CheckCircle className="w-4 h-4" />, title: "Domain-specific tools built in", desc: "Trucking, games, education, business — not just a generic chatbox." },
-              { icon: <CheckCircle className="w-4 h-4" />, title: "White-label for your business", desc: "Deploy branded AI for your team or customers with custom tools." },
-              { icon: <CheckCircle className="w-4 h-4" />, title: "Lives math and code visualizations", desc: "Lyra summons live animated mathematics right in the chat." },
+              { title: "Remembers you across sessions", desc: "No more re-explaining your projects, preferences, or context." },
+              { title: "Evolves and self-improves", desc: "Lyra reflects on every conversation and gets better over time." },
+              { title: "Learns how YOUR brain works", desc: "Adapts teaching style, pacing, and format to match you specifically." },
+              { title: "Domain-specific tools built in", desc: "Trucking, games, education, business — not just a generic chatbox." },
+              { title: "White-label for your business", desc: "Deploy branded AI for your team or customers with custom tools." },
+              { title: "Real actions, not just words", desc: "Lyra executes trades, sends emails, builds games — not just talks." },
             ].map((item) => (
               <div key={item.title} className="flex items-start gap-3 p-4 rounded-xl" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                <span style={{ color: "rgb(110,231,183)", marginTop: 2 }}>{item.icon}</span>
+                <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "rgb(110,231,183)" }} />
                 <div>
                   <p className="text-sm font-semibold text-white mb-0.5">{item.title}</p>
                   <p className="text-xs leading-relaxed" style={{ color: "rgba(255,255,255,0.38)" }}>{item.desc}</p>
@@ -264,6 +406,127 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="relative py-24 px-6" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">What people are saying</h2>
+            <p className="text-lg max-w-xl mx-auto" style={{ color: "rgba(255,255,255,0.35)" }}>
+              Real users. Real workflows.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {[
+              {
+                name: "Jordan M.",
+                role: "Independent Trucker, Texas",
+                avatar: "JM",
+                quote: "I use Lyra for HOS tracking and load searching every day. It's the only AI that actually knows my industry. Saved me hours a week.",
+                color: "rgba(234,179,8,0.15)",
+                border: "rgba(234,179,8,0.2)",
+              },
+              {
+                name: "Priya S.",
+                role: "Founder, EdTech Startup",
+                avatar: "PS",
+                quote: "We white-labeled Lyra for our learning platform in 3 days. The knowledge base + custom persona made it feel completely native.",
+                color: "rgba(109,40,217,0.15)",
+                border: "rgba(109,40,217,0.25)",
+                featured: true,
+              },
+              {
+                name: "Alex T.",
+                role: "Retail Trader",
+                avatar: "AT",
+                quote: "The Oracle + backtester combo is insane. I told Lyra my strategy, she backtested it, found the flaw, and now I'm actually profitable.",
+                color: "rgba(16,185,129,0.1)",
+                border: "rgba(16,185,129,0.2)",
+              },
+            ].map((t) => (
+              <div key={t.name} className="rounded-2xl p-6 flex flex-col gap-4" style={{ background: t.color, border: `1px solid ${t.border}` }}>
+                <div className="flex gap-0.5">
+                  {[1,2,3,4,5].map((i) => <Star key={i} className="w-3.5 h-3.5 fill-current" style={{ color: "rgb(251,191,36)" }} />)}
+                </div>
+                <p className="text-sm leading-relaxed flex-1" style={{ color: "rgba(255,255,255,0.7)" }}>&ldquo;{t.quote}&rdquo;</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}>
+                    {t.avatar}
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-white">{t.name}</div>
+                    <div className="text-xs" style={{ color: "rgba(255,255,255,0.35)" }}>{t.role}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section className="relative py-24 px-6" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-4 text-xs font-medium" style={{ background: "rgba(109,40,217,0.1)", border: "1px solid rgba(109,40,217,0.2)", color: "rgb(196,181,253)" }}>
+              Simple Pricing
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">Start free. Scale when ready.</h2>
+            <p className="text-lg max-w-xl mx-auto" style={{ color: "rgba(255,255,255,0.35)" }}>
+              No hidden fees. Cancel anytime.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-stretch">
+            {PLANS.map((plan) => (
+              <div key={plan.key} className="rounded-2xl p-6 flex flex-col relative" style={{
+                background: plan.featured ? "rgba(109,40,217,0.12)" : "rgba(255,255,255,0.025)",
+                border: plan.featured ? "1px solid rgba(109,40,217,0.4)" : "1px solid rgba(255,255,255,0.07)",
+                boxShadow: plan.featured ? "0 0 40px rgba(109,40,217,0.1)" : undefined,
+              }}>
+                {plan.featured && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", color: "white" }}>
+                    MOST POPULAR
+                  </div>
+                )}
+                <div className="mb-6">
+                  <h3 className="text-lg font-bold text-white mb-1">{plan.name}</h3>
+                  <p className="text-xs mb-4" style={{ color: "rgba(255,255,255,0.4)" }}>{plan.desc}</p>
+                  <div className="flex items-end gap-1">
+                    <span className="text-4xl font-bold text-white">${plan.price}</span>
+                    {plan.price > 0 && <span className="text-sm mb-1" style={{ color: "rgba(255,255,255,0.35)" }}>/mo</span>}
+                    {plan.price === 0 && <span className="text-sm mb-1" style={{ color: "rgba(255,255,255,0.35)" }}>forever</span>}
+                  </div>
+                </div>
+                <ul className="space-y-2.5 flex-1 mb-6">
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex items-center gap-2.5 text-sm" style={{ color: "rgba(255,255,255,0.6)" }}>
+                      <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: plan.featured ? "rgb(196,181,253)" : "rgb(110,231,183)" }} />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link href={plan.href} className="block">
+                  <Button className="w-full font-semibold" style={plan.featured ? {
+                    background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))",
+                    color: "white",
+                    border: "none",
+                    boxShadow: "0 4px 16px rgba(109,40,217,0.3)",
+                  } : {
+                    background: "rgba(255,255,255,0.06)",
+                    color: "rgba(255,255,255,0.6)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                  }}>
+                    {plan.cta}
+                  </Button>
+                </Link>
+              </div>
+            ))}
+          </div>
+          <p className="text-center mt-8 text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>
+            Looking for agency or enterprise pricing? <Link href="/pricing" className="underline hover:text-white/50">See all plans →</Link>
+          </p>
         </div>
       </section>
 
@@ -318,11 +581,14 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="relative py-24 px-6">
+      {/* Final CTA */}
+      <section className="relative py-24 px-6" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
         <div className="max-w-2xl mx-auto text-center">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center mx-auto mb-6" style={{ boxShadow: "0 8px 32px rgba(109,40,217,0.35)" }}>
+            <Sparkles className="w-6 h-6 text-white" />
+          </div>
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">Start building with Lyra today</h2>
-          <p className="mb-8" style={{ color: "rgba(255,255,255,0.38)" }}>Free to start. She gets smarter every conversation.</p>
+          <p className="mb-8 text-lg" style={{ color: "rgba(255,255,255,0.38)" }}>Free to start. No credit card. Gets smarter every conversation.</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link href="/login">
               <Button size="lg" className="text-white border-0 font-semibold px-10 h-12 text-base shadow-2xl" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 8px 32px rgba(109,40,217,0.3)" }}>
