@@ -1,0 +1,28 @@
+[gd_scene load_steps=2 format=3 uid="uid://etherealblast001"]
+
+[ext_resource type="Script" path="res://scenes/entities/EtherealBlast.gd" id="1_blast"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_blast"]
+radius = 5.0
+
+[node name="EtherealBlast" type="Area2D"]
+collision_layer = 16
+collision_mask = 34
+script = ExtResource("1_blast")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_blast")
+
+[node name="BlastCore" type="ColorRect" parent="."]
+offset_left = -4.0
+offset_top = -4.0
+offset_right = 4.0
+offset_bottom = 4.0
+color = Color(0.3, 0.7, 1.0, 1)
+
+[node name="BlastGlow" type="ColorRect" parent="."]
+offset_left = -7.0
+offset_top = -7.0
+offset_right = 7.0
+offset_bottom = 7.0
+color = Color(0.2, 0.4, 0.9, 0.35)

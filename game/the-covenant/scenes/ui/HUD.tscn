@@ -1,0 +1,133 @@
+[gd_scene load_steps=2 format=3 uid="uid://hud001"]
+
+[ext_resource type="Script" path="res://scenes/ui/HUD.gd" id="1_hud"]
+
+[node name="HUD" type="CanvasLayer"]
+layer = 10
+script = ExtResource("1_hud")
+
+[node name="Control" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TopBar" type="HBoxContainer" parent="Control"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 60.0
+grow_horizontal = 2
+
+[node name="LevelLabel" type="Label" parent="Control/TopBar"]
+layout_mode = 2
+custom_minimum_size = Vector2(60, 0)
+text = "Lv.1"
+
+[node name="HPBar" type="ProgressBar" parent="Control/TopBar"]
+layout_mode = 2
+custom_minimum_size = Vector2(180, 20)
+max_value = 120.0
+value = 120.0
+show_percentage = false
+
+[node name="HPLabel" type="Label" parent="Control/TopBar"]
+layout_mode = 2
+custom_minimum_size = Vector2(100, 0)
+text = "HP: 120/120"
+
+[node name="MPBar" type="ProgressBar" parent="Control/TopBar"]
+layout_mode = 2
+custom_minimum_size = Vector2(140, 20)
+max_value = 80.0
+value = 80.0
+show_percentage = false
+
+[node name="MPLabel" type="Label" parent="Control/TopBar"]
+layout_mode = 2
+custom_minimum_size = Vector2(100, 0)
+text = "MP: 80/80"
+
+[node name="XPBar" type="ProgressBar" parent="Control/TopBar"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 16)
+max_value = 100.0
+value = 0.0
+show_percentage = false
+
+[node name="BottomBar" type="HBoxContainer" parent="Control"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -30.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="GoldLabel" type="Label" parent="Control/BottomBar"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+text = "Gold: 0"
+
+[node name="FragmentLabel" type="Label" parent="Control/BottomBar"]
+layout_mode = 2
+custom_minimum_size = Vector2(160, 0)
+text = "Fragments: 0/5"
+
+[node name="QuestPanel" type="PanelContainer" parent="Control"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -200.0
+offset_top = 70.0
+offset_right = -10.0
+offset_bottom = 170.0
+grow_horizontal = 0
+
+[node name="QuestLabel" type="Label" parent="Control/QuestPanel"]
+layout_mode = 2
+text = "No active quests"
+
+[node name="DialoguePanel" type="PanelContainer" parent="Control"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 100.0
+offset_top = -120.0
+offset_right = -100.0
+offset_bottom = -40.0
+grow_horizontal = 2
+grow_vertical = 0
+visible = false
+
+[node name="VBox" type="VBoxContainer" parent="Control/DialoguePanel"]
+layout_mode = 2
+
+[node name="SpeakerLabel" type="Label" parent="Control/DialoguePanel/VBox"]
+layout_mode = 2
+text = "Speaker"
+
+[node name="TextLabel" type="Label" parent="Control/DialoguePanel/VBox"]
+layout_mode = 2
+text = "Dialogue text goes here..."
+autowrap_mode = 2
+
+[node name="NotificationLabel" type="Label" parent="Control"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -150.0
+offset_top = 80.0
+offset_right = 150.0
+offset_bottom = 110.0
+grow_horizontal = 2
+horizontal_alignment = 1
+text = "Notification"
+visible = false

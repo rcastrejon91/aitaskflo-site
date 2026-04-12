@@ -1,0 +1,23 @@
+[gd_scene load_steps=3 format=3 uid="uid://portal001"]
+
+[ext_resource type="Script" path="res://scenes/entities/LevelPortal.gd" id="1_portal"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_portal"]
+size = Vector2(40, 50)
+
+[node name="LevelPortal" type="Area2D"]
+script = ExtResource("1_portal")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(2.5, 3)
+modulate = Color(0.3, 0.1, 0.6, 0.8)
+
+[node name="CollShape" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_portal")
+
+[node name="Label" type="Label" parent="."]
+offset_left = -60
+offset_top = -50
+offset_right = 60
+offset_bottom = -30
+horizontal_alignment = 1

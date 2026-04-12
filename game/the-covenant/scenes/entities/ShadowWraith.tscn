@@ -1,0 +1,55 @@
+[gd_scene load_steps=6 format=3 uid="uid://shadowwraith001"]
+
+[ext_resource type="Script" path="res://scenes/entities/ShadowWraith.gd" id="1_wraith"]
+[ext_resource type="Script" path="res://scripts/components/HealthComponent.gd" id="2_health"]
+[ext_resource type="Script" path="res://scripts/components/HurtboxComponent.gd" id="3_hurtbox"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(14, 14)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_hurtbox"]
+size = Vector2(12, 14)
+
+[node name="ShadowWraith" type="CharacterBody2D"]
+collision_layer = 4
+collision_mask = 1
+script = ExtResource("1_wraith")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(2, 2)
+modulate = Color(0.3, 0.15, 0.6, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_body")
+
+[node name="HealthComponent" type="Node" parent="."]
+script = ExtResource("2_health")
+max_hp = 80
+
+[node name="HurtboxComponent" type="Area2D" parent="."]
+collision_layer = 32
+collision_mask = 16
+script = ExtResource("3_hurtbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="HurtboxComponent"]
+shape = SubResource("RectangleShape2D_hurtbox")
+
+[node name="HealthBar" type="ProgressBar" parent="."]
+offset_left = -16.0
+offset_top = -24.0
+offset_right = 16.0
+offset_bottom = -20.0
+max_value = 80.0
+value = 80.0
+show_percentage = false
+visible = false
+
+[node name="NameLabel" type="Label" parent="."]
+offset_left = -35.0
+offset_top = -34.0
+offset_right = 35.0
+offset_bottom = -22.0
+horizontal_alignment = 1
+text = "Shadow Wraith"
+
+[node name="NavigationAgent2D" type="NavigationAgent2D" parent="."]

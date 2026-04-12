@@ -1,0 +1,62 @@
+[gd_scene load_steps=8 format=3 uid="uid://player001"]
+
+[ext_resource type="Script" path="res://scenes/entities/Player.gd" id="1_player"]
+[ext_resource type="Script" path="res://scripts/components/HealthComponent.gd" id="2_health"]
+[ext_resource type="Script" path="res://scripts/components/HitboxComponent.gd" id="3_hitbox"]
+[ext_resource type="Script" path="res://scripts/components/HurtboxComponent.gd" id="4_hurtbox"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(20, 28)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_attack"]
+radius = 22.0
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_hurtbox"]
+size = Vector2(18, 26)
+
+[node name="Player" type="CharacterBody2D"]
+collision_layer = 2
+collision_mask = 1
+script = ExtResource("1_player")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(2, 2)
+modulate = Color(0.3, 0.5, 0.9, 1)
+
+[node name="BodyShape" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_body")
+
+[node name="HealthComponent" type="Node" parent="."]
+script = ExtResource("2_health")
+max_health = 120.0
+
+[node name="HitboxArea" type="Area2D" parent="."]
+collision_layer = 16
+collision_mask = 32
+monitoring = true
+monitorable = false
+script = ExtResource("3_hitbox")
+
+[node name="AttackShape" type="CollisionShape2D" parent="HitboxArea"]
+position = Vector2(30, 0)
+shape = SubResource("CircleShape2D_attack")
+disabled = true
+
+[node name="HurtboxArea" type="Area2D" parent="."]
+collision_layer = 4
+collision_mask = 0
+monitoring = false
+monitorable = true
+script = ExtResource("4_hurtbox")
+
+[node name="HurtShape" type="CollisionShape2D" parent="HurtboxArea"]
+shape = SubResource("RectangleShape2D_hurtbox")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+zoom = Vector2(2, 2)
+position_smoothing_enabled = true
+position_smoothing_speed = 8.0
+
+[node name="TKLine" type="Line2D" parent="."]
+width = 2.0
+default_color = Color(0.6, 0.2, 0.9, 0.8)

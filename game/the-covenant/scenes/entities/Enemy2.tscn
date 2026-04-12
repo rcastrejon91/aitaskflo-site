@@ -1,0 +1,66 @@
+[gd_scene load_steps=7 format=3 uid="uid://enemy002"]
+
+[ext_resource type="Script" path="res://scenes/entities/Enemy2.gd" id="1_enemy2"]
+[ext_resource type="Script" path="res://scripts/components/HealthComponent.gd" id="2_health"]
+[ext_resource type="Script" path="res://scripts/components/HitboxComponent.gd" id="3_hitbox"]
+[ext_resource type="Script" path="res://scripts/components/HurtboxComponent.gd" id="4_hurtbox"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(18, 18)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_hitbox"]
+size = Vector2(24, 24)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_hurtbox"]
+size = Vector2(16, 16)
+
+[node name="Enemy2" type="CharacterBody2D"]
+collision_layer = 4
+collision_mask = 1
+script = ExtResource("1_enemy2")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(2.5, 2.5)
+modulate = Color(0.3, 0.1, 0.5, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_body")
+
+[node name="HealthComponent" type="Node" parent="."]
+script = ExtResource("2_health")
+max_hp = 100
+
+[node name="HitboxComponent" type="Area2D" parent="."]
+collision_layer = 16
+collision_mask = 32
+script = ExtResource("3_hitbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="HitboxComponent"]
+position = Vector2(0, -20)
+shape = SubResource("RectangleShape2D_hitbox")
+
+[node name="HurtboxComponent" type="Area2D" parent="."]
+collision_layer = 32
+collision_mask = 16
+script = ExtResource("4_hurtbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="HurtboxComponent"]
+shape = SubResource("RectangleShape2D_hurtbox")
+
+[node name="HealthBar" type="ProgressBar" parent="."]
+offset_left = -20.0
+offset_top = -30.0
+offset_right = 20.0
+offset_bottom = -26.0
+max_value = 100.0
+value = 100.0
+show_percentage = false
+visible = false
+
+[node name="NameLabel" type="Label" parent="."]
+offset_left = -40.0
+offset_top = -38.0
+offset_right = 40.0
+offset_bottom = -28.0
+horizontal_alignment = 1
+text = "Covenant Guardian"

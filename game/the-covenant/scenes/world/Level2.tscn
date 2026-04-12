@@ -1,0 +1,329 @@
+[gd_scene load_steps=14 format=3 uid="uid://level2001"]
+
+[ext_resource type="Script" path="res://scenes/world/Level2.gd" id="1_level"]
+[ext_resource type="PackedScene" path="res://scenes/entities/Player.tscn" id="2_player"]
+[ext_resource type="PackedScene" path="res://scenes/entities/Enemy.tscn" id="3_enemy"]
+[ext_resource type="PackedScene" path="res://scenes/entities/Enemy2.tscn" id="4_enemy2"]
+[ext_resource type="PackedScene" path="res://scenes/entities/Pickup.tscn" id="5_pickup"]
+[ext_resource type="PackedScene" path="res://scenes/entities/NPC.tscn" id="6_npc"]
+[ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="7_hud"]
+[ext_resource type="PackedScene" path="res://scenes/ui/PauseMenu.tscn" id="8_pause"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_h2"]
+size = Vector2(1200, 20)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_v2"]
+size = Vector2(20, 1200)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_pillar"]
+size = Vector2(40, 40)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_inner1"]
+size = Vector2(200, 20)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_inner2"]
+size = Vector2(20, 200)
+
+[node name="Level2" type="Node2D"]
+script = ExtResource("1_level")
+
+[node name="Background" type="ColorRect" parent="."]
+offset_left = -1200.0
+offset_top = -1200.0
+offset_right = 2400.0
+offset_bottom = 2400.0
+color = Color(0.04, 0.02, 0.08, 1)
+
+[node name="FloorTiles" type="Node2D" parent="."]
+
+[node name="Floor1" type="ColorRect" parent="FloorTiles"]
+offset_left = -550.0
+offset_top = -550.0
+offset_right = 550.0
+offset_bottom = 550.0
+color = Color(0.08, 0.05, 0.14, 1)
+
+[node name="CenterArena" type="ColorRect" parent="FloorTiles"]
+offset_left = -200.0
+offset_top = -200.0
+offset_right = 200.0
+offset_bottom = 200.0
+color = Color(0.12, 0.06, 0.2, 1)
+
+[node name="NorthChamber" type="ColorRect" parent="FloorTiles"]
+offset_left = -150.0
+offset_top = -500.0
+offset_right = 150.0
+offset_bottom = -250.0
+color = Color(0.1, 0.04, 0.18, 1)
+
+[node name="SouthChamber" type="ColorRect" parent="FloorTiles"]
+offset_left = -150.0
+offset_top = 250.0
+offset_right = 150.0
+offset_bottom = 500.0
+color = Color(0.1, 0.04, 0.18, 1)
+
+[node name="EastChamber" type="ColorRect" parent="FloorTiles"]
+offset_left = 250.0
+offset_top = -150.0
+offset_right = 500.0
+offset_bottom = 150.0
+color = Color(0.1, 0.04, 0.18, 1)
+
+[node name="WestChamber" type="ColorRect" parent="FloorTiles"]
+offset_left = -500.0
+offset_top = -150.0
+offset_right = -250.0
+offset_bottom = 150.0
+color = Color(0.1, 0.04, 0.18, 1)
+
+[node name="Walls" type="Node2D" parent="."]
+
+[node name="WallTop" type="StaticBody2D" parent="Walls"]
+position = Vector2(0, -560)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/WallTop"]
+shape = SubResource("RectangleShape2D_wall_h2")
+
+[node name="Visual" type="ColorRect" parent="Walls/WallTop"]
+offset_left = -600.0
+offset_top = -10.0
+offset_right = 600.0
+offset_bottom = 10.0
+color = Color(0.15, 0.08, 0.25, 1)
+
+[node name="WallBottom" type="StaticBody2D" parent="Walls"]
+position = Vector2(0, 560)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/WallBottom"]
+shape = SubResource("RectangleShape2D_wall_h2")
+
+[node name="Visual" type="ColorRect" parent="Walls/WallBottom"]
+offset_left = -600.0
+offset_top = -10.0
+offset_right = 600.0
+offset_bottom = 10.0
+color = Color(0.15, 0.08, 0.25, 1)
+
+[node name="WallLeft" type="StaticBody2D" parent="Walls"]
+position = Vector2(-560, 0)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/WallLeft"]
+shape = SubResource("RectangleShape2D_wall_v2")
+
+[node name="Visual" type="ColorRect" parent="Walls/WallLeft"]
+offset_left = -10.0
+offset_top = -600.0
+offset_right = 10.0
+offset_bottom = 600.0
+color = Color(0.15, 0.08, 0.25, 1)
+
+[node name="WallRight" type="StaticBody2D" parent="Walls"]
+position = Vector2(560, 0)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/WallRight"]
+shape = SubResource("RectangleShape2D_wall_v2")
+
+[node name="Visual" type="ColorRect" parent="Walls/WallRight"]
+offset_left = -10.0
+offset_top = -600.0
+offset_right = 10.0
+offset_bottom = 600.0
+color = Color(0.15, 0.08, 0.25, 1)
+
+[node name="Pillar1" type="StaticBody2D" parent="Walls"]
+position = Vector2(-200, -200)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/Pillar1"]
+shape = SubResource("RectangleShape2D_pillar")
+
+[node name="Visual" type="ColorRect" parent="Walls/Pillar1"]
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+color = Color(0.3, 0.15, 0.45, 1)
+
+[node name="Pillar2" type="StaticBody2D" parent="Walls"]
+position = Vector2(200, -200)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/Pillar2"]
+shape = SubResource("RectangleShape2D_pillar")
+
+[node name="Visual" type="ColorRect" parent="Walls/Pillar2"]
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+color = Color(0.3, 0.15, 0.45, 1)
+
+[node name="Pillar3" type="StaticBody2D" parent="Walls"]
+position = Vector2(-200, 200)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/Pillar3"]
+shape = SubResource("RectangleShape2D_pillar")
+
+[node name="Visual" type="ColorRect" parent="Walls/Pillar3"]
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+color = Color(0.3, 0.15, 0.45, 1)
+
+[node name="Pillar4" type="StaticBody2D" parent="Walls"]
+position = Vector2(200, 200)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/Pillar4"]
+shape = SubResource("RectangleShape2D_pillar")
+
+[node name="Visual" type="ColorRect" parent="Walls/Pillar4"]
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+color = Color(0.3, 0.15, 0.45, 1)
+
+[node name="InnerWall1" type="StaticBody2D" parent="Walls"]
+position = Vector2(0, -300)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/InnerWall1"]
+shape = SubResource("RectangleShape2D_wall_inner1")
+
+[node name="Visual" type="ColorRect" parent="Walls/InnerWall1"]
+offset_left = -100.0
+offset_top = -10.0
+offset_right = 100.0
+offset_bottom = 10.0
+color = Color(0.25, 0.12, 0.38, 1)
+
+[node name="InnerWall2" type="StaticBody2D" parent="Walls"]
+position = Vector2(-300, 0)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/InnerWall2"]
+shape = SubResource("RectangleShape2D_wall_inner2")
+
+[node name="Visual" type="ColorRect" parent="Walls/InnerWall2"]
+offset_left = -10.0
+offset_top = -100.0
+offset_right = 10.0
+offset_bottom = 100.0
+color = Color(0.25, 0.12, 0.38, 1)
+
+[node name="Decorations" type="Node2D" parent="."]
+
+[node name="ShadowRune1" type="ColorRect" parent="Decorations"]
+offset_left = -10.0
+offset_top = -10.0
+offset_right = 10.0
+offset_bottom = 10.0
+color = Color(0.8, 0.0, 0.4, 0.7)
+
+[node name="ShadowRune2" type="ColorRect" parent="Decorations"]
+offset_left = -310.0
+offset_top = -310.0
+offset_right = -290.0
+offset_bottom = -290.0
+color = Color(0.8, 0.0, 0.4, 0.7)
+
+[node name="ShadowRune3" type="ColorRect" parent="Decorations"]
+offset_left = 290.0
+offset_top = 290.0
+offset_right = 310.0
+offset_bottom = 310.0
+color = Color(0.8, 0.0, 0.4, 0.7)
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+position = Vector2(0, 400)
+
+[node name="Enemies" type="Node2D" parent="."]
+
+[node name="ShadowWraith1" parent="Enemies" instance=ExtResource("3_enemy")]
+position = Vector2(-350, -100)
+move_speed = 60.0
+chase_speed = 90.0
+attack_damage = 18
+xp_reward = 35
+gold_reward = 15
+enemy_name = "Dark Wraith"
+
+[node name="ShadowWraith2" parent="Enemies" instance=ExtResource("3_enemy")]
+position = Vector2(350, -100)
+move_speed = 60.0
+chase_speed = 90.0
+attack_damage = 18
+xp_reward = 35
+gold_reward = 15
+enemy_name = "Dark Wraith"
+
+[node name="ShadowWraith3" parent="Enemies" instance=ExtResource("3_enemy")]
+position = Vector2(0, -450)
+move_speed = 55.0
+chase_speed = 85.0
+attack_damage = 16
+xp_reward = 30
+gold_reward = 12
+enemy_name = "Shadow Sentinel"
+
+[node name="ShadowWraith4" parent="Enemies" instance=ExtResource("3_enemy")]
+position = Vector2(-400, 300)
+move_speed = 65.0
+chase_speed = 95.0
+attack_damage = 20
+xp_reward = 40
+gold_reward = 18
+enemy_name = "Phantom Knight"
+
+[node name="Guardian1" parent="Enemies" instance=ExtResource("4_enemy2")]
+position = Vector2(0, -350)
+charge_speed = 200.0
+attack_damage = 28
+xp_reward = 60
+gold_reward = 30
+enemy_name = "Void Guardian"
+
+[node name="Guardian2" parent="Enemies" instance=ExtResource("4_enemy2")]
+position = Vector2(400, 350)
+charge_speed = 190.0
+attack_damage = 25
+xp_reward = 55
+gold_reward = 25
+enemy_name = "Shadow Juggernaut"
+
+[node name="Pickups" type="Node2D" parent="."]
+
+[node name="HealthPotion1" parent="Pickups" instance=ExtResource("5_pickup")]
+position = Vector2(-400, 0)
+
+[node name="HealthPotion2" parent="Pickups" instance=ExtResource("5_pickup")]
+position = Vector2(400, 0)
+
+[node name="ManaPotion1" parent="Pickups" instance=ExtResource("5_pickup")]
+position = Vector2(0, 300)
+
+[node name="Gold1" parent="Pickups" instance=ExtResource("5_pickup")]
+position = Vector2(-300, 400)
+
+[node name="Gold2" parent="Pickups" instance=ExtResource("5_pickup")]
+position = Vector2(300, -400)
+
+[node name="XPOrb1" parent="Pickups" instance=ExtResource("5_pickup")]
+position = Vector2(-450, -400)
+
+[node name="CovenantFragment" parent="Pickups" instance=ExtResource("5_pickup")]
+position = Vector2(450, -450)
+
+[node name="NPCs" type="Node2D" parent="."]
+
+[node name="ShadowVoice" parent="NPCs" instance=ExtResource("6_npc")]
+position = Vector2(0, 450)
+npc_name = "Shadow Voice"
+dialogue_id = "dark_pact_offer"
+npc_color = Color(0.3, 0.0, 0.5, 1)
+
+[node name="HUD" parent="." instance=ExtResource("7_hud")]
+
+[node name="PauseMenu" parent="." instance=ExtResource("8_pause")]
+
+[node name="AmbientLight" type="CanvasModulate" parent="."]
+color = Color(0.5, 0.4, 0.65, 1)

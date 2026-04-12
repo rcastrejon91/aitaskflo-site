@@ -1,0 +1,16 @@
+[gd_scene load_steps=3 format=3 uid="uid://collect001"]
+
+[ext_resource type="Script" path="res://scenes/entities/Collectible.gd" id="1_collect"]
+[ext_resource type="Texture2D" uid="uid://collecttex" path="res://assets/sprites/collectible.png" id="2_texture"]
+
+[node name="Collectible" type="Area2D"]
+collision_layer = 64
+collision_mask = 2
+script = ExtResource("1_collect")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("2_texture")
+scale = Vector2(1.5, 1.5)
+
+[node name="CollShape" type="CollisionShape2D" parent="."]
+shape = &"new CircleShape2D"
