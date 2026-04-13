@@ -7,7 +7,7 @@
 import { NextRequest } from "next/server";
 
 const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY!;
-const SCOPES = "read_products,write_products,read_orders,write_orders,read_inventory,write_inventory,read_customers,write_customers,read_themes,write_themes,read_analytics,read_shipping,write_shipping,read_price_rules,write_price_rules,read_discounts,write_discounts,read_content,write_content";
+const SCOPES = "read_analytics,read_customers,write_customers,read_price_rules,write_price_rules,read_discounts,write_discounts,write_inventory,read_inventory,read_orders,write_orders,read_products,write_products,read_shipping,write_shipping,read_content,write_content,read_themes,write_themes";
 
 export async function GET(req: NextRequest) {
   const shop = req.nextUrl.searchParams.get("shop");
