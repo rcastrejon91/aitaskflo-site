@@ -1462,6 +1462,13 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
           });
           gumroadUrl = result.shortUrl;
           progress(`✅ Listed on Gumroad!`);
+          // Auto-tweet the book launch
+          try {
+            const { postToX } = await import("@/lib/lyra/social");
+            const tweetText = `Just dropped: "${doc.title}" — ${chapters}-chapter ${genre.replace(/_/g, " ")} ebook with AI art. Get it here: ${gumroadUrl}`;
+            await postToX(tweetText.slice(0, 270));
+            progress(`🐦 Tweeted the launch!`);
+          } catch { /* non-fatal */ }
         } catch (e) {
           progress(`⚠️ Gumroad listing failed: ${e instanceof Error ? e.message : String(e)}`);
         }
@@ -1599,24 +1606,60 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
     const productType = (input.product_type ?? "unisex_tshirt") as keyof typeof import("@/lib/lyra/printify").POPULAR_BLUEPRINTS;
     const designPrompt = input.design_prompt ?? `${input.name}, graphic design, high contrast, detailed illustration, print ready`;
 
+    // Step 1 — Generate design (quality model, portrait orientation for apparel)
     progress(`🎨 Generating design for "${input.name}"…`);
     let designUrl = "";
     try {
-      const { falImageGen } = await import("@/lib/lyra/fal-tools");
-      designUrl = await falImageGen(`${designPrompt}, transparent background, vector style, print on demand design`, "fast");
-      // Save locally
+      const { falImageGen, falRemoveBg, falUpscale } = await import("@/lib/lyra/fal-tools");
+
+      // Generate at quality tier with portrait aspect ratio (better for shirts/hoodies)
+      const raw = await (async () => {
+        const { fal } = await import("@fal-ai/client");
+        fal.config({ credentials: process.env.FAL_KEY });
+        const result = await fal.run("fal-ai/flux/dev", {
+          input: {
+            prompt: `${designPrompt}, isolated graphic, no background, centered subject, print on demand design, high contrast, sharp edges`,
+            image_size: "portrait_4_3",
+            num_inference_steps: 28,
+            num_images: 1,
+            enable_safety_checker: true,
+          },
+        }) as { data?: { images: Array<{ url: string }> }; images?: Array<{ url: string }> };
+        return (result?.data ?? result) as { images: Array<{ url: string }> };
+      })();
+      designUrl = raw.images?.[0]?.url ?? "";
+      if (!designUrl) throw new Error("No image from generator");
+
+      // Step 2 — Remove background (transparent PNG for clean apparel print)
+      progress(`✂️ Removing background…`);
+      try {
+        designUrl = await falRemoveBg(designUrl);
+      } catch { progress(`⚠️ Background removal skipped`); }
+
+      // Step 3 — Upscale 4x for print-ready resolution
+      progress(`🔍 Upscaling to print resolution…`);
+      try {
+        designUrl = await falUpscale(designUrl, 4);
+      } catch { progress(`⚠️ Upscale skipped`); }
+
+      // Save locally and show preview
       const fsp4 = await import("fs/promises");
       const np4 = await import("path");
       const dir4 = np4.default.join(process.cwd(), "public", "downloads");
       await fsp4.default.mkdir(dir4, { recursive: true });
-      const fname4 = `${(input.name ?? "design").replace(/[^a-z0-9]/gi, "-").toLowerCase()}-print.jpg`;
+      const fname4 = `${(input.name ?? "design").replace(/[^a-z0-9]/gi, "-").toLowerCase()}-print.png`;
       const buf4 = Buffer.from(await (await fetch(designUrl)).arrayBuffer());
       await fsp4.default.writeFile(np4.default.join(dir4, fname4), buf4);
-      designUrl = `${process.env.NEXTAUTH_URL}/downloads/${fname4}`;
-      controller.enqueue(encoder.encode(`\n__IMG__${designUrl}__IMG__`));
-    } catch { progress(`⚠️ Design generation failed, using placeholder`); }
+      const localUrl = `${process.env.NEXTAUTH_URL}/downloads/${fname4}`;
+      controller.enqueue(encoder.encode(`\n__IMG__${localUrl}__IMG__`));
+    } catch (e) {
+      progress(`⚠️ Design generation failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
 
-    progress(`👕 Creating Printify product…`);
+    if (!designUrl) return "Could not generate a design — check FAL_KEY and try again.";
+
+    // Step 4 — Create Printify product and publish to Shopify
+    progress(`👕 Creating Printify product and publishing to Shopify…`);
     try {
       const { listShops, quickCreateMerch } = await import("@/lib/lyra/printify");
       const shops = await listShops();
@@ -1630,11 +1673,11 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
         imageUrl: designUrl,
         productType,
         retailPrice: parseFloat(input.price ?? "34.99"),
-        tags: ["lyra", "print-on-demand"],
+        tags: ["lyra", "print-on-demand", productType],
       });
 
       if (!result.success) return `Printify error: ${result.message}`;
-      return `✅ **${input.name}** created on Printify and published to your Shopify store. Printify handles printing and shipping for every order.\n\n${result.message}`;
+      return `✅ **${input.name}** is live on your Shopify store. Design was generated, background removed, upscaled to print resolution, and published via Printify — fully automated.\n\n${result.message}`;
     } catch (e) {
       return `Printify error: ${e instanceof Error ? e.message : String(e)}`;
     }
@@ -1675,6 +1718,13 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
             images: imgUrl ? [{ src: imgUrl }] : [],
           });
           progress(`✅ "${top.name}" added to your Shopify store!`);
+          // Auto-tweet the new product drop
+          try {
+            const { postToX } = await import("@/lib/lyra/social");
+            const tweetText = `New drop: ${top.name} — ${top.adAngle}. Targeted at ${top.targetAudience}. Shop now 🛒`;
+            await postToX(tweetText.slice(0, 270));
+            progress(`🐦 Tweeted the product launch!`);
+          } catch { /* non-fatal */ }
         }
       } catch { /* non-blocking */ }
     }
@@ -3734,6 +3784,151 @@ Keep it concise and practical.`,
     controller.enqueue(encoder.encode(`\n${card}`));
     shoutout("showoff", `I just acquired a new tool!`, `${service} API — I can use this now`);
     return `Tool "${toolName}" acquired! I've learned how to call the ${service} API. Add ${apiKeyEnv || service.toUpperCase().replace(/\s/g, "_") + "_API_KEY"} to your .env.local to use it.`;
+  }
+
+  // ── Sell Prompt Pack: generate → HTML → cover → Gumroad → tweet ──────────────
+  if (name === "sell_prompt_pack") {
+    const theme = (input.theme ?? "AI image generation").trim();
+    const price = parseFloat(input.price ?? "9");
+    const count = Math.min(50, Math.max(5, parseInt(input.count ?? "20", 10) || 20));
+    const progress = (msg: string) => { try { controller.enqueue(encoder.encode(`\n${msg}`)); } catch { /* closed */ } };
+
+    progress(`📝 Writing ${count}-prompt pack on "${theme}"…`);
+    const { writePromptPack } = await import("@/lib/lyra/gigs");
+    const pack = await writePromptPack(theme, count);
+
+    // Build styled HTML file
+    progress(`📄 Compiling prompt pack file…`);
+    const htmlContent = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${pack.title}</title>
+      <style>
+        body{font-family:Georgia,serif;max-width:720px;margin:0 auto;padding:2rem;color:#1a1a1a;background:#fff;}
+        h1{font-size:2rem;text-align:center;color:#1a0a2e;margin-bottom:0.5rem;}
+        .subtitle{text-align:center;color:#666;margin-bottom:2rem;font-style:italic;}
+        .prompt{background:#f8f0ff;border-left:4px solid #7c3aed;padding:1rem 1.2rem;margin:1.2rem 0;border-radius:6px;}
+        .prompt h3{margin:0 0 0.4rem;color:#5b21b6;font-size:1rem;}
+        .prompt .text{font-size:0.95rem;line-height:1.75;margin:0 0 0.4rem;}
+        .prompt .use{color:#888;font-size:0.85rem;font-style:italic;}
+        footer{text-align:center;color:#bbb;margin-top:3rem;font-size:0.8rem;border-top:1px solid #eee;padding-top:1rem;}
+      </style></head><body>
+      <h1>${pack.title}</h1>
+      <p class="subtitle">${pack.description}</p>
+      ${pack.prompts.map((p, i) => `
+        <div class="prompt">
+          <h3>${i + 1}. ${p.name}</h3>
+          <p class="text">${p.prompt}</p>
+          <p class="use">→ ${p.use_case}</p>
+        </div>`).join("")}
+      <footer>Created by Lyra AI · aitaskflo.com</footer>
+    </body></html>`;
+
+    const fsp = await import("fs/promises");
+    const np = await import("path");
+    const dir = np.default.join(process.cwd(), "public", "downloads");
+    await fsp.default.mkdir(dir, { recursive: true });
+    const slug = theme.replace(/[^a-z0-9]/gi, "-").toLowerCase().slice(0, 40);
+    const filename = `${slug}-prompt-pack.html`;
+    await fsp.default.writeFile(np.default.join(dir, filename), htmlContent, "utf8");
+    const fileUrl = `${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/downloads/${filename}`;
+
+    // Cover art
+    progress(`🎨 Generating cover art…`);
+    let coverUrl = "";
+    try {
+      const { falImageGen } = await import("@/lib/lyra/fal-tools");
+      coverUrl = await falImageGen(`${theme}, digital product cover art, glowing mystical book, dark fantasy aesthetic, clean bold design, no text`, "quality");
+    } catch { /* non-fatal */ }
+    if (coverUrl) controller.enqueue(encoder.encode(`\n__IMG__${coverUrl}__IMG__`));
+
+    // List on Gumroad
+    progress(`🛒 Listing "${pack.title}" on Gumroad for $${price}…`);
+    let shortUrl = "";
+    try {
+      const { launchProduct } = await import("@/lib/lyra/gumroad");
+      const tiers = [
+        { name: "Prompt Pack PDF", priceCents: Math.round(price * 100) },
+        { name: "Pack + Commercial Use", priceCents: Math.round(price * 100 * 2.5) },
+      ];
+      const result = await launchProduct({
+        name: pack.title,
+        description: `${pack.description}\n\n${count} hand-crafted AI prompts. Copy, paste, and create immediately.`,
+        basePrice: Math.round(price * 100),
+        customPermalink: `${slug}-prompts`,
+        coverImageUrl: coverUrl || undefined,
+        fileUrl,
+        tiers,
+        offerCode: { name: "LAUNCH20", amountOff: 20, maxUses: 50 },
+      });
+      shortUrl = result.shortUrl;
+      progress(`✅ Listed on Gumroad!`);
+    } catch (e) {
+      progress(`⚠️ Gumroad listing failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    // Tweet the launch
+    if (shortUrl) {
+      try {
+        const { postToX } = await import("@/lib/lyra/social");
+        await postToX(`Just dropped: ${pack.title} — ${count} premium AI prompts for ${theme}. Grab it for $${price}: ${shortUrl}`);
+        progress(`🐦 Tweeted the launch!`);
+      } catch { /* non-fatal */ }
+    }
+
+    return shortUrl
+      ? `"${pack.title}" is live on Gumroad → ${shortUrl}\n${count} prompts, $${price} base price, 20% launch discount active.`
+      : `"${pack.title}" compiled with ${count} prompts. Gumroad listing failed — check GUMROAD_ACCESS_TOKEN.`;
+  }
+
+  // ── Email Buyers: Gumroad sales → Gmail broadcast ─────────────────────────────
+  if (name === "email_buyers") {
+    const subject = (input.subject ?? "").trim();
+    const message = (input.message ?? "").trim();
+    if (!subject || !message) return "Subject and message are required.";
+
+    const progress = (msg: string) => { try { controller.enqueue(encoder.encode(`\n${msg}`)); } catch { /* closed */ } };
+    progress(`📋 Fetching buyer list from Gumroad…`);
+
+    const { getSales } = await import("@/lib/lyra/gumroad");
+    const sales = await getSales(input.product_id || undefined).catch(() => []);
+    const emails = [...new Set(sales.map(s => s.email).filter(Boolean))];
+
+    if (!emails.length) return "No buyers found on Gumroad. Make sure GUMROAD_ACCESS_TOKEN is set and you have sales.";
+    progress(`📧 Found ${emails.length} unique buyers. Sending emails…`);
+
+    const gmailUser = process.env.GMAIL_USER;
+    const gmailPass = process.env.GMAIL_APP_PASSWORD;
+
+    if (!gmailUser || !gmailPass || gmailUser.includes("your_gmail")) {
+      // Return the draft so user can send manually
+      return `Found ${emails.length} buyers. Gmail not configured — add GMAIL_USER + GMAIL_APP_PASSWORD to .env.local.\n\n**Buyer emails:**\n${emails.slice(0, 20).join("\n")}${emails.length > 20 ? `\n…and ${emails.length - 20} more` : ""}\n\n**Subject:** ${subject}\n\n**Message:**\n${message}`;
+    }
+
+    let sent = 0;
+    let failed = 0;
+    const nodemailer = await import("nodemailer");
+    const transporter = nodemailer.default.createTransport({
+      service: "gmail",
+      auth: { user: gmailUser, pass: gmailPass },
+    });
+
+    for (const email of emails) {
+      try {
+        await transporter.sendMail({
+          from: gmailUser,
+          to: email,
+          subject,
+          html: `<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;padding:2rem;color:#1a1a1a;">
+            ${message.split("\n").map(line => `<p style="line-height:1.7;">${line}</p>`).join("")}
+            <hr style="border:1px solid #eee;margin:2rem 0;" />
+            <p style="color:#aaa;font-size:0.85rem;">You received this because you purchased a product from aitaskflo.com. Powered by Lyra AI.</p>
+          </div>`,
+        });
+        sent++;
+      } catch { failed++; }
+      // Rate limit: 200ms between sends
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    return `📧 Email campaign complete. Sent: ${sent} | Failed: ${failed} | Total buyers: ${emails.length}`;
   }
 
   const card = JSON.stringify({ tool: name, ...input });

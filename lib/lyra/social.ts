@@ -106,7 +106,7 @@ export async function queuePostFromLearning(entry: LearningEntry): Promise<Socia
 }
 
 // Post to X (Twitter) via API v2
-async function postToX(content: string): Promise<{ id: string; url: string } | null> {
+export async function postToX(content: string): Promise<{ id: string; url: string } | null> {
   const bearerToken = process.env.X_BEARER_TOKEN;
   const apiKey = process.env.X_API_KEY;
   const apiSecret = process.env.X_API_SECRET;
