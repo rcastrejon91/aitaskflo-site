@@ -1740,6 +1740,32 @@ ACTIONS:
     },
   },
   {
+    name: "sell_prompt_pack",
+    description: "Create a premium AI prompt pack and sell it on Gumroad. Lyra generates themed prompts, builds a formatted file, creates cover art, lists on Gumroad with pricing tiers, and tweets the launch. Use when user wants to sell prompt packs, AI prompt collections, or digital prompt products.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        theme: { type: "string", description: "Prompt theme e.g. 'dark fantasy characters', 'product photography', 'logo design'" },
+        count: { type: "string", description: "Number of prompts to include (default: 20)" },
+        price: { type: "string", description: "Price in USD e.g. '9' (default: 9)" },
+      },
+      required: ["theme"],
+    },
+  },
+  {
+    name: "email_buyers",
+    description: "Email all Gumroad buyers to announce a new product, share an update, or send a promo code. Lyra fetches buyer emails from Gumroad sales and sends a broadcast via Gmail. Use when user wants to email customers, announce a launch, or run an email campaign to past buyers.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        subject: { type: "string", description: "Email subject line" },
+        message: { type: "string", description: "What to announce — new product URL, promo code, update" },
+        product_id: { type: "string", description: "Optional: only email buyers of a specific Gumroad product ID" },
+      },
+      required: ["subject", "message"],
+    },
+  },
+  {
     name: "shopify_create_store",
     description: "Create a complete Shopify store from a single description. Lyra picks the niche, creates products, writes descriptions, generates product images, sets prices, creates a launch discount, and gives the merchant an install link. Use when user says 'create me a store', 'start a shopify store', 'build me a [type] store', or 'set up a store selling [product]'.",
     input_schema: {
