@@ -1382,7 +1382,7 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
 
       // ── Step 2: Write the book content ────────────────────────────────────────
       progress(`📖 Writing "${title || topic}" — ${chapters} chapters…`);
-      const { generateDocument, generateDocPdf } = await import("@/lib/lyra/publishgen");
+      const { generateDocument } = await import("@/lib/lyra/publishgen");
 
       const doc = await generateDocument(
         title || topic,
@@ -1396,18 +1396,43 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
       // Inject our fal.ai cover over the Pollinations placeholder
       if (coverUrl) doc.coverUrl = coverUrl;
 
-      // ── Step 3: Generate PDF ───────────────────────────────────────────────────
-      progress(`📄 Compiling PDF…`);
-      const pdfBuf = await generateDocPdf(doc);
+      // ── Step 3: Save as HTML (no react-pdf dependency, works everywhere) ────────
+      progress(`📄 Compiling book file…`);
       const fsp = await import("fs/promises");
       const nodePath = await import("path");
       const dir = nodePath.default.join(process.cwd(), "public", "downloads");
       await fsp.default.mkdir(dir, { recursive: true });
-      const filename = `${(doc.title).replace(/[^a-z0-9]/gi, "-").toLowerCase()}-lyra.pdf`;
-      await fsp.default.writeFile(nodePath.default.join(dir, filename), pdfBuf);
+      const slug = (doc.title).replace(/[^a-z0-9]/gi, "-").toLowerCase();
+      const filename = `${slug}-lyra.html`;
       const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+
+      // Build a clean HTML file (readable + printable, no react-pdf)
+      const coverImg = coverUrl ? `<img src="${coverUrl}" style="width:100%;max-height:500px;object-fit:cover;border-radius:8px;margin-bottom:2rem;" />` : "";
+      const sectionsHtml = doc.sections.map((s, i) => `
+        <section style="page-break-before:always;padding:2rem 0;">
+          <h2 style="font-size:1.6rem;color:#1a0a2e;margin-bottom:0.5rem;">Chapter ${i + 1}: ${s.title}</h2>
+          <hr style="border:2px solid #1a0a2e;width:40px;margin:0 0 1.2rem;" />
+          ${s.imageUrl ? `<img src="${s.imageUrl}" style="width:100%;max-height:320px;object-fit:cover;border-radius:6px;margin-bottom:1.2rem;" />` : ""}
+          ${s.content.split("\n").filter(p => p.trim()).map(p => `<p style="font-size:1rem;line-height:1.8;text-align:justify;margin-bottom:0.8rem;">${p}</p>`).join("")}
+          ${s.callout ? `<blockquote style="background:#f8f0ff;border-left:4px solid #7c3aed;padding:0.8rem 1rem;border-radius:4px;margin:1.2rem 0;"><strong>${s.callout.type.toUpperCase()}:</strong> ${s.callout.text}</blockquote>` : ""}
+        </section>
+      `).join("");
+
+      const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${doc.title}</title>
+        <style>body{font-family:Georgia,serif;max-width:700px;margin:0 auto;padding:2rem;color:#1a1a1a;background:#fff;}</style>
+      </head><body>
+        ${coverImg}
+        <h1 style="font-size:2.4rem;text-align:center;color:#1a0a2e;">${doc.title}</h1>
+        ${doc.subtitle ? `<p style="text-align:center;color:#666;font-style:italic;">${doc.subtitle}</p>` : ""}
+        <p style="text-align:center;color:#999;margin-bottom:3rem;">by ${doc.author}</p>
+        <nav><h2>Contents</h2><ol>${doc.sections.map(s => `<li>${s.title}</li>`).join("")}</ol></nav>
+        ${sectionsHtml}
+        <footer style="text-align:center;color:#aaa;margin-top:3rem;font-size:0.85rem;">Written by Lyra AI · aitaskflo.com</footer>
+      </body></html>`;
+
+      await fsp.default.writeFile(nodePath.default.join(dir, filename), html, "utf8");
       const downloadUrl = `${baseUrl}/downloads/${filename}`;
-      progress(`✅ PDF ready.`);
+      progress(`✅ Book file ready.`);
 
       // ── Step 4: Optionally list on Gumroad ────────────────────────────────────
       let gumroadUrl = "";
@@ -1444,10 +1469,10 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
         gumroadUrl,
       });
       controller.enqueue(encoder.encode(`\n${card}`));
-      controller.enqueue(encoder.encode(`\n📥 **[Download "${doc.title}"](${downloadUrl})**`));
+      controller.enqueue(encoder.encode(`\n📥 **[Read "${doc.title}"](${downloadUrl})**`));
       if (gumroadUrl) controller.enqueue(encoder.encode(`\n🛒 **[Buy on Gumroad](${gumroadUrl})**`));
 
-      return `"${doc.title}" is complete — ${doc.sections.length} chapters, cover art, fully illustrated PDF.${gumroadUrl ? ` Live on Gumroad at ${gumroadUrl}.` : ` Say "list it on Gumroad for $${price}" to sell it.`}`;
+      return `"${doc.title}" is complete — ${doc.sections.length} chapters with cover art and illustrations.${gumroadUrl ? ` Live on Gumroad at ${gumroadUrl}.` : ` Say "list it on Gumroad for $${price}" to sell it.`}`;
 
     } finally {
       clearInterval(keepAlive);
