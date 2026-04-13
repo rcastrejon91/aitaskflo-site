@@ -1376,6 +1376,18 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
           addText: !!(title),
         });
         coverUrl = cover.url;
+        // Save cover to our server so the URL never expires (fal.ai URLs are temporary)
+        try {
+          const fsp2 = await import("fs/promises");
+          const np2 = await import("path");
+          const coverDir = np2.default.join(process.cwd(), "public", "downloads");
+          await fsp2.default.mkdir(coverDir, { recursive: true });
+          const coverFilename = `${(title || topic).replace(/[^a-z0-9]/gi, "-").toLowerCase()}-cover.jpg`;
+          const coverBuf = Buffer.from(await (await fetch(coverUrl)).arrayBuffer());
+          await fsp2.default.writeFile(np2.default.join(coverDir, coverFilename), coverBuf);
+          const baseUrl2 = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+          coverUrl = `${baseUrl2}/downloads/${coverFilename}`;
+        } catch { /* keep fal.ai url if save fails */ }
         controller.enqueue(encoder.encode(`\n__IMG__${coverUrl}__IMG__`));
         progress(`✅ Cover ready.`);
       } catch { progress(`⚠️ Cover generation failed, continuing without…`); }

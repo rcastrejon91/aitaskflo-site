@@ -1543,7 +1543,7 @@ ACTIONS:
   // ── Full Book Creation ───────────────────────────────────────────────────
   {
     name: "write_book",
-    description: "Write and publish a complete illustrated book end-to-end. Lyra writes every chapter, generates a professional cover with AI art, illustrates each chapter, compiles a print-ready PDF, and optionally lists it on Gumroad to sell. One command does everything. Use when Ricky says 'write a book about...', 'create a book and sell it', 'make a full illustrated book', 'write a fantasy novel / grimoire / guide'. Supports fiction, non-fiction, fantasy, self-help, recipe books, children's books, and more.",
+    description: "Write and publish a complete illustrated book end-to-end. Lyra writes every chapter, generates a professional cover with AI art, illustrates each chapter, compiles an HTML book file, and optionally lists it on Gumroad to sell. One command does everything. Use when the user says 'write a book about...', 'create a book and sell it', 'make a full illustrated book', 'write a fantasy novel / grimoire / guide / horror book / thriller'. Supports fiction, non-fiction, fantasy, self-help, recipe books, children's books, and more. ALWAYS use this over make_document when the user wants a book, novel, or story.",
     input_schema: {
       type: "object" as const,
       properties: {
