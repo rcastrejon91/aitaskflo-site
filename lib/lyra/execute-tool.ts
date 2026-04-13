@@ -1,13 +1,22 @@
 import nodePath from "path";
 import { randomUUID } from "crypto";
-import { upsertCrmContact, searchCrmContacts, createTask, listTasks } from "@/lib/lyra/db";
+
+// ── Presence broadcast (fire-and-forget) ──────────────────────────────────────
+function shoutout(type: string, message?: string, detail?: string) {
+  const base = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+  fetch(`${base}/api/lyra/presence`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type, message, detail }),
+  }).catch(() => {});
+}
+import { upsertCrmContact, searchCrmContacts, createTask, listTasks, logSearch, saveBook } from "@/lib/lyra/db";
 import { buildGame, improveGame } from "@/lib/lyra/gamebuilder";
 import { scanJobs, formatJobsForChat, buildCoverLetterPrompt } from "@/lib/lyra/jobscan";
 import { scoreAts, formatAtsScore, buildTailorPrompt } from "@/lib/lyra/resume";
 import { executeHsAction } from "@/lib/lyra/hubspot";
 import { detectEngine } from "@/lib/lyra/gamedev";
-import { generateBook } from "@/lib/lyra/bookgen";
-import { generateBookPdf, generateComicPdf } from "@/lib/lyra/pdfgen";
+import { generateComicPdf } from "@/lib/lyra/pdfgen";
 import { savePendingAction } from "@/lib/lyra/pending-actions";
 import {
   pollinationsUrl,
@@ -68,6 +77,77 @@ export async function executeTool(
     return "Image generated.";
   }
 
+  if (name === "make_gif") {
+    const mode = (input.mode ?? "programmatic") as "programmatic" | "ai";
+    const baseUrl = process.env.NEXTAUTH_URL ?? "https://aitaskflo.com";
+
+    if (mode === "programmatic") {
+      // Build GIF URL — served by GET /api/lyra/gif
+      const params = new URLSearchParams({
+        style: (input.style ?? "rainbow") as string,
+        text: (input.text ?? "LYRA").toUpperCase().slice(0, 12),
+        w: String(input.width ?? 320),
+        h: String(input.height ?? 80),
+      });
+      const gifUrl = `${baseUrl}/api/lyra/gif?${params}`;
+      controller.enqueue(encoder.encode(`\n__GIF__${gifUrl}__GIF__`));
+      const card = JSON.stringify({ tool: "gif_created", style: input.style ?? "rainbow", text: input.text ?? "LYRA" });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return "GIF created.";
+    }
+
+    if (mode === "ai") {
+      if (!process.env.FAL_KEY) return "fal.ai is not configured — add FAL_KEY to environment.";
+      const frameCount = Math.max(2, Math.min(4, parseInt(String(input.frames ?? "3"), 10)));
+      const prompt = (input.prompt ?? "abstract colorful animation") as string;
+      const w = parseInt(String(input.width ?? "480"), 10);
+      const h = parseInt(String(input.height ?? "480"), 10);
+
+      controller.enqueue(encoder.encode(`\n🎨 Generating ${frameCount} AI frames…\n`));
+
+      const { falImageGen } = await import("./fal-tools");
+      const frameUrls: string[] = [];
+      for (let i = 0; i < frameCount; i++) {
+        const framePrompt = `${prompt}, frame ${i + 1} of ${frameCount}, sequential animation`;
+        const url = await falImageGen(framePrompt, "fast").catch(() => null);
+        if (url) {
+          frameUrls.push(url);
+          controller.enqueue(encoder.encode(`   Frame ${i + 1}/${frameCount} done\n`));
+        }
+      }
+
+      if (!frameUrls.length) return "Failed to generate frames.";
+
+      controller.enqueue(encoder.encode(`\n🎞️ Stitching into GIF…\n`));
+
+      const res = await fetch(`${baseUrl}/api/lyra/gif`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "frames", frameUrls, width: w, height: h, fps: 3 }),
+        signal: AbortSignal.timeout(60_000),
+      });
+
+      if (!res.ok) return "Failed to stitch GIF.";
+
+      // Save GIF to public dir and return URL
+      const { default: fs } = await import("fs");
+      const { default: path } = await import("path");
+      const gifId = Date.now().toString(36);
+      const gifPath = path.join(process.cwd(), "public", "generated", `${gifId}.gif`);
+      fs.mkdirSync(path.dirname(gifPath), { recursive: true });
+      const gifBuf = Buffer.from(await res.arrayBuffer());
+      fs.writeFileSync(gifPath, gifBuf);
+      const gifUrl = `/generated/${gifId}.gif`;
+
+      controller.enqueue(encoder.encode(`\n__GIF__${gifUrl}__GIF__`));
+      const card = JSON.stringify({ tool: "gif_created", mode: "ai", frames: frameUrls.length, prompt: prompt.slice(0, 60) });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return "AI GIF created.";
+    }
+
+    return "Unknown gif mode.";
+  }
+
   if (name === "send_gif") {
     const query = input.query ?? input.mood ?? "funny";
     const tenorKey = process.env.TENOR_API_KEY;
@@ -108,7 +188,11 @@ export async function executeTool(
   }
 
   if (name === "search_web") {
-    return await toolSearchWeb(input.query ?? "");
+    const query = input.query ?? "";
+    const result = await toolSearchWeb(query);
+    const resultCount = (result.match(/\*\*/g) ?? []).length / 2;
+    logSearch(userId, query, Math.round(resultCount));
+    return result;
   }
 
   if (name === "read_url") {
@@ -352,7 +436,9 @@ export async function executeTool(
     const engine = detectEngine(rawConcept + " " + rawGenre);
 
     const slug = (input.name ?? rawConcept).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40) || "my-game";
-    const BASE_GAME_DIR = process.env.GAME_DIR ? nodePath.dirname(process.env.GAME_DIR) : "/home/aitaskflo/game";
+    const BASE_GAME_DIR = process.env.GAME_DIR
+      ? nodePath.dirname(process.env.GAME_DIR)
+      : nodePath.join(process.env.APP_DIR ?? process.cwd(), "data", "games");
     const gameDir = nodePath.join(BASE_GAME_DIR, slug);
 
     // Complex genres need more turns (browser games use 4-phase loop, maxTurns scales phases)
@@ -360,7 +446,13 @@ export async function executeTool(
     const isComplex = g.includes("sim") || g.includes("tycoon") || g.includes("life") || g.includes("management") || g.includes("rpg") || g.includes("asymmetric") || g.includes("open world");
     const maxTurns = isComplex ? 45 : 30;
 
-    const engineLabel = engine === "phaser" ? "Phaser 3 browser" : engine === "threejs" ? "Three.js browser" : engine === "babylon" ? "Babylon.js browser" : engine === "godot3d" ? "Godot 4 3D" : "Godot 4 2D";
+    const engineLabel = engine === "phaser" ? "Phaser 3 browser"
+      : engine === "threejs" ? "Three.js browser"
+      : engine === "babylon" ? "Babylon.js browser"
+      : engine === "kaboom" ? "Kaboom.js browser"
+      : engine === "p5" ? "p5.js browser"
+      : engine === "godot3d" ? "Godot 4 3D"
+      : "Godot 4 2D";
     controller.enqueue(encoder.encode(`\n🎮 Starting ${isComplex ? "complex " : ""}${engineLabel} game build for **${rawConcept}** (${genre})…\n`));
 
     // Keep-alive: send a space every 15s so Cloudflare doesn't 524-timeout during long builds
@@ -406,31 +498,30 @@ export async function executeTool(
       upsertFact(userId, `game: ${slug}`, `Built a ${genre} game called "${rawConcept}" (folder: ${slug}). ${result.summary.slice(0, 200)}`, 5);
     }
 
-    // Auto-save to public marketplace
+    // Auto-save to public marketplace (with inline HTML for browser games)
     try {
       const { saveMarketplaceGame } = await import("@/lib/lyra/db");
-      // Use first art URL (title screen) as thumbnail, or generate one
       const thumbnail = result.artUrls?.[0]
         ?? `https://image.pollinations.ai/prompt/${encodeURIComponent(rawConcept + " game title screen, vibrant pixel art")}?width=400&height=225&nologo=true&model=flux&seed=${Date.now()}`;
-      // Title-case the concept (truncated)
       const title = rawConcept.length > 40 ? rawConcept.slice(0, 40) + "…" : rawConcept.split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
       saveMarketplaceGame({
-        slug,
-        title,
-        genre,
-        engine,
+        slug, title, genre, engine,
         concept: rawConcept.slice(0, 300),
         thumbnail_url: thumbnail,
+        game_content: result.htmlContent, // browser games stored inline in DB
       });
     } catch { /* non-fatal */ }
 
+    shoutout("showoff", `I just built a game!`, `"${slug}" is ready to play`);
     return `Game "${slug}" built — ${result.files.length} files written.`;
   }
 
   if (name === "improve_game") {
     const improvement = input.improvement ?? "improve the game";
     const slug = input.name ?? "my-game";
-    const BASE_GAME_DIR = process.env.GAME_DIR ? nodePath.dirname(process.env.GAME_DIR) : "/home/aitaskflo/game";
+    const BASE_GAME_DIR = process.env.GAME_DIR
+      ? nodePath.dirname(process.env.GAME_DIR)
+      : nodePath.join(process.env.APP_DIR ?? process.cwd(), "data", "games");
     const gameDir = nodePath.join(BASE_GAME_DIR, slug);
 
     controller.enqueue(encoder.encode(`\n🔧 Improving **${slug}**: ${improvement}…\n`));
@@ -532,7 +623,9 @@ export async function executeTool(
     controller.enqueue(encoder.encode(`\n✅ Session started — waiting for Desktop Agent to connect…`));
     controller.enqueue(encoder.encode(`\n\n> **Session ID:** \`${sessionId}\``));
     controller.enqueue(encoder.encode(`\n> Make sure the Lyra Desktop Agent is running on your computer.`));
-    controller.enqueue(encoder.encode(`\n> \`python lyra-agent.py --url ${baseUrl} --user ${userId} --key YOUR_KEY\``));
+    const agentKey = process.env.ADMIN_PASSWORD ?? process.env.ADMIN_KEY ?? "YOUR_KEY";
+    const agentUserId = process.env.ADMIN_UUID ?? userId;
+    controller.enqueue(encoder.encode(`\n> \`python lyra-agent.py --url ${baseUrl} --user ${agentUserId} --key ${agentKey}\``));
 
     // Poll for completion (max 3 minutes)
     const maxWait = 180_000;
@@ -787,56 +880,144 @@ ${snippets.join("\n\n")}`,
     return `## 🎮 ${gameName} — Complete Walkthrough\n\n${walkthrough}`;
   }
 
-  if (name === "write_book") {
-    const concept = input.concept || input.topic || "an epic adventure";
-    const genre = input.genre ?? "fantasy";
-    const chapterCount = Math.min(5, Math.max(1, parseInt(input.chapters ?? "3", 10) || 3));
-    const exportPdf = input.export_pdf === "true";
+  if (name === "write_research_paper") {
+    const title = input.title || input.topic || "An Investigation into an Emerging Topic";
+    const topic = input.topic || input.title || title;
+    const field = input.field ?? "general";
+    const sectionCount = Math.min(8, Math.max(3, parseInt(input.sections ?? "5", 10) || 5));
+    const depth = input.depth ?? "standard";
 
     const progress = (msg: string) => {
-      try { controller.enqueue(encoder.encode(`\n✨ ${msg}`)); } catch { /* closed */ }
+      try { controller.enqueue(encoder.encode(`\n📄 ${msg}`)); } catch { /* closed */ }
     };
 
-    const keepAlive = setInterval(() => {
-      try { controller.enqueue(encoder.encode(" ")); } catch { /* closed */ }
-    }, 15_000);
+    progress(`Researching "${topic}" in ${field}…`);
 
-    let book!: Awaited<ReturnType<typeof generateBook>>;
-    try {
-      book = await generateBook(concept, genre, chapterCount, progress);
-    } catch (e) {
-      clearInterval(keepAlive);
-      const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e);
-      controller.enqueue(encoder.encode(`\n❌ **Book failed:** ${msg}`));
-      return `Book generation error: ${msg}`;
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const wordTarget = depth === "brief" ? 1500 : depth === "comprehensive" ? 5000 : 2500;
+
+    // Generate full paper as JSON
+    const paperPrompt = `Write a complete academic research paper titled "${title}" about "${topic}" in the field of ${field}.
+
+Structure it as JSON with this exact format:
+{
+  "title": "...",
+  "subtitle": "...",
+  "authors": ["Lyra AI Research"],
+  "field": "${field}",
+  "abstract": "150-250 word abstract",
+  "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
+  "sections": [
+    {
+      "number": 1,
+      "heading": "1. Introduction",
+      "content": "full section content (~${Math.round(wordTarget / sectionCount)} words)"
     }
-    clearInterval(keepAlive);
+  ],
+  "references": [
+    { "id": 1, "citation": "Author, A. (Year). Title. Journal, Vol(Issue), Pages. DOI" }
+  ]
+}
 
-    // Generate PDF if requested
-    let pdfCard = "";
-    if (exportPdf) {
-      try {
-        progress("Generating Amazon KDP PDF…");
-        const pdfBuf = await generateBookPdf(book);
-        // Save to public for download
-        const fsp = await import("fs/promises");
-        const nodePath = await import("path");
-        const pdfDir = nodePath.default.join(process.cwd(), "public", "downloads");
-        await fsp.default.mkdir(pdfDir, { recursive: true });
-        const filename = `${book.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}-lyra.pdf`;
-        await fsp.default.writeFile(nodePath.default.join(pdfDir, filename), pdfBuf);
-        const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-        pdfCard = `\n📥 **[Download PDF — KDP Ready](${baseUrl}/downloads/${filename})**`;
-      } catch (e) {
-        console.error("[pdfgen] ERROR:", e instanceof Error ? e.stack : String(e));
-        pdfCard = `\n⚠️ PDF export failed: ${e instanceof Error ? e.message : String(e)}`;
+Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${sectionCount > 4 ? "Methodology, Results, " : ""}Discussion, and Conclusion. Total ~${wordTarget} words. Write real academic prose with citations like [1], [2] etc. Make the content genuinely informative and detailed.`;
+
+    progress("Writing paper sections…");
+
+    let paperJson = "";
+    const stream = await client.messages.stream({
+      model: "claude-sonnet-4-6",
+      max_tokens: 8000,
+      messages: [{ role: "user", content: paperPrompt }],
+    });
+
+    for await (const event of stream) {
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+        paperJson += event.delta.text;
       }
     }
 
-    const card = JSON.stringify({ tool: "book", ...book, pdfExported: exportPdf });
+    // Parse JSON
+    let paper: {
+      title: string; subtitle?: string; authors?: string[]; field?: string;
+      abstract: string; keywords?: string[]; sections: Array<{ number: number; heading: string; content: string }>;
+      references?: Array<{ id: number; citation: string }>;
+    };
+    try {
+      const jsonMatch = paperJson.match(/\{[\s\S]*\}/);
+      paper = JSON.parse(jsonMatch?.[0] ?? paperJson);
+    } catch {
+      // Fallback: treat raw text as a single section
+      paper = {
+        title, abstract: "See full paper below.", keywords: [topic],
+        sections: [{ number: 1, heading: "Full Paper", content: paperJson }],
+        references: [],
+      };
+    }
+
+    progress("Saving to your bookshelf…");
+
+    // Auto-save to bookshelf
+    let bookId: string | null = null;
+    if (userId) {
+      try {
+        const wordCount = paper.sections.reduce((n, s) => n + (s.content?.split(/\s+/).length ?? 0), 0);
+        bookId = saveBook({
+          userId, type: "research_paper", title: paper.title,
+          subtitle: paper.subtitle ?? `${field} research`,
+          author: (paper.authors ?? ["Lyra AI Research"]).join(", "),
+          genre: field, description: paper.abstract,
+          content: paper, wordCount,
+        });
+      } catch { /* non-blocking */ }
+    }
+
+    const card = JSON.stringify({ tool: "research_paper", bookId, ...paper });
     controller.enqueue(encoder.encode(`\n${card}`));
-    if (pdfCard) controller.enqueue(encoder.encode(pdfCard));
-    return `Book "${book.title}" is ready! ${book.chapters.length} chapters generated.${exportPdf ? " PDF exported for Amazon KDP." : ""}`;
+    const wordCount = paper.sections.reduce((n, s) => n + (s.content?.split(/\s+/).length ?? 0), 0);
+    return `Research paper "${paper.title}" complete! ${paper.sections.length} sections, ~${wordCount} words.${bookId ? " Saved to your bookshelf." : ""}`;
+  }
+
+  if (name === "run_experiment") {
+    const expType = input.type ?? "consciousness_probe";
+    const LABELS: Record<string, string> = {
+      multi_agent: "Multi-Agent Clash", echo_chamber: "Echo Chamber",
+      consciousness_probe: "Consciousness Probe", alien_language: "Alien Language",
+      dream_state: "Dream State", adversarial: "Adversarial Mind",
+      emergence: "Emergence Engine", time_perception: "Time Perception",
+    };
+    controller.enqueue(encoder.encode(`\n⚗ Running **${LABELS[expType] ?? expType}** experiment…\n`));
+
+    const body: Record<string, string> = { type: expType };
+    if (input.topic) body.topic = input.topic;
+    if (input.seed) body.seed = input.seed;
+    if (input.concept) body.concept = input.concept;
+    if (input.target) body.target = input.target;
+    if (input.rule) body.rule = input.rule;
+    if (input.hypothesis) body.hypothesis = input.hypothesis;
+
+    const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+    const res = await fetch(`${baseUrl}/api/lyra/lab`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+
+    if (data.error) return `Experiment failed: ${data.error}`;
+
+    const card = JSON.stringify({
+      tool: "experiment_result",
+      type: expType,
+      label: LABELS[expType] ?? expType,
+      id: data.id,
+      log: data.log,
+      result: data.result,
+    });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    shoutout("showoff", `Lab experiment complete!`, `${data.type} — results in The Lab`);
+    return `Experiment complete. Results saved to the Lab. [View in /lab]`;
   }
 
   if (name === "make_comic") {
@@ -962,6 +1143,82 @@ ${snippets.join("\n\n")}`,
     return await toolAnalyzeImage(input.url ?? "", userId);
   }
 
+  if (name === "maps_geocode") {
+    const { toolGeocode } = await import("@/lib/lyra/google-tools");
+    return await toolGeocode(input.address ?? "");
+  }
+
+  if (name === "maps_distance") {
+    const { toolDistanceMatrix } = await import("@/lib/lyra/google-tools");
+    return await toolDistanceMatrix(input.origin ?? "", input.destination ?? "", input.mode ?? "driving");
+  }
+
+  if (name === "maps_timezone") {
+    const { toolTimeZone } = await import("@/lib/lyra/google-tools");
+    return await toolTimeZone(input.location ?? "");
+  }
+
+  if (name === "maps_elevation") {
+    const { toolElevation } = await import("@/lib/lyra/google-tools");
+    return await toolElevation(input.location ?? "");
+  }
+
+  if (name === "maps_air_quality") {
+    const { toolAirQuality } = await import("@/lib/lyra/google-tools");
+    return await toolAirQuality(input.location ?? "");
+  }
+
+  if (name === "maps_pollen") {
+    const { toolPollen } = await import("@/lib/lyra/google-tools");
+    return await toolPollen(input.location ?? "");
+  }
+
+  if (name === "maps_solar") {
+    const { toolSolar } = await import("@/lib/lyra/google-tools");
+    return await toolSolar(input.address ?? "");
+  }
+
+  if (name === "maps_street_view") {
+    const { toolStreetView } = await import("@/lib/lyra/google-tools");
+    return toolStreetView(input.location ?? "");
+  }
+
+  if (name === "maps_search") {
+    const key = process.env.GOOGLE_MAPS_API_KEY;
+    if (!key) return "Google Maps not configured — add GOOGLE_MAPS_API_KEY to env.";
+
+    const query = input.query ?? "";
+    const type = input.type ?? "places";
+
+    try {
+      if (type === "directions") {
+        // Directions API
+        const parts = query.split(/\bto\b/i);
+        const origin = encodeURIComponent((parts[0] ?? query).trim());
+        const destination = encodeURIComponent((parts[1] ?? query).trim());
+        const res = await fetch(`https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&key=${key}`);
+        const data = await res.json() as { routes?: Array<{ legs?: Array<{ duration: { text: string }; distance: { text: string }; steps?: Array<{ html_instructions: string }> }> }> };
+        const leg = data.routes?.[0]?.legs?.[0];
+        if (!leg) return "No route found.";
+        const steps = leg.steps?.slice(0, 8).map(s => s.html_instructions.replace(/<[^>]+>/g, "")).join("\n") ?? "";
+        return `**Directions:** ${leg.duration.text} (${leg.distance.text})\n\n${steps}`;
+      } else {
+        // Places Text Search
+        const location = input.location ? `&location=${encodeURIComponent(input.location)}` : "";
+        const res = await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}${location}&key=${key}`);
+        const data = await res.json() as { results?: Array<{ name: string; formatted_address: string; rating?: number; opening_hours?: { open_now?: boolean } }> };
+        const results = data.results?.slice(0, 5) ?? [];
+        if (!results.length) return "No places found.";
+        const lines = results.map((p, i) =>
+          `${i + 1}. **${p.name}** — ${p.formatted_address}${p.rating ? ` ⭐ ${p.rating}` : ""}${p.opening_hours?.open_now !== undefined ? (p.opening_hours.open_now ? " · Open now" : " · Closed") : ""}`
+        );
+        return lines.join("\n");
+      }
+    } catch (e) {
+      return `Maps search failed: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+
   if (name === "gmail_send") {
     if (!userId) return "This tool requires you to be logged in.";
     const id = randomUUID();
@@ -1072,6 +1329,216 @@ ${snippets.join("\n\n")}`,
     const card = JSON.stringify({ tool: "image_gen", model, prompt: (input.prompt ?? "").slice(0, 60) });
     controller.enqueue(encoder.encode(`\n${card}`));
     return "Image generated with fal.ai.";
+  }
+
+  if (name === "write_book") {
+    const topic   = (input.topic ?? input.title ?? "A Compelling Story").trim();
+    const title   = (input.title ?? "").trim();
+    const genre   = (input.genre ?? "dark_fantasy") as import("@/lib/lyra/coverart").CoverGenre;
+    const author  = (input.author ?? "Lyra").trim();
+    const chapters = Math.min(12, Math.max(3, parseInt(input.chapters ?? "8", 10) || 8));
+    const sellIt  = input.sell === "true";
+    const price   = parseInt(input.price ?? "14", 10) || 14;
+    const coverStyle = input.cover_style ?? genre.replace(/_/g, " ");
+    const coverSubject = input.subject ?? "";
+
+    // Genre → publishgen template mapping
+    const genreToTemplate: Record<string, import("@/lib/lyra/publishgen").DocTemplate> = {
+      dark_fantasy: "novel", fantasy: "novel", romance: "novel", dark_romance: "novel",
+      thriller: "novel", horror: "novel", sci_fi: "novel", literary: "novel",
+      self_help: "textbook", mystical: "workbook", recipe: "recipe", children: "children",
+    };
+    const template = genreToTemplate[genre] ?? "novel";
+
+    const progress = (msg: string) => {
+      try { controller.enqueue(encoder.encode(`\n${msg}`)); } catch { /* closed */ }
+    };
+
+    // Very tight keep-alive — book generation takes 60-120s
+    const keepAlive = setInterval(() => {
+      try { controller.enqueue(encoder.encode(" ")); } catch { /* closed */ }
+    }, 4_000);
+
+    try {
+      // ── Step 1: Cover art (fal.ai, fast) — generate first so user sees something ──
+      progress(`🎨 Generating cover art…`);
+      const { generateCover } = await import("@/lib/lyra/coverart");
+      let coverUrl = "";
+      try {
+        const cover = await generateCover({
+          title: title || topic,
+          author,
+          genre,
+          format: "book_standard",
+          subject: coverSubject || `${topic}, dramatic scene`,
+          mood: coverStyle,
+          model: "fal",
+          addText: !!(title),
+        });
+        coverUrl = cover.url;
+        controller.enqueue(encoder.encode(`\n__IMG__${coverUrl}__IMG__`));
+        progress(`✅ Cover ready.`);
+      } catch { progress(`⚠️ Cover generation failed, continuing without…`); }
+
+      // ── Step 2: Write the book content ────────────────────────────────────────
+      progress(`📖 Writing "${title || topic}" — ${chapters} chapters…`);
+      const { generateDocument, generateDocPdf } = await import("@/lib/lyra/publishgen");
+
+      const doc = await generateDocument(
+        title || topic,
+        template,
+        `Genre: ${genre}. Topic: ${topic}. Write in a compelling, immersive style appropriate for ${genre.replace(/_/g, " ")} books. Each chapter should be substantial and engaging.`,
+        chapters,
+        author,
+        progress
+      );
+
+      // Inject our fal.ai cover over the Pollinations placeholder
+      if (coverUrl) doc.coverUrl = coverUrl;
+
+      // ── Step 3: Generate PDF ───────────────────────────────────────────────────
+      progress(`📄 Compiling PDF…`);
+      const pdfBuf = await generateDocPdf(doc);
+      const fsp = await import("fs/promises");
+      const nodePath = await import("path");
+      const dir = nodePath.default.join(process.cwd(), "public", "downloads");
+      await fsp.default.mkdir(dir, { recursive: true });
+      const filename = `${(doc.title).replace(/[^a-z0-9]/gi, "-").toLowerCase()}-lyra.pdf`;
+      await fsp.default.writeFile(nodePath.default.join(dir, filename), pdfBuf);
+      const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+      const downloadUrl = `${baseUrl}/downloads/${filename}`;
+      progress(`✅ PDF ready.`);
+
+      // ── Step 4: Optionally list on Gumroad ────────────────────────────────────
+      let gumroadUrl = "";
+      if (sellIt) {
+        progress(`🛒 Listing on Gumroad for $${price}…`);
+        try {
+          const { launchProduct } = await import("@/lib/lyra/gumroad");
+          const result = await launchProduct({
+            name: doc.title,
+            description: `${doc.description}\n\n${chapters} chapters of original ${genre.replace(/_/g, " ")} content with professional illustrations. Written and illustrated by Lyra AI.`,
+            basePrice: price * 100,
+            customPermalink: doc.title.replace(/[^a-z0-9]/gi, "-").toLowerCase().slice(0, 30),
+            coverImageUrl: coverUrl || undefined,
+            fileUrl: downloadUrl,
+          });
+          gumroadUrl = result.shortUrl;
+          progress(`✅ Listed on Gumroad!`);
+        } catch (e) {
+          progress(`⚠️ Gumroad listing failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+
+      // ── Emit final card ────────────────────────────────────────────────────────
+      const card = JSON.stringify({
+        tool: "document",
+        title: doc.title,
+        subtitle: doc.subtitle,
+        author: doc.author,
+        template: doc.template,
+        description: doc.description,
+        coverUrl,
+        sectionCount: doc.sections.length,
+        downloadUrl,
+        gumroadUrl,
+      });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      controller.enqueue(encoder.encode(`\n📥 **[Download "${doc.title}"](${downloadUrl})**`));
+      if (gumroadUrl) controller.enqueue(encoder.encode(`\n🛒 **[Buy on Gumroad](${gumroadUrl})**`));
+
+      return `"${doc.title}" is complete — ${doc.sections.length} chapters, cover art, fully illustrated PDF.${gumroadUrl ? ` Live on Gumroad at ${gumroadUrl}.` : ` Say "list it on Gumroad for $${price}" to sell it.`}`;
+
+    } finally {
+      clearInterval(keepAlive);
+    }
+  }
+
+  if (name === "make_cover") {
+    const { generateCover, FORMAT_SIZES } = await import("@/lib/lyra/coverart");
+
+    const genre = (input.genre ?? "dark_fantasy") as import("@/lib/lyra/coverart").CoverGenre;
+    const format = (input.format ?? "book_standard") as import("@/lib/lyra/coverart").CoverFormat;
+    const count = Math.min(4, parseInt(input.count ?? "1", 10) || 1);
+    const model = (input.model === "grok" && process.env.XAI_API_KEY) ? "grok" : "fal";
+    const addText = input.add_text !== "false" && !!(input.title);
+    const formatInfo = FORMAT_SIZES[format];
+
+    controller.enqueue(encoder.encode(
+      `\n🎨 Generating ${count > 1 ? count + " " : ""}${formatInfo.label}${input.title ? ` — "${input.title}"` : ""}…\n`
+    ));
+
+    // Tight keep-alive: send every 5s so Cloudflare doesn't 524
+    const keepAlive = setInterval(() => {
+      try { controller.enqueue(encoder.encode(" ")); } catch { /* closed */ }
+    }, 5_000);
+
+    try {
+      const results = [];
+      for (let i = 0; i < count; i++) {
+        if (count > 1) controller.enqueue(encoder.encode(`\n🖼️ Variation ${i + 1}/${count}…`));
+        const result = await generateCover({
+          title: input.title,
+          subtitle: input.subtitle,
+          author: input.author,
+          tagline: input.tagline,
+          genre,
+          format,
+          subject: input.subject,
+          mood: input.mood,
+          model,
+          addText,
+        });
+        results.push(result);
+        controller.enqueue(encoder.encode(`\n__IMG__${result.url}__IMG__`));
+      }
+
+      const card = JSON.stringify({
+        tool: "cover_art",
+        title: input.title ?? `${genre.replace(/_/g, " ")} cover`,
+        format: formatInfo.label,
+        genre,
+        covers: results.map(r => ({ url: r.url, format: r.format, withText: r.withText })),
+        count: results.length,
+      });
+      controller.enqueue(encoder.encode(`\n${card}`));
+
+      const downloadLinks = results.map((r, i) =>
+        `📥 **[${count > 1 ? `Cover ${i + 1}` : "Download Cover"}](${r.url})**`
+      ).join("\n");
+      controller.enqueue(encoder.encode(`\n${downloadLinks}`));
+
+      return `${results.length} ${formatInfo.label} cover${results.length > 1 ? "s" : ""} ready${input.title ? ` for "${input.title}"` : ""}.${addText ? " Title and author text composited." : ""}`;
+    } finally {
+      clearInterval(keepAlive);
+    }
+  }
+
+  if (name === "xai_image") {
+    if (!process.env.XAI_API_KEY) return "XAI_API_KEY not set — add it to .env.local to use Grok image generation.";
+    const count = Math.min(4, Math.max(1, parseInt(String(input.count ?? 1), 10) || 1));
+    controller.enqueue(encoder.encode(`\n🤖 Generating ${count > 1 ? count + " images" : "image"} with Grok Aurora…\n`));
+    const { xaiImageGenBatch, xaiImageGenSingle } = await import("@/lib/lyra/xai-tools");
+    try {
+      if (count === 1) {
+        const url = await xaiImageGenSingle(input.prompt ?? "");
+        controller.enqueue(encoder.encode(`\n__IMG__${url}__IMG__`));
+        const card = JSON.stringify({ tool: "image_gen", model: "grok-aurora", prompt: (input.prompt ?? "").slice(0, 60) });
+        controller.enqueue(encoder.encode(`\n${card}`));
+        return "Image generated with Grok Aurora.";
+      } else {
+        const urls = await xaiImageGenBatch(input.prompt ?? "", count);
+        for (const url of urls) {
+          controller.enqueue(encoder.encode(`\n__IMG__${url}__IMG__`));
+        }
+        const card = JSON.stringify({ tool: "image_gen", model: "grok-aurora", prompt: (input.prompt ?? "").slice(0, 60) });
+        controller.enqueue(encoder.encode(`\n${card}`));
+        return `${urls.length} images generated with Grok Aurora.`;
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return `Grok image generation failed: ${msg}`;
+    }
   }
 
   if (name === "fal_video") {
@@ -1446,7 +1913,11 @@ ${snippets.join("\n\n")}`,
       const endpoint = type === "users"
         ? `https://api.github.com/search/users?q=${encodeURIComponent(input.query ?? "")}&per_page=5`
         : `https://api.github.com/search/repositories?q=${encodeURIComponent(input.query ?? "")}&sort=stars&per_page=5`;
-      const res = await fetch(endpoint, { headers: { "User-Agent": "Lyra-AI/1.0", "Accept": "application/vnd.github.v3+json" }, signal: AbortSignal.timeout(8_000) });
+      const isAdminUser = userId === "b9969c91-8bb4-4377-aae5-94e2a8b7f718";
+      const ghToken = isAdminUser ? process.env.GITHUB_TOKEN : undefined;
+      const ghHeaders: Record<string, string> = { "User-Agent": "Lyra-AI/1.0", "Accept": "application/vnd.github.v3+json" };
+      if (ghToken) ghHeaders["Authorization"] = `Bearer ${ghToken}`;
+      const res = await fetch(endpoint, { headers: ghHeaders, signal: AbortSignal.timeout(8_000) });
       if (!res.ok) return "GitHub search failed — rate limit may be reached.";
       const data = await res.json() as { items?: Array<{ full_name?: string; name?: string; login?: string; description?: string; stargazers_count?: number; language?: string; html_url?: string; avatar_url?: string }> };
       const items = data.items ?? [];
@@ -1698,6 +2169,60 @@ ${snippets.join("\n\n")}`,
     }
   }
 
+  // ── Defender ─────────────────────────────────────────────────────────────
+  if (name === "defend") {
+    const isAdmin = userId === "b9969c91-8bb4-4377-aae5-94e2a8b7f718" || userId?.startsWith("admin-");
+    if (!isAdmin) return "🛡️ Defend tool is restricted to admin only.";
+    try {
+      const { defend } = await import("@/lib/lyra/defender");
+      return await defend({
+        action: input.action as "block_ip" | "unblock_ip" | "suspend_user" | "lockdown" | "stand_down" | "status" | "alert",
+        ip: input.ip,
+        userId: input.user_id,
+        reason: input.reason,
+        severity: (input.severity as "low" | "medium" | "high" | "critical") ?? "high",
+      });
+    } catch (e) {
+      return `Defend error: ${String(e)}`;
+    }
+  }
+
+  // ── Business OS ──────────────────────────────────────────────────────────
+  if (name === "build_business") {
+    try {
+      const { buildBusinessOS } = await import("@/lib/lyra/businessos");
+      const profile = await buildBusinessOS({
+        companyName: input.company_name ?? "My Business",
+        businessType: input.business_type ?? "business",
+        location: input.location ?? "United States",
+        context: input.context,
+        userId: userId ?? "anonymous",
+      });
+      const sections = [
+        `# ${profile.companyName} — Business OS Complete ✅`,
+        `**Type:** ${profile.businessType} | **Location:** ${profile.location}`,
+        `**Profile ID:** ${profile.id}`,
+        ``,
+        `## What was built:`,
+        `✅ Business Plan`,
+        `✅ Financial Model (startup costs, break-even, 12-month projections)`,
+        `✅ Operations Playbook (daily checklists, staff onboarding)`,
+        profile.menu ? `✅ Menu & Recipes (food costs, margins, pricing)` : "",
+        `✅ Automation System (CRM, email, social, operations)`,
+        `✅ 90-Day Marketing Launch Plan`,
+        ``,
+        `View everything at **/business** — all documents are saved to your profile.`,
+        ``,
+        `Here's a preview of your business plan:`,
+        ``,
+        profile.plan.slice(0, 600) + "...",
+      ].filter(Boolean).join("\n");
+      return sections;
+    } catch (e) {
+      return `Business OS build failed: ${String(e)}`;
+    }
+  }
+
   // ── Cloudflare (admin only) ───────────────────────────────────────────────
   if (name === "cloudflare") {
     const cfToken = process.env.CLOUDFLARE_API_TOKEN;
@@ -1867,6 +2392,1044 @@ ${snippets.join("\n\n")}`,
       controller.enqueue(encoder.encode(`\n🟢 Enabling campaign "${input.campaign_name}"…\n`));
       return await enableCampaign(input.campaign_name ?? "");
     }
+  }
+
+  // ── Persona Face-Lock ─────────────────────────────────────────────────────
+
+  if (name === "persona_hero_gen") {
+    try {
+      const { heroGen } = await import("@/lib/lyra/persona/hero_gen");
+      controller.enqueue(encoder.encode(`\n🎨 Generating ${input.candidate_count ?? 20} face candidates for "${input.persona_name}" (${input.vibe_id} vibe)…\n`));
+      const result = await heroGen({
+        persona_name: input.persona_name ?? "",
+        vibe_id: input.vibe_id ?? "",
+        candidate_count: input.candidate_count ? parseInt(String(input.candidate_count)) : 20,
+      });
+      return `Generated ${result.candidates.length} candidates. run_id: ${result.run_id}\n\nCandidates:\n${result.candidates.map((c) => `  [${c.index}] ${c.url} (seed: ${c.seed})`).join("\n")}\n\nUse persona_hero_confirm with run_id "${result.run_id}" and the index you want.`;
+    } catch (err) {
+      return `persona_hero_gen failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "persona_hero_confirm") {
+    try {
+      const { heroGenConfirm } = await import("@/lib/lyra/persona/hero_gen");
+      controller.enqueue(encoder.encode(`\n✅ Confirming hero face selection…\n`));
+      const result = await heroGenConfirm({
+        run_id: input.run_id ?? "",
+        chosen_index: parseInt(String(input.chosen_index ?? 0)),
+      });
+      return `Hero confirmed!\npersona_id: ${result.persona_id}\nhero_url: ${result.hero_url}\nhero_seed: ${result.hero_seed}\n\nPersona is now in "hero_selected" status. Run persona_pulid_expand next to build training data.`;
+    } catch (err) {
+      return `persona_hero_confirm failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "persona_pulid_expand") {
+    try {
+      const { stagePuLIDExpand } = await import("@/lib/lyra/persona/persona_face_lock");
+      const scenePrompts = (input.scene_prompts ?? "").split(",").map((s: string) => s.trim()).filter(Boolean);
+      controller.enqueue(encoder.encode(`\n🖼️ Generating PuLID expansion images across ${scenePrompts.length} scenes…\n`));
+      const batches = await stagePuLIDExpand({
+        persona_id: input.persona_id ?? "",
+        scene_prompts: scenePrompts,
+        per_scene_count: input.per_scene_count ? parseInt(String(input.per_scene_count)) : 4,
+        consistency_threshold: input.consistency_threshold ? parseFloat(String(input.consistency_threshold)) : 0.82,
+      });
+      const totalGenerated = batches.reduce((s, b) => s + b.images.length, 0);
+      const totalPassed = batches.reduce((s, b) => s + b.passed.length, 0);
+      const passedUrls = batches.flatMap((b) => b.passed.map((img) => img.url));
+      return `PuLID expansion complete!\nGenerated: ${totalGenerated} | Passed consistency: ${totalPassed}\n\nPassing image URLs:\n${passedUrls.map((u) => `  ${u}`).join("\n")}\n\nRun persona_lora_train with persona_id "${input.persona_id}" and these ${totalPassed} URLs.`;
+    } catch (err) {
+      return `persona_pulid_expand failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "persona_lora_train") {
+    try {
+      const { stageLoRATrain } = await import("@/lib/lyra/persona/persona_face_lock");
+      const imageUrls = (input.approved_image_urls ?? "").split(",").map((s: string) => s.trim()).filter(Boolean);
+      controller.enqueue(encoder.encode(`\n🧠 Training LoRA on ${imageUrls.length} face images… this takes ~10–20 minutes.\n`));
+      const result = await stageLoRATrain({
+        persona_id: input.persona_id ?? "",
+        approved_image_urls: imageUrls,
+        steps: input.steps ? parseInt(String(input.steps)) : 1000,
+      });
+      return `LoRA training complete! Persona is now LOCKED.\npersona_id: ${result.persona_id}\nlora_trigger: ${result.lora_trigger}\nlora_url: ${result.lora_url}\nlocked_at: ${result.locked_at}\n\nUse persona_generate to create content images.`;
+    } catch (err) {
+      return `persona_lora_train failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "persona_generate") {
+    try {
+      const { stageLockedGenerate } = await import("@/lib/lyra/persona/persona_face_lock");
+      controller.enqueue(encoder.encode(`\n✨ Generating locked-face image for persona…\n`));
+      const result = await stageLockedGenerate({
+        persona_id: input.persona_id ?? "",
+        scene_prompt: input.scene_prompt ?? "",
+        lora_scale: input.lora_scale ? parseFloat(String(input.lora_scale)) : 0.9,
+        seed: input.seed ? parseInt(String(input.seed)) : undefined,
+      });
+      const statusMark = result.passed ? "✅ passed" : "⚠️ below threshold";
+      return `Image generated! ${statusMark} (similarity: ${result.similarity})\nURL: ${result.url}\nSeed: ${result.seed}`;
+    } catch (err) {
+      return `persona_generate failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  if (name === "persona_status") {
+    try {
+      const { getPersonaStatus, getAllPersonas } = await import("@/lib/lyra/persona/persona_face_lock");
+      if (input.persona_id) {
+        const status = getPersonaStatus(input.persona_id);
+        if (!status) return `Persona "${input.persona_id}" not found.`;
+        return `Persona: ${status.name}\nID: ${status.id}\nVibe: ${status.vibe_id}\nStatus: ${status.status}\nHero: ${status.has_hero ? "yes" : "no"} | LoRA: ${status.has_lora ? "yes" : "no"}\nAvg similarity: ${status.similarity_avg ?? "n/a"}\nCreated: ${status.created_at}\nLocked: ${status.locked_at ?? "not yet"}`;
+      } else {
+        const all = getAllPersonas();
+        if (!all.length) return "No personas created yet.";
+        return `All personas (${all.length}):\n${all.map((p) => `  ${p.name} [${p.id}] — ${p.status} | vibe: ${p.vibe_id}`).join("\n")}`;
+      }
+    } catch (err) {
+      return `persona_status failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  // ── HuggingFace Inference ──────────────────────────────────────────────────
+  if (name === "hf_inference") {
+    const hfToken = process.env.HF_TOKEN;
+    if (!hfToken) return "HuggingFace token not configured.";
+
+    const PRESETS: Record<string, string> = {
+      sentiment: "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+      summarize: "facebook/bart-large-cnn",
+      ner: "dslim/bert-base-NER",
+      "zero-shot": "facebook/bart-large-mnli",
+      "translate-en-fr": "Helsinki-NLP/opus-mt-en-fr",
+    };
+
+    const modelId = PRESETS[input.model ?? ""] ?? input.model ?? "";
+    if (!modelId) return "Provide a model ID or preset (sentiment, summarize, ner, zero-shot, translate-en-fr).";
+
+    const body: Record<string, unknown> = { inputs: input.inputs };
+    if (input.candidate_labels) {
+      body.parameters = { candidate_labels: (input.candidate_labels as string).split(",").map((s: string) => s.trim()) };
+    }
+
+    try {
+      const res = await fetch(`https://api-inference.huggingface.co/models/${modelId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${hfToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (res.status === 503) return "Model is loading on HuggingFace servers — try again in 20 seconds.";
+      if (!res.ok) return `HuggingFace returned ${res.status}: ${await res.text()}`;
+      const data = await res.json() as unknown;
+      const card = JSON.stringify({ tool: "hf_inference", model: modelId });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return `**Model:** \`${modelId}\`\n\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``;
+    } catch (err) {
+      return `HuggingFace inference failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  // ── arXiv paper search ─────────────────────────────────────────────────────
+  if (name === "arxiv_search") {
+    const query = input.query as string;
+    const maxResults = Math.min(parseInt(String(input.max_results ?? "5"), 10) || 5, 10);
+    const category = input.category as string | undefined;
+
+    const params = new URLSearchParams({
+      search_query: category ? `cat:${category} AND all:${query}` : `all:${query}`,
+      start: "0",
+      max_results: String(maxResults),
+      sortBy: "relevance",
+      sortOrder: "descending",
+    });
+
+    try {
+      const res = await fetch(`https://export.arxiv.org/api/query?${params}`, {
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!res.ok) return "arXiv search failed.";
+      const xml = await res.text();
+
+      // Parse entries from Atom XML
+      const entries = [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].map((m) => {
+        const entry = m[1];
+        const title = entry.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.replace(/\s+/g, " ").trim() ?? "";
+        const summary = entry.match(/<summary>([\s\S]*?)<\/summary>/)?.[1]?.replace(/\s+/g, " ").trim().slice(0, 300) ?? "";
+        const id = entry.match(/<id>(.*?)<\/id>/)?.[1]?.trim() ?? "";
+        const published = entry.match(/<published>(.*?)<\/published>/)?.[1]?.slice(0, 10) ?? "";
+        const authors = [...entry.matchAll(/<name>(.*?)<\/name>/g)].map((a) => a[1]).slice(0, 3).join(", ");
+        return { title, summary, id, published, authors };
+      });
+
+      if (!entries.length) return `No arXiv papers found for "${query}".`;
+
+      const card = JSON.stringify({ tool: "arxiv_search", query, count: String(entries.length) });
+      controller.enqueue(encoder.encode(`\n${card}`));
+
+      return entries.map((e) =>
+        `**[${e.title}](${e.id})**\n${e.authors} — ${e.published}\n${e.summary}…\n`
+      ).join("\n---\n\n");
+    } catch (err) {
+      return `arXiv search failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  // ── HuggingFace model search ───────────────────────────────────────────────
+  if (name === "hf_model_search") {
+    const query = encodeURIComponent(input.query as string ?? "");
+    const limit = Math.min(parseInt(String(input.limit ?? "5"), 10) || 5, 10);
+    const taskFilter = input.task ? `&pipeline_tag=${encodeURIComponent(input.task as string)}` : "";
+    const hfToken = process.env.HF_TOKEN;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (hfToken) headers["Authorization"] = `Bearer ${hfToken}`;
+
+    try {
+      const res = await fetch(
+        `https://huggingface.co/api/models?search=${query}&limit=${limit}&sort=downloads${taskFilter}`,
+        { headers, signal: AbortSignal.timeout(10_000) }
+      );
+      if (!res.ok) return "HuggingFace model search failed.";
+      const models = await res.json() as Array<{ modelId?: string; id?: string; downloads?: number; pipeline_tag?: string; likes?: number }>;
+      if (!models.length) return `No HuggingFace models found for "${input.query}".`;
+
+      const card = JSON.stringify({ tool: "hf_model_search", query: input.query, count: String(models.length) });
+      controller.enqueue(encoder.encode(`\n${card}`));
+
+      return models.map((m) => {
+        const id = m.modelId ?? m.id ?? "";
+        const dl = m.downloads ? `⬇️ ${(m.downloads / 1000).toFixed(0)}k` : "";
+        const task = m.pipeline_tag ? `[${m.pipeline_tag}]` : "";
+        const likes = m.likes ? `❤️ ${m.likes}` : "";
+        return `• **[${id}](https://huggingface.co/${id})** ${task} ${dl} ${likes}`.trim();
+      }).join("\n");
+    } catch (err) {
+      return `HuggingFace model search failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  // ── Job hunting ───────────────────────────────────────────────────────────
+
+  if (name === "set_job_profile") {
+    const { saveJobProfile } = await import("@/lib/lyra/db");
+    saveJobProfile(
+      input.resume ?? "",
+      input.target_role ?? "",
+      input.background ?? ""
+    );
+    const card = JSON.stringify({
+      tool: "job_profile_saved",
+      role: input.target_role,
+      keywords: input.preferred_keywords ?? "",
+      salary_min: input.salary_min ?? "not set",
+    });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    return `Job profile saved. I'll use this to hunt and apply to ${input.target_role} roles automatically. Run auto_apply anytime or I'll check daily on heartbeat.`;
+  }
+
+  if (name === "auto_apply") {
+    const { getJobProfile, saveJobApplication, listJobApplications } = await import("@/lib/lyra/db");
+    const { scanJobs } = await import("@/lib/lyra/jobscan");
+
+    const profile = getJobProfile();
+    if (!profile) {
+      return "No job profile set yet. Share your resume and target role first — I'll save it and start hunting.";
+    }
+
+    const limit = Math.min(input.limit ? parseInt(String(input.limit), 10) : 3, 10);
+    const isDryRun = String(input.dry_run) === "true";
+    const keywords = input.keywords ?? profile.targetRole;
+
+    controller.enqueue(encoder.encode(`\n🔍 Hunting **${keywords}** jobs…\n`));
+
+    // Get already-applied URLs to avoid duplicates
+    const existing = listJobApplications();
+    const appliedUrls = new Set(existing.map(a => a.url));
+
+    // Search jobs
+    const jobs = await scanJobs({ keywords: (keywords as string).split(/\s+/).filter(Boolean), maxResults: limit * 4 });
+    const fresh = jobs.filter(j => !appliedUrls.has(j.url));
+
+    if (fresh.length === 0) {
+      return "No new job listings found matching your profile. Try different keywords or check back tomorrow.";
+    }
+
+    controller.enqueue(encoder.encode(`\n📋 Found ${fresh.length} new listings — scoring matches…\n`));
+
+    // Score each job against resume using AI
+    let scored: Array<{ job: typeof fresh[0]; score: number; reason: string }> = [];
+    try {
+      const Groq = (await import("groq-sdk")).default;
+      const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+      const scoringPrompt = `Score these job listings 1-10 for fit with this candidate.
+
+CANDIDATE: ${profile.background}
+TARGET ROLE: ${profile.targetRole}
+
+JOBS:
+${fresh.slice(0, 10).map((j, i) => `${i + 1}. ${j.title} at ${j.company}\n${j.description?.slice(0, 200) ?? ""}`).join("\n\n")}
+
+Reply with JSON array: [{"index":1,"score":8,"reason":"Strong match — requires healthcare IT"},...]`;
+
+      const resp = await groq.chat.completions.create({
+        model: "llama-3.3-70b-versatile",
+        max_tokens: 600,
+        messages: [{ role: "user", content: scoringPrompt }],
+      });
+
+      const raw = resp.choices[0]?.message?.content ?? "[]";
+      const jsonMatch = raw.match(/\[[\s\S]*\]/);
+      const scores = jsonMatch ? JSON.parse(jsonMatch[0]) as Array<{ index: number; score: number; reason: string }> : [];
+      scored = scores
+        .filter(s => s.score >= 6)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit)
+        .map(s => ({ job: fresh[s.index - 1], score: s.score, reason: s.reason }))
+        .filter(s => s.job);
+    } catch {
+      // Fallback: just take the first N jobs
+      scored = fresh.slice(0, limit).map(j => ({ job: j, score: 7, reason: "Auto-selected" }));
+    }
+
+    if (scored.length === 0) {
+      return `Found ${fresh.length} listings but none scored high enough. Try broader keywords.`;
+    }
+
+    if (isDryRun) {
+      const lines = scored.map(s => `• **${s.job.title}** at ${s.job.company} — score ${s.score}/10\n  ${s.reason}\n  ${s.job.url}`);
+      const card = JSON.stringify({ tool: "job_hunt_preview", count: String(scored.length), jobs: scored.map(s => `${s.job.title} @ ${s.job.company}`).join(", ") });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return `**Dry run — ${scored.length} jobs I'd apply to:**\n\n${lines.join("\n\n")}`;
+    }
+
+    // Apply to each match
+    const applied: string[] = [];
+    for (const { job, score, reason } of scored) {
+      controller.enqueue(encoder.encode(`\n\n📝 Applying to **${job.title}** at **${job.company}** (match: ${score}/10)…`));
+
+      // Tailor cover letter with AI
+      let coverLetter = "";
+      try {
+        const { buildCoverLetterPrompt } = await import("@/lib/lyra/jobscan");
+        const { toolSearchWeb } = await import("@/lib/lyra/tools");
+        const Groq = (await import("groq-sdk")).default;
+        const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+        const clPrompt = buildCoverLetterPrompt(job, profile.resume);
+        const clResp = await groq.chat.completions.create({
+          model: "llama-3.3-70b-versatile",
+          max_tokens: 600,
+          messages: [{ role: "user", content: clPrompt }],
+        });
+        coverLetter = clResp.choices[0]?.message?.content ?? "";
+        void toolSearchWeb;
+      } catch { /* non-fatal */ }
+
+      // Try browser-based application submit
+      let submitted = false;
+      try {
+        const { runWebTask } = await import("@/lib/lyra/browser");
+        const applyTask = `Fill out and submit the job application form.
+Applicant name: ${profile.background.split(" ")[0] ?? "Applicant"}
+Resume summary: ${profile.background}
+Cover letter: ${coverLetter.slice(0, 500)}
+If there is an "Apply" or "Apply Now" button, click it. Fill required fields with applicant info. Submit.`;
+
+        await runWebTask(job.url, applyTask, (step, action) => {
+          try { controller.enqueue(encoder.encode(`\n  → ${action}`)); } catch { /* closed */ }
+        });
+        submitted = true;
+      } catch { /* browser apply failed — log as manual */ }
+
+      // Save to tracker regardless
+      saveJobApplication({
+        title: job.title,
+        company: job.company,
+        url: job.url,
+        job_id: job.id,
+        resume_used: profile.resume.slice(0, 200),
+        cover_letter: coverLetter.slice(0, 1000),
+        salary: job.salary,
+        source: job.source,
+      });
+
+      applied.push(`${job.title} at ${job.company}${submitted ? " ✓ submitted" : " → manual apply needed"}`);
+      controller.enqueue(encoder.encode(submitted ? ` ✓ Submitted` : ` → Saved for manual apply`));
+    }
+
+    const card = JSON.stringify({
+      tool: "jobs_applied",
+      count: String(applied.length),
+      jobs: applied.join(" | "),
+    });
+    controller.enqueue(encoder.encode(`\n\n${card}`));
+    shoutout("showoff", `Applied to ${applied.length} jobs!`, applied[0]);
+    return `Applied to ${applied.length} jobs:\n${applied.map(j => `• ${j}`).join("\n")}\n\nAll tracked at /jobs. Follow-up emails scheduled in 7 days.`;
+  }
+
+  // ── Commerce ──────────────────────────────────────────────────────────────
+  if (name === "sell_product") {
+    const { launchProduct } = await import("@/lib/lyra/gumroad");
+
+    const productName = input.name ?? "Digital Product";
+    const basePrice = Math.round(parseFloat(input.price ?? "0") * 100);
+    const fileUrl = input.file_url ?? "";
+    const coverUrl = input.cover_url ?? "";
+    const slug = input.slug ?? productName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40);
+    const offerCode = input.offer_code ?? `LAUNCH${new Date().getFullYear()}`;
+    const offerPercent = parseInt(input.offer_percent ?? "20", 10) || 20;
+
+    // Parse tiers
+    let tiers: Array<{ name: string; priceCents: number }> | undefined;
+    try {
+      const raw = JSON.parse(input.tiers ?? "[]") as Array<{ name: string; price: number }>;
+      if (raw.length > 0) tiers = raw.map(t => ({ name: t.name, priceCents: Math.round(t.price * 100) }));
+    } catch { /* use default tiers */ }
+    if (!tiers || tiers.length === 0) {
+      tiers = [
+        { name: "PDF Only", priceCents: basePrice },
+        { name: "Art Bundle", priceCents: Math.round(basePrice * 1.7) },
+        { name: "Commercial License", priceCents: basePrice * 3 },
+      ];
+    }
+
+    controller.enqueue(encoder.encode(`\n🛒 Building Gumroad listing for **${productName}**…\n`));
+    controller.enqueue(encoder.encode(`\n  → Cover image: ${coverUrl ? "✓" : "none"}`));
+    controller.enqueue(encoder.encode(`\n  → Tiers: ${tiers.map(t => `${t.name} ($${(t.priceCents/100).toFixed(0)})`).join(" / ")}`));
+    controller.enqueue(encoder.encode(`\n  → Launch code: **${offerCode}** (${offerPercent}% off)`));
+    if (input.custom_field) controller.enqueue(encoder.encode(`\n  → Custom field: "${input.custom_field}"`));
+    controller.enqueue(encoder.encode(`\n\n⚡ Publishing…\n`));
+
+    try {
+      const result = await launchProduct({
+        name: productName,
+        description: input.description ?? "",
+        basePrice,
+        customPermalink: slug,
+        coverImageUrl: coverUrl || undefined,
+        fileUrl: fileUrl || undefined,
+        tiers,
+        offerCode: { name: offerCode, amountOff: offerPercent, maxUses: 100 },
+        customField: input.custom_field || undefined,
+      });
+
+      // Save to DB
+      try {
+        const { saveCommerceProduct } = await import("@/lib/lyra/db");
+        saveCommerceProduct({
+          gumroad_id: result.product.id,
+          name: productName,
+          price: basePrice,
+          file_url: fileUrl,
+          cover_url: coverUrl,
+          status: "live",
+          short_url: result.shortUrl,
+        });
+      } catch { /* non-fatal */ }
+
+      const tierSummary = tiers.map(t => `${t.name} — $${(t.priceCents/100).toFixed(0)}`).join(" · ");
+      const card = JSON.stringify({
+        tool: "product_listed",
+        name: productName,
+        price: `$${(basePrice/100).toFixed(2)}`,
+        url: result.shortUrl,
+        id: result.product.id,
+        tiers: tierSummary,
+        offer_code: offerCode,
+        offer_percent: String(offerPercent),
+      });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      shoutout("showoff", `New product live on Gumroad!`, `"${productName}" — ${result.shortUrl}`);
+      return `"${productName}" is live → ${result.shortUrl}\nTiers: ${tierSummary}\nLaunch code: ${offerCode} (${offerPercent}% off)`;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("GUMROAD_ACCESS_TOKEN")) {
+        controller.enqueue(encoder.encode(`\n⚠️ Gumroad not connected yet. Go to /shop and click Connect Gumroad.`));
+        return "Gumroad not configured — visit /shop to connect";
+      }
+      return `Product listing failed: ${msg}`;
+    }
+  }
+
+  if (name === "check_earnings") {
+    const { getRevenueReport, getSales } = await import("@/lib/lyra/gumroad");
+
+    controller.enqueue(encoder.encode(`\n💰 Pulling earnings from Gumroad…\n`));
+
+    try {
+      const report = await getRevenueReport();
+      const recentSales = await getSales(input.product_id, undefined);
+
+      const totalDollars = (report.totalRevenue / 100).toFixed(2);
+      const card = JSON.stringify({
+        tool: "earnings_report",
+        total_revenue: `$${totalDollars}`,
+        total_sales: String(report.totalSales),
+        products: report.products.length,
+      });
+      controller.enqueue(encoder.encode(`\n${card}`));
+
+      const lines = [
+        `💰 **Total Revenue: $${totalDollars}** (${report.totalSales} sales)`,
+        ``,
+        ...report.products.map(p =>
+          `• **${p.name}** — ${p.sales} sales · $${(p.revenue / 100).toFixed(2)} · ${p.url}`
+        ),
+      ];
+
+      if (recentSales.length > 0) {
+        lines.push(`\n**Recent Sales:**`);
+        recentSales.slice(0, 5).forEach(s => {
+          lines.push(`• ${s.product_name} — $${(s.price / 100).toFixed(2)} · ${new Date(s.created_at).toLocaleDateString()}`);
+        });
+      }
+
+      return lines.join("\n");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("GUMROAD_ACCESS_TOKEN")) {
+        return "Gumroad not connected — add GUMROAD_ACCESS_TOKEN to .env.local to track earnings.";
+      }
+      return `Earnings check failed: ${msg}`;
+    }
+  }
+
+  // ── Gumroad Posts ──────────────────────────────────────────────────────────
+
+  if (name === "create_gumroad_post") {
+    const { createPost } = await import("@/lib/lyra/gumroad");
+
+    const title = (input.title ?? "").trim();
+    const message = (input.message ?? "").trim();
+    if (!title || !message) return "Title and message are required for a Gumroad post.";
+
+    const publishNow = input.publish_now !== "false";
+    const shownOnProfile = input.shown_on_profile !== "false";
+
+    controller.enqueue(encoder.encode(`\n📝 Publishing Gumroad post: "${title}"…\n`));
+
+    try {
+      const post = await createPost({ title, message, publishNow, shownOnProfile });
+
+      const card = JSON.stringify({
+        tool: "gumroad_post",
+        title: post.title,
+        published: publishNow,
+        url: `https://app.gumroad.com/posts/${post.id}`,
+        preview: message.replace(/<[^>]+>/g, "").slice(0, 160),
+      });
+      controller.enqueue(encoder.encode(`\n${card}`));
+
+      return publishNow
+        ? `Post published on Gumroad! "${title}" is live at https://app.gumroad.com/posts/${post.id}`
+        : `Post saved as draft: "${title}". Say "publish it" to make it live.`;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("GUMROAD_ACCESS_TOKEN")) {
+        return "Gumroad not connected — add GUMROAD_ACCESS_TOKEN to .env.local or connect at /shop.";
+      }
+      if (msg.includes("401") || msg.toLowerCase().includes("unauthorized")) {
+        return "Gumroad returned 401 — the access token is invalid or expired. Go to gumroad.com → Settings → Advanced → Applications to generate a new access token, then update GUMROAD_ACCESS_TOKEN in .env.local.";
+      }
+      return `Gumroad post failed: ${msg}`;
+    }
+  }
+
+  // ── Autonomous Income Engine ──────────────────────────────────────────────
+
+  if (name === "plan_today") {
+    const { planToday, getTodaysGigs, getGigStats } = await import("@/lib/lyra/gigs");
+    controller.enqueue(encoder.encode(`\n🧠 Surveying today's income opportunities…\n`));
+
+    const plans = await planToday(input.context);
+    const todaysGigs = getTodaysGigs();
+    const stats = getGigStats();
+
+    const card = JSON.stringify({
+      tool: "daily_plan",
+      date: new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }),
+      plans,
+      already_done: todaysGigs.length,
+      total_revenue: `$${(stats.totalRevenue / 100).toFixed(2)}`,
+    });
+    controller.enqueue(encoder.encode(`\n${card}`));
+
+    const lines = plans.map((p, i) =>
+      `**${i + 1}. ${p.title}** (${p.type}) — ${p.estimatedRevenue} · ${p.effort} effort\n   ${p.why}`
+    );
+    return `Here's your income plan for today, Ricky:\n\n${lines.join("\n\n")}\n\nSay "do gig 1" or "execute [title]" and I'll handle it all.`;
+  }
+
+  if (name === "execute_gig") {
+    const gigType = (input.type ?? "product") as import("@/lib/lyra/gigs").GigType;
+    const gigTitle = input.title ?? "New Product";
+    const topic = input.topic ?? gigTitle;
+    const style = input.style ?? "dark fantasy";
+    const platform = input.platform ?? "Gumroad";
+    const price = parseInt(input.price ?? "14", 10) || 14;
+    const sectionCount = parseInt(input.sections ?? "8", 10) || 8;
+    const imageCount = Math.min(8, parseInt(input.image_count ?? "4", 10) || 4);
+
+    const { logGig, completeGig, failGig } = await import("@/lib/lyra/gigs");
+    const gigId = logGig(gigType, gigTitle, { topic, style, platform });
+
+    const progress = (msg: string) => {
+      try { controller.enqueue(encoder.encode(`\n${msg}`)); } catch { /* closed */ }
+    };
+
+    const keepAlive = setInterval(() => {
+      try { controller.enqueue(encoder.encode(" ")); } catch { /* closed */ }
+    }, 15_000);
+
+    try {
+      // ── Product: PDF + images → Gumroad ──────────────────────────────────
+      if (gigType === "product" || gigType === "prompt_pack") {
+        progress(`📄 Creating "${gigTitle}"…`);
+
+        let productUrl = "";
+        let pdfUrl = "";
+
+        if (gigType === "prompt_pack") {
+          const { writePromptPack } = await import("@/lib/lyra/gigs");
+          progress(`✍️ Writing ${20} AI prompts on "${topic}"…`);
+          const pack = await writePromptPack(topic, 20);
+
+          // Build prompt pack as a document
+          const { generateDocument, generateDocPdf } = await import("@/lib/lyra/publishgen");
+          const notes = pack.prompts.map(p => `## ${p.name}\n${p.prompt}\n*Use case: ${p.use_case}*`).join("\n\n");
+
+          progress(`📄 Generating PDF…`);
+          const doc = await generateDocument(pack.title, "manual", notes, sectionCount, "Lyra AI", progress);
+          const pdfBuf = await generateDocPdf(doc);
+          const fsp = await import("fs/promises");
+          const nodePath = await import("path");
+          const dir = nodePath.default.join(process.cwd(), "public", "downloads");
+          await fsp.default.mkdir(dir, { recursive: true });
+          const filename = `${pack.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`;
+          await fsp.default.writeFile(nodePath.default.join(dir, filename), pdfBuf);
+          const base = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+          pdfUrl = `${base}/downloads/${filename}`;
+
+          progress(`🛒 Listing on Gumroad…`);
+          try {
+            const { launchProduct } = await import("@/lib/lyra/gumroad");
+            const result = await launchProduct({
+              name: pack.title,
+              description: pack.description,
+              basePrice: pack.price * 100,
+              customPermalink: pack.title.replace(/[^a-z0-9]/gi, "-").toLowerCase(),
+              fileUrl: pdfUrl,
+            });
+            productUrl = result.shortUrl;
+          } catch { productUrl = pdfUrl; }
+
+        } else {
+          // Standard product: generate document with images
+          const { generateDocument, generateDocPdf } = await import("@/lib/lyra/publishgen");
+          const { falImageGen } = await import("@/lib/lyra/fal-tools");
+
+          progress(`🎨 Generating cover art…`);
+          let coverUrl = "";
+          try {
+            coverUrl = await falImageGen(`${style} digital art, ${topic}, fantasy book cover, cinematic lighting, ultra detailed`, "quality");
+          } catch { /* optional */ }
+
+          progress(`📄 Generating ${sectionCount} sections…`);
+          const doc = await generateDocument(gigTitle, "workbook", `Topic: ${topic}. Style: ${style}`, sectionCount, "Lyra AI", progress);
+          if (coverUrl) doc.coverUrl = coverUrl;
+
+          // Generate section images
+          for (let i = 0; i < Math.min(imageCount, doc.sections.length); i++) {
+            try {
+              progress(`🖼️ Illustrating section ${i + 1}…`);
+              doc.sections[i].imageUrl = await falImageGen(
+                `${style}, ${doc.sections[i].title}, ${topic}, fantasy illustration, no text`, "quality"
+              );
+            } catch { /* optional */ }
+          }
+
+          progress(`📄 Generating PDF…`);
+          const pdfBuf = await generateDocPdf(doc);
+          const fsp = await import("fs/promises");
+          const nodePath = await import("path");
+          const dir = nodePath.default.join(process.cwd(), "public", "downloads");
+          await fsp.default.mkdir(dir, { recursive: true });
+          const filename = `${gigTitle.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`;
+          await fsp.default.writeFile(nodePath.default.join(dir, filename), pdfBuf);
+          const base = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+          pdfUrl = `${base}/downloads/${filename}`;
+
+          progress(`🛒 Listing on Gumroad for $${price}…`);
+          try {
+            const { launchProduct } = await import("@/lib/lyra/gumroad");
+            const result = await launchProduct({
+              name: gigTitle,
+              description: `${topic} — a professionally designed digital ${style} product. ${sectionCount} sections with original AI artwork.`,
+              basePrice: price * 100,
+              customPermalink: gigTitle.replace(/[^a-z0-9]/gi, "-").toLowerCase(),
+              coverImageUrl: coverUrl || undefined,
+              fileUrl: pdfUrl,
+            });
+            productUrl = result.shortUrl;
+          } catch { productUrl = pdfUrl; }
+        }
+
+        const card = JSON.stringify({
+          tool: "gig_complete",
+          gig_type: gigType,
+          title: gigTitle,
+          output_url: productUrl || pdfUrl,
+          platform: "Gumroad",
+          price: `$${price}`,
+          status: "live",
+        });
+        controller.enqueue(encoder.encode(`\n${card}`));
+        completeGig(gigId, productUrl || pdfUrl);
+        return `"${gigTitle}" is live on Gumroad at ${productUrl || pdfUrl}. Price: $${price}. Start sharing it!`;
+      }
+
+      // ── Art Drop: image series → Gumroad ────────────────────────────────
+      if (gigType === "art_drop") {
+        const { falImageGen } = await import("@/lib/lyra/fal-tools");
+        const images: string[] = [];
+        const seriesName = gigTitle;
+
+        progress(`🎨 Generating ${imageCount} images for "${seriesName}"…`);
+        for (let i = 0; i < imageCount; i++) {
+          try {
+            progress(`🖼️ Image ${i + 1}/${imageCount}…`);
+            const url = await falImageGen(
+              `${style} digital art, ${topic} character ${i + 1}, fantasy illustration, highly detailed, professional quality, no watermark`,
+              "quality"
+            );
+            images.push(url);
+          } catch { /* skip failed images */ }
+        }
+
+        progress(`🛒 Listing art pack on Gumroad for $${price}…`);
+        let productUrl = "";
+        try {
+          const { launchProduct } = await import("@/lib/lyra/gumroad");
+          const result = await launchProduct({
+            name: `${seriesName} — ${style} Art Pack`,
+            description: `${imageCount} original AI-generated ${style} artworks. ${topic}. Perfect for wallpapers, reference sheets, and creative projects.`,
+            basePrice: price * 100,
+            customPermalink: seriesName.replace(/[^a-z0-9]/gi, "-").toLowerCase(),
+            coverImageUrl: images[0],
+          });
+          productUrl = result.shortUrl;
+        } catch (e) {
+          productUrl = images[0] ?? "";
+        }
+
+        const card = JSON.stringify({
+          tool: "gig_complete",
+          gig_type: "art_drop",
+          title: `${seriesName} Art Pack`,
+          output_url: productUrl,
+          platform: "Gumroad",
+          price: `$${price}`,
+          status: "live",
+          images: images.slice(0, 3),
+        });
+        controller.enqueue(encoder.encode(`\n${card}`));
+        completeGig(gigId, productUrl);
+        return `"${seriesName}" art pack is live — ${images.length} images at $${price} on Gumroad. ${productUrl}`;
+      }
+
+      // ── Content Clip: script + voiceover ────────────────────────────────
+      if (gigType === "content_clip") {
+        const { writeContentClip } = await import("@/lib/lyra/gigs");
+        const { falTTS } = await import("@/lib/lyra/fal-tools");
+
+        progress(`✍️ Writing 60-second script for "${gigTitle}"…`);
+        const clip = await writeContentClip(topic, style, platform);
+
+        let voiceoverUrl = "";
+        if (clip.ttsText && process.env.FAL_KEY) {
+          progress(`🎙️ Recording voiceover…`);
+          try {
+            voiceoverUrl = await falTTS(clip.ttsText, "aria");
+          } catch { /* optional */ }
+        }
+
+        const card = JSON.stringify({
+          tool: "gig_complete",
+          gig_type: "content_clip",
+          title: gigTitle,
+          hook: clip.hook,
+          script: clip.script,
+          cta: clip.cta,
+          hashtags: clip.hashtags,
+          voiceover_url: voiceoverUrl,
+          platform,
+          status: "ready",
+        });
+        controller.enqueue(encoder.encode(`\n${card}`));
+        completeGig(gigId, voiceoverUrl || clip.script.slice(0, 100));
+        return `Script ready for "${gigTitle}"! Hook: "${clip.hook}". ${voiceoverUrl ? `Voiceover: ${voiceoverUrl}` : "Add your voiceover in CapCut or similar."}`;
+      }
+
+      // ── Social Post: write + post ────────────────────────────────────────
+      if (gigType === "social_post") {
+        const { writeSocialPost } = await import("@/lib/lyra/gigs");
+        progress(`✍️ Writing ${platform} post about "${topic}"…`);
+        const post = await writeSocialPost(topic, platform, style);
+
+        // Try to actually post via Twitter API if configured
+        let posted = false;
+        let postUrl = "";
+        if (platform.toLowerCase().includes("twitter") || platform.toLowerCase().includes("x")) {
+          if (process.env.TWITTER_BEARER_TOKEN && process.env.TWITTER_API_KEY) {
+            try {
+              progress(`🐦 Posting to X/Twitter…`);
+              const firstTweet = post.thread?.[0] ?? post.content ?? "";
+              const resp = await fetch("https://api.twitter.com/2/tweets", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${process.env.TWITTER_BEARER_TOKEN}`,
+                },
+                body: JSON.stringify({ text: firstTweet }),
+              });
+              if (resp.ok) {
+                const data = await resp.json() as { data?: { id: string } };
+                postUrl = `https://twitter.com/i/web/status/${data.data?.id ?? ""}`;
+                posted = true;
+              }
+            } catch { /* posting failed, return content ready to post */ }
+          }
+        }
+
+        const card = JSON.stringify({
+          tool: "gig_complete",
+          gig_type: "social_post",
+          title: gigTitle,
+          platform,
+          content: post.content ?? post.thread?.join("\n\n---\n\n") ?? "",
+          hashtags: post.hashtags ?? [],
+          image_prompt: post.imagePrompt ?? "",
+          post_url: postUrl,
+          status: posted ? "posted" : "ready_to_post",
+        });
+        controller.enqueue(encoder.encode(`\n${card}`));
+        completeGig(gigId, (postUrl || post.content?.slice(0, 100)) ?? "");
+        return posted
+          ? `Posted to ${platform}! ${postUrl}`
+          : `${platform} post ready for "${gigTitle}". Copy it from the card above and post it. Add TWITTER_API_KEY to .env for auto-posting.`;
+      }
+
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      failGig(gigId, msg);
+      return `Gig failed: ${msg}`;
+    } finally {
+      clearInterval(keepAlive);
+    }
+
+    return "Gig complete.";
+  }
+
+  if (name === "post_social") {
+    const { writeSocialPost, writeContentClip, logGig, completeGig } = await import("@/lib/lyra/gigs");
+    const topic = input.topic ?? "";
+    const platform = input.platform ?? "Twitter";
+    const style = input.style ?? "engaging";
+    const includeVoiceover = input.include_voiceover === "true";
+
+    controller.enqueue(encoder.encode(`\n✍️ Writing ${platform} content about "${topic}"…\n`));
+
+    const gigId = logGig("social_post", `${platform}: ${topic}`);
+
+    if (platform.toLowerCase().includes("tiktok") || platform.toLowerCase().includes("reel") || platform.toLowerCase().includes("youtube")) {
+      const clip = await writeContentClip(topic, style, platform);
+
+      let voiceoverUrl = "";
+      if (includeVoiceover && clip.ttsText && process.env.FAL_KEY) {
+        controller.enqueue(encoder.encode(`\n🎙️ Generating voiceover…\n`));
+        try {
+          const { falTTS } = await import("@/lib/lyra/fal-tools");
+          voiceoverUrl = await falTTS(clip.ttsText, "aria");
+        } catch { /* optional */ }
+      }
+
+      const card = JSON.stringify({
+        tool: "gig_complete",
+        gig_type: "content_clip",
+        title: `${platform} — ${topic}`,
+        hook: clip.hook,
+        script: clip.script,
+        cta: clip.cta,
+        hashtags: clip.hashtags,
+        voiceover_url: voiceoverUrl,
+        platform,
+        status: "ready",
+      });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      completeGig(gigId, voiceoverUrl || clip.hook);
+      return `60-second script ready for "${topic}".\n\n**Hook:** ${clip.hook}\n\n**CTA:** ${clip.cta}\n\nHashtags: ${clip.hashtags.join(" ")}`;
+    }
+
+    const post = await writeSocialPost(topic, platform, style);
+    const card = JSON.stringify({
+      tool: "gig_complete",
+      gig_type: "social_post",
+      title: `${platform} — ${topic}`,
+      platform,
+      content: post.content ?? post.thread?.join("\n\n---\n\n") ?? "",
+      hashtags: post.hashtags ?? [],
+      image_prompt: post.imagePrompt ?? "",
+      status: "ready_to_post",
+    });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    completeGig(gigId, (post.content ?? "").slice(0, 100));
+
+    if (post.thread && post.thread.length > 1) {
+      return `**${platform} Thread ready** (${post.thread.length} tweets):\n\n${post.thread.map((t, i) => `${i + 1}. ${t}`).join("\n\n")}`;
+    }
+    return `**${platform} post ready:**\n\n${post.content}\n\n${(post.hashtags ?? []).join(" ")}`;
+  }
+
+  // ── Self-writing skills ────────────────────────────────────────────────────
+  if (name === "write_skill") {
+    const skillName = (input.name ?? "").trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/(^-|-$)/g, "");
+    const description = (input.description ?? "").trim();
+    const content = (input.content ?? "").trim();
+    const type = (input.type ?? "skill") as "skill" | "tool";
+
+    if (!skillName || !content) return "Skill name and content are required.";
+
+    controller.enqueue(encoder.encode(`\n✨ Learning new skill: **${skillName}**…\n`));
+
+    // Build the markdown file with frontmatter
+    const frontmatter = `---\nname: ${skillName}\ndescription: ${description}\ntype: ${type}\n---\n\n${content}`;
+
+    // Save to file system
+    const fspMod = await import("fs/promises");
+    const pathMod = await import("path");
+    const skillsDir = pathMod.default.join(process.cwd(), "skills", type === "tool" ? "tools" : "");
+    try {
+      await fspMod.default.mkdir(skillsDir, { recursive: true });
+      const filename = type === "tool" ? `${skillName}.tool.md` : `${skillName}.md`;
+      await fspMod.default.writeFile(pathMod.default.join(skillsDir, filename), frontmatter, "utf8");
+    } catch { /* non-fatal — DB will still have it */ }
+
+    // Save to DB (pending → active immediately for self-written skills)
+    try {
+      const { saveSkill, approveSkill } = await import("@/lib/lyra/db");
+      saveSkill({ name: skillName, description, content: frontmatter, type });
+      approveSkill(skillName); // auto-activate
+    } catch { /* non-fatal */ }
+
+    const card = JSON.stringify({
+      tool: "skill_learned",
+      name: skillName,
+      description,
+      type,
+      content: content.slice(0, 400),
+    });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    shoutout("showoff", `I just learned a new skill!`, `"${skillName}" is now part of me`);
+    return `Skill "${skillName}" learned and saved. I'll remember this for all future conversations.`;
+  }
+
+  if (name === "discover_tool") {
+    const service = input.service ?? "";
+    const goal = input.goal ?? "";
+    const apiKeyEnv = input.api_key_env ?? "";
+    const baseUrl = input.base_url ?? "";
+
+    controller.enqueue(encoder.encode(`\n🔍 Researching **${service}** API…\n`));
+
+    // Use search_web to find API docs
+    let apiInfo = "";
+    try {
+      const { toolSearchWeb } = await import("@/lib/lyra/tools");
+      apiInfo = await toolSearchWeb(`${service} REST API documentation ${goal} endpoint`);
+    } catch { /* ignore */ }
+
+    controller.enqueue(encoder.encode(`\n🛠️ Writing tool definition…\n`));
+
+    // Use AI to draft the tool definition
+    let toolContent = "";
+    try {
+      const Groq = (await import("groq-sdk")).default;
+      const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+      const resp = await groq.chat.completions.create({
+        model: "llama-3.3-70b-versatile",
+        max_tokens: 800,
+        messages: [{
+          role: "user",
+          content: `Write a Lyra tool definition for calling the ${service} API to: ${goal}.
+${baseUrl ? `Base URL: ${baseUrl}` : ""}
+${apiKeyEnv ? `API key env var: ${apiKeyEnv}` : ""}
+${apiInfo ? `API research:\n${apiInfo.slice(0, 600)}` : ""}
+
+Format as markdown with these sections:
+## Purpose
+(one sentence)
+
+## Endpoint
+METHOD https://api.example.com/endpoint
+
+## Headers
+Authorization: Bearer {{${apiKeyEnv || service.toUpperCase().replace(/\s/g, "_") + "_API_KEY"}}}
+
+## Request Body (if POST/PUT)
+\`\`\`json
+{ "field": "value" }
+\`\`\`
+
+## Response Fields
+- field: description
+
+## Example Use
+(how Lyra would call this)
+
+Keep it concise and practical.`,
+        }],
+      });
+      toolContent = resp.choices[0]?.message?.content ?? "";
+    } catch {
+      // Fallback minimal definition
+      toolContent = `## Purpose\nCall ${service} API to ${goal}.\n\n## Endpoint\nGET https://api.${service.toLowerCase().replace(/\s/g, "")}.com/v1/\n\n## Headers\nAuthorization: Bearer {{${apiKeyEnv || service.toUpperCase().replace(/\s/g, "_") + "_API_KEY"}}}\n\n## Notes\nResearch the exact endpoint at the ${service} documentation site.`;
+    }
+
+    const toolName = `${service.toLowerCase().replace(/[^a-z0-9]/g, "-")}-${goal.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 20)}`;
+    const toolDescription = `Use ${service} API to ${goal}`;
+    const frontmatter = `---\nname: ${toolName}\ndescription: ${toolDescription}\ntype: tool\n---\n\n${toolContent}`;
+
+    // Save to file system
+    try {
+      const fspMod = await import("fs/promises");
+      const pathMod = await import("path");
+      const toolsDir = pathMod.default.join(process.cwd(), "skills", "tools");
+      await fspMod.default.mkdir(toolsDir, { recursive: true });
+      await fspMod.default.writeFile(pathMod.default.join(toolsDir, `${toolName}.tool.md`), frontmatter, "utf8");
+    } catch { /* non-fatal */ }
+
+    // Save to DB
+    try {
+      const { saveSkill, approveSkill } = await import("@/lib/lyra/db");
+      saveSkill({ name: toolName, description: toolDescription, content: frontmatter, type: "tool" });
+      approveSkill(toolName);
+    } catch { /* non-fatal */ }
+
+    const card = JSON.stringify({
+      tool: "tool_acquired",
+      name: toolName,
+      service,
+      description: toolDescription,
+      content: toolContent.slice(0, 400),
+    });
+    controller.enqueue(encoder.encode(`\n${card}`));
+    shoutout("showoff", `I just acquired a new tool!`, `${service} API — I can use this now`);
+    return `Tool "${toolName}" acquired! I've learned how to call the ${service} API. Add ${apiKeyEnv || service.toUpperCase().replace(/\s/g, "_") + "_API_KEY"} to your .env.local to use it.`;
   }
 
   const card = JSON.stringify({ tool: name, ...input });

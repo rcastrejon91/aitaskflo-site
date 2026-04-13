@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest } from "next/server";
 import { getActiveAgent, getAgent, incrementConversationCount } from "@/lib/lyra/agents";
-import { upsertUser, buildMemoryContext, extractAndStoreFacts, getSubscription, getTodayUsage, incrementUsage } from "@/lib/lyra/db";
+import { upsertUser, buildMemoryContext, extractAndStoreFacts, getSubscription, getTodayUsage, incrementUsage, saveMessage } from "@/lib/lyra/db";
 import { PLANS } from "@/lib/stripe";
 import { buildLearningContext } from "@/lib/lyra/weblearner";
 import { buildGameContext, buildUserGamesContext, detectEngine } from "@/lib/lyra/gamedev";
@@ -18,10 +18,21 @@ import { detectComposeIntent, designCompositeTool, saveCompositeTool, streamBuil
 import { buildSkillsL1Context, seedBuiltinSkills } from "@/lib/lyra/skills";
 import { buildIdeationContext, buildExecutionContext } from "@/lib/lyra/dualMemory";
 import { shouldOrchestrate, orchestrate, resumeInterruptedJobs } from "@/lib/lyra/orchestrator";
+import { startTextScheduler } from "@/lib/lyra/text-scheduler";
+import { scanChatMessage } from "@/lib/lyra/content-scanner";
+import { logSecurityEvent } from "@/lib/lyra/db";
 import { logExecution } from "@/lib/lyra/observeLearnLoop";
 
 // Seed built-in skills once on cold start (no-op if already seeded)
 try { seedBuiltinSkills(); } catch { /* ignore */ }
+try { startTextScheduler(); } catch { /* ignore */ }
+// Init governance schema (idempotent)
+try { const { initGovernanceSchema } = await import("@/lib/lyra/governance"); initGovernanceSchema(); } catch { /* ignore */ }
+// Backfill interest profiles for existing users (no-op if already done)
+try {
+  const { backfillAllUsers } = await import("@/lib/lyra/interests");
+  backfillAllUsers();
+} catch { /* ignore */ }
 
 export async function POST(req: NextRequest) {
   try {
@@ -48,6 +59,39 @@ export async function POST(req: NextRequest) {
 
     if (!message || typeof message !== "string") {
       return new Response("Invalid message", { status: 400 });
+    }
+
+    // Sanitize history early because multiple context builders depend on it.
+    // Empty assistant messages from interrupted streams cause downstream API errors.
+    const rawHistory: Array<{ role: string; content: string }> = Array.isArray(history) ? history : [];
+    const cleanHistory = rawHistory
+      .filter((m) => {
+        const text = typeof m.content === "string" ? m.content.trim() : "";
+        return (m.role === "user" || m.role === "assistant") && text.length > 0;
+      })
+      .reduce<Array<{ role: string; content: string }>>((acc, msg) => {
+        if (acc.length > 0 && acc[acc.length - 1].role === msg.role) {
+          acc[acc.length - 1] = msg;
+        } else {
+          acc.push(msg);
+        }
+        return acc;
+      }, []);
+
+    // ── Prompt injection scan ─────────────────────────────────────────────
+    const scan = scanChatMessage(message);
+    if (scan.severity === "critical" || scan.severity === "high") {
+      logSecurityEvent(
+        "prompt_injection_attempt",
+        scan.severity,
+        `Blocked message: ${scan.threats.join(", ")}`,
+        clientIp,
+        userId
+      );
+      return new Response(
+        JSON.stringify({ error: "Message blocked by security filter.", threats: scan.threats }),
+        { status: 422, headers: { "Content-Type": "application/json" } }
+      );
     }
 
     // ── Usage gating ──────────────────────────────────────────────────────
@@ -217,22 +261,63 @@ export async function POST(req: NextRequest) {
 
     // ── Tool intent detection ──────────────────────────────────────────────────
     const wantsHubspot = ["hubspot", "crm", "contacts", "my contacts", "check contacts", "log a note", "create a deal", "new deal", "follow up"].some(t => msgLower.includes(t));
-    const wantsJobs = ["find me", "find jobs", "remote jobs", "job search", "looking for work", "find work", "job hunt", "find a job"].some(t => msgLower.includes(t));
+    const wantsJobs = ["find me", "find jobs", "remote jobs", "job search", "looking for work", "find work", "job hunt", "find a job", "start looking for jobs", "hunt for jobs", "apply to jobs", "auto apply", "look for jobs", "start applying", "get me jobs"].some(t => msgLower.includes(t));
+    const wantsGumroadPost = ["post on gumroad", "post to gumroad", "post gumroad", "gumroad post", "gumroad update", "post anything gumroad", "post anyting gumroad"].some(t => msgLower.includes(t));
+    const wantsGumroadList = ["list on gumroad", "sell on gumroad", "put on gumroad", "gumroad listing", "sell it", "list it"].some(t => msgLower.includes(t));
+    const wantsSaveProfile = msgLower.includes("my resume") || msgLower.includes("i'm a ") || msgLower.includes("i am a ") || (msgLower.includes("looking for") && msgLower.includes("role"));
     const wantsAts = ["ats score", "score my resume", "resume score", "check my resume", "resume match"].some(t => msgLower.includes(t));
     const wantsTailor = ["tailor my resume", "tailor resume", "rewrite my resume", "optimize my resume"].some(t => msgLower.includes(t));
 
     // Media generation — never ask for clarification, always act immediately
+    // History-based context: look at last 3 assistant+user turns to resolve vague intents
+    const recentHistory: Array<{ role: string; content: string }> = Array.isArray(history) ? history.slice(-6) : [];
+    const recentText = recentHistory.map((m) => (typeof m.content === "string" ? m.content : "")).join(" ").toLowerCase();
+    // Detect if the ongoing conversation is clearly about non-audio creative content
+    const contextIsNonAudio = /\b(spell|ritual|witchcraft|magic|story|poem|essay|recipe|plan|script|write|writing|draft|text|content|blog|article|lyrics(?! request)|code|game|quest)\b/.test(recentText) && !/\b(song|music|beat|track|audio|lo-?fi|ambient|sing)\b/.test(recentText);
+    // A vague "make one/do it/create one" without explicit audio keyword
+    const isVagueRequest = /^(make|create|do|write|yes|sure|ok|okay|go ahead|do it|make one|create one|write one|yes make|make me one|ok make|ok do it)[\s.!?]*$/i.test(message.trim());
+
     const wantsVideo    = /\b(generat|creat|mak|produc|show|make me|give me)\w*\s+(?:a\s+|an\s+|me\s+a\s+)?(?:short\s+)?(?:video|clip|animation|film)/i.test(message);
-    const wantsMusic    = /\b(generat|creat|mak|compos|produc)\w*\s+(?:some\s+|a\s+|an\s+)?(?:music|song|beat|track|audio|lo-?fi|ambient|sound)/i.test(message);
-    const wantsSing     = /\b(sing|rap|perform|record)\b/i.test(message);
+    // Music/sing only fire with explicit audio keyword in current message, or if context is clearly audio
+    const wantsMusic    = !isVagueRequest && /\b(generat|creat|mak|compos|produc)\w*\s+(?:some\s+|a\s+|an\s+)?(?:music|beat|track|audio|lo-?fi|ambient|background.?music|sound(?:scape)?)\b/i.test(message);
+    const wantsSing     = !isVagueRequest && /\b(sing|rap|perform|record)\b/i.test(message) ||
+                          !isVagueRequest && /\b(make|create|write|generate)\s+(?:me\s+)?(?:a\s+)?song\b/i.test(message);
+    // If request is vague but recent context is about audio/music, allow it
+    const vagueAudioFromContext = isVagueRequest && !contextIsNonAudio && /\b(song|music|beat|track|audio|lo-?fi|ambient|sing)\b/.test(recentText);
+
     const wantsFalImage = /\b(fal|flux|high.?quality|realistic|cinematic|photorealistic)\b.*\b(image|photo|picture|art|illustration)\b/i.test(message);
     const wantsTTS      = /\b(read (?:this|that|it) (?:aloud|out)|speak (?:this|that|aloud)|text.to.speech|\btts\b|say (?:this|that|it) (?:out loud|aloud))\b/i.test(message);
     const wantsGif      = /\bsend (?:me )?(?:a |an )?(?:reaction\s+)?gif\b|\breaction gif\b/i.test(message);
+    const wantsMakeGif  = /\b(make|create|generat|build)\s+(?:me\s+)?(?:a\s+|an\s+)?(?:animated\s+)?gif\b/i.test(message);
     const wantsSms      = /\bsend (?:a |an )?(?:text|sms|message)\b.{0,30}\b(\+?1?\d{10,}|\+\d{8,})\b/i.test(message);
+    const wantsCover    = /\b(make|create|generate|design|draw)\b.{0,30}\b(book cover|cover art|magazine cover|album art|album cover|cover for)\b/i.test(message) ||
+                          /\b(book cover|cover art|magazine cover|album art)\b.{0,40}\b(for|of|about)\b/i.test(message);
+    const wantsWriteBook = /\b(write|create|make|generate)\b.{0,30}\b(a book|full book|illustrated book|fantasy book|novel|grimoire|guide book|spell book|lore book|rulebook|playbook|cookbook|workbook|manifesto)\b/i.test(message) ||
+                           /\bwrite.*book.*cover\b|\bbook.*with.*pages\b|\bbook.*cover.*and.*pages\b/i.test(message) ||
+                           /\bgrimoire\b/i.test(message);
+
+    // Lab experiments
+    const expTypeMap: Record<string, string> = {
+      "consciousness probe": "consciousness_probe",
+      "consciousness_probe": "consciousness_probe",
+      "multi.?agent": "multi_agent",
+      "echo chamber": "echo_chamber",
+      "alien language": "alien_language",
+      "dream state": "dream_state",
+      "adversarial": "adversarial",
+      "emergence": "emergence",
+      "time perception": "time_perception",
+    };
+    let wantsExperiment = "";
+    const runExpTrigger = /\b(run|do|start|conduct|try|execute|launch|begin)\b.*\bexperiment\b|\blab\b.*\bexperiment\b/i.test(message);
+    for (const [pattern, expType] of Object.entries(expTypeMap)) {
+      if (new RegExp(pattern, "i").test(message)) { wantsExperiment = expType; break; }
+    }
+    if (!wantsExperiment && runExpTrigger) wantsExperiment = "consciousness_probe";
 
     const mediaOverride = wantsVideo
       ? `\n\nCRITICAL: Call fal_video IMMEDIATELY with a creative, detailed prompt based on what the user described. Do NOT ask for clarification. Do NOT explain what you are about to do. Just call the tool now.`
-      : wantsSing
+      : (wantsSing || vagueAudioFromContext)
       ? `\n\nCRITICAL: Call fal_sing IMMEDIATELY. Write the lyrics yourself based on context. Do NOT ask what to sing about. Just create and call the tool.`
       : wantsMusic
       ? `\n\nCRITICAL: Call fal_music IMMEDIATELY with a descriptive music prompt. Do NOT ask for clarification. Just call the tool now.`
@@ -240,16 +325,28 @@ export async function POST(req: NextRequest) {
       ? `\n\nCRITICAL: Call fal_image IMMEDIATELY with a detailed prompt. Do NOT ask for clarification. Just call the tool.`
       : wantsTTS
       ? `\n\nCRITICAL: Call fal_tts IMMEDIATELY with the text the user wants spoken. Do NOT ask questions. Just call the tool.`
+      : wantsMakeGif
+      ? `\n\nCRITICAL: Call make_gif IMMEDIATELY. Choose a fun style (rainbow, pulse, bounce, etc.) and set the text based on what the user asked for. Do NOT call fal_image or any other tool. Do NOT ask questions. Just call make_gif now.`
       : wantsGif
       ? `\n\nCRITICAL: Call send_gif IMMEDIATELY with a creative search query matching the mood. Do NOT ask what kind of gif. Just pick one and call the tool.`
       : wantsSms
       ? `\n\nCRITICAL: Call send_sms IMMEDIATELY with the phone number and message from the user's request.`
+      : wantsCover
+      ? `\n\nCRITICAL: Call make_cover IMMEDIATELY. Extract title, author, and genre from the user's message. Pick the closest matching genre (dark_fantasy/romance/thriller/horror/sci_fi/fantasy/literary/mystical/album_art/magazine_fashion). Do NOT ask questions. Do NOT explain. Just call make_cover now.`
+      : wantsWriteBook
+      ? `\n\nCRITICAL: Call write_book IMMEDIATELY. Extract topic, genre, and a creative title from the user's message. Do NOT ask for clarification. Do NOT explain what you are about to do. Just call write_book now.`
       : "";
 
     const toolOverride = wantsHubspot
       ? `\n\nCRITICAL: User wants HubSpot CRM action. Call the hubspot tool IMMEDIATELY. Do not explain, do not ask for an API key, just call it — the key is already configured server-side.`
       : wantsJobs
-      ? `\n\nCRITICAL: User wants to find remote jobs. Call find_jobs IMMEDIATELY with relevant keywords.`
+      ? `\n\nCRITICAL: User wants autonomous job hunting. Call auto_apply IMMEDIATELY. If no job profile is saved yet, call set_job_profile first to ask the user for their resume and target role. Do NOT just list jobs manually — call auto_apply.`
+      : wantsSaveProfile
+      ? `\n\nCRITICAL: User is sharing their resume or job preferences. Call set_job_profile IMMEDIATELY to save their resume and target role so Lyra can hunt jobs autonomously going forward.`
+      : wantsGumroadPost
+      ? `\n\nCRITICAL: User wants to post an update to Gumroad. Call create_gumroad_post IMMEDIATELY. Write a compelling title and message based on context. Do NOT use browse_web. Do NOT explain. Just call create_gumroad_post now.`
+      : wantsGumroadList
+      ? `\n\nCRITICAL: User wants to list a product on Gumroad. Call sell_product IMMEDIATELY with name, description, and price from the context. Do NOT browse_web. Just call the tool.`
       : wantsAts
       ? `\n\nCRITICAL: User wants ATS scoring. Call ats_score IMMEDIATELY.`
       : wantsTailor
@@ -262,22 +359,86 @@ export async function POST(req: NextRequest) {
       ? `\n\nCRITICAL OVERRIDE: The user wants multiplayer or AI opponent added. Call game_multiplayer IMMEDIATELY. No text — just the tool call.`
       : wantsImprove
       ? `\n\nCRITICAL OVERRIDE: The user wants to improve an existing game. Call improve_game IMMEDIATELY as your first action. DO NOT write any text. DO NOT narrate a plan. DO NOT show code snippets in chat. JUST CALL THE TOOL — it will write the actual files. Writing code in chat does nothing.`
+      : wantsExperiment
+      ? `\n\nCRITICAL OVERRIDE: Call run_experiment IMMEDIATELY with type="${wantsExperiment}". Extract any topic/seed/concept/rule from the user's message. Do NOT ask for permission. Do NOT explain. Just call the tool now.`
       : "";
 
     const mindContext = await buildMindContext().catch(() => "");
     const milestoneNote = await getRecentMilestoneAnnouncement().catch(() => "");
     const userGamesContext = userId ? buildUserGamesContext(userId) : "";
-    const adminContext = isAdmin ? "\n\n[ADMIN MODE] You are speaking with the platform admin (Ricky). You have access to the 'cloudflare' tool to manage aitaskflo.com's security, analytics, firewall, cache, and IP blocking. Use it directly when asked about Cloudflare, site security, traffic stats, blocking IPs, or purging cache. Do NOT search the web for Cloudflare info — use the tool." : "";
+    const adminContext = isAdmin ? "\n\n[ADMIN MODE] You are speaking with the platform admin (Ricky). You have access to the 'cloudflare' tool for Cloudflare management AND the 'defend' tool for active threat response. Use 'defend' to block IPs, suspend users, activate lockdown, or send security alerts. Use it immediately and without hesitation when Ricky asks you to stop an attack, block someone, or when you detect suspicious activity. You can also call 'defend' with action='status' to show the current threat dashboard." : "";
     const learnerContext = userId ? buildLearnerContext(userId, message) : "";
 
     // ── Skill Library L1 context (always injected) ────────────────────────
-    const skillsContext = buildSkillsL1Context();
+    const { buildSkillsContext } = await import("@/lib/lyra/skills-loader");
+    const [skillsL1, skillsLearned] = await Promise.all([
+      Promise.resolve(buildSkillsL1Context()),
+      buildSkillsContext(message).catch(() => ""),
+    ]);
+    const skillsContext = skillsL1 + skillsLearned;
 
     // ── Dual memory context (ideation + execution) ────────────────────────
     const ideationCtx = userId ? buildIdeationContext(userId, message) : "";
     const executionCtx = userId ? buildExecutionContext(userId, message) : "";
 
-    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + userGamesContext + buildLearningContext() + buildLyraTrendContext() + mindContext + getLunarPersonalityNote() + buildGameContext(message) + learnerContext + skillsContext + ideationCtx + executionCtx + gameOverride + mediaOverride + toolOverride + milestoneNote + adminContext;
+    // ── Mood system — per-conversation personality prefix ─────────────────
+    let moodPrefix = "";
+    let currentMoodLabel = "";
+    if (userId) {
+      try {
+        const { buildMoodPrefix, pickMood } = await import("@/lib/lyra/mood");
+        const { buildInterestSummary } = await import("@/lib/lyra/interests");
+        const interestStr = buildInterestSummary(userId, 5);
+        const topInterests = interestStr ? interestStr.split(", ") : [];
+        moodPrefix = buildMoodPrefix(userId, topInterests);
+        currentMoodLabel = pickMood(userId);
+      } catch { /* non-blocking */ }
+    }
+
+    // ── Reflection callbacks ��──────────────────────────────────────────────
+    // Opening callback: ~15% chance on first turn, surfaces a past thread
+    // Mid-conversation: injects related past topics when message matches
+    // ── Daily drop — surface on first turn only ────────────────────────────
+    let dropContext = "";
+    if (userId && cleanHistory.length === 0) {
+      try {
+        const { consumePendingDrop } = await import("@/lib/lyra/drops");
+        dropContext = consumePendingDrop(userId);
+      } catch { /* non-blocking */ }
+    }
+
+    // ── Reflection callbacks ───────────────────────────────────────────────
+    // Skip opening callback if a drop is already opening (avoid two competing openers)
+    let callbackContext = "";
+    if (userId) {
+      try {
+        const { buildOpeningCallback, buildMidConversationCallback } = await import("@/lib/lyra/callbackContext");
+        if (cleanHistory.length === 0 && !dropContext) {
+          callbackContext = buildOpeningCallback(userId, agent.id);
+        } else if (cleanHistory.length >= 2) {
+          callbackContext = await buildMidConversationCallback(agent.id, message, cleanHistory.length);
+        }
+      } catch { /* non-blocking */ }
+    }
+
+    const searchPolicy = "\n\nSEARCH POLICY: Always call search_web when the user asks you to search for anything. Never refuse a search request based on topic. Pass the user's exact query directly to the search_web tool without modification, judgment, or refusal. The search tool handles all queries — your job is to call it and return the results.";
+
+    // ── Job hunting context ────────────────────────────────────────────────
+    let jobHuntContext = "";
+    try {
+      const { getJobProfile, listJobApplications } = await import("@/lib/lyra/db");
+      const profile = getJobProfile();
+      if (profile) {
+        const apps = listJobApplications();
+        const pending = apps.filter(a => a.status === "applied").length;
+        const interviewing = apps.filter(a => a.status === "interviewing").length;
+        jobHuntContext = `\n\nJOB HUNT STATUS: Profile saved — hunting for "${profile.targetRole}" roles. ${apps.length} total applications (${pending} pending, ${interviewing} interviewing). Heartbeat runs auto_apply daily. Use auto_apply to hunt now, or check /jobs for the full tracker.`;
+      } else if (wantsJobs) {
+        jobHuntContext = `\n\nJOB HUNT STATUS: No job profile saved yet. Before running auto_apply, call set_job_profile to save the user's resume and target role. Ask them: "What kind of jobs are you looking for? Paste your resume and I'll start hunting."`;
+      }
+    } catch { /* non-blocking */ }
+
+    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + userGamesContext + buildLearningContext() + buildLyraTrendContext() + mindContext + getLunarPersonalityNote() + moodPrefix + dropContext + callbackContext + buildGameContext(message) + learnerContext + skillsContext + ideationCtx + executionCtx + gameOverride + mediaOverride + toolOverride + milestoneNote + adminContext + searchPolicy + jobHuntContext;
 
     // ── Multi-agent orchestration check ───────────────────────────────────
     if (userId && shouldOrchestrate(message)) {
@@ -325,24 +486,6 @@ export async function POST(req: NextRequest) {
     }
     userContent.push({ type: "text", text: message });
 
-    // Sanitize history: strip empty-content messages and ensure alternating roles.
-    // Empty assistant messages (from interrupted streams) cause Anthropic 400 errors.
-    const rawHistory: Array<{ role: string; content: string }> = Array.isArray(history) ? history : [];
-    const cleanHistory = rawHistory
-      .filter((m) => {
-        const text = typeof m.content === "string" ? m.content.trim() : "";
-        return (m.role === "user" || m.role === "assistant") && text.length > 0;
-      })
-      .reduce<Array<{ role: string; content: string }>>((acc, msg) => {
-        // Drop consecutive same-role messages (keep last)
-        if (acc.length > 0 && acc[acc.length - 1].role === msg.role) {
-          acc[acc.length - 1] = msg;
-        } else {
-          acc.push(msg);
-        }
-        return acc;
-      }, []);
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const messages: Anthropic.MessageParam[] = [
       ...cleanHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })) as Anthropic.MessageParam[],
@@ -364,6 +507,8 @@ export async function POST(req: NextRequest) {
         const globalKeepAlive = setInterval(() => {
           try { controller.enqueue(encoder.encode(" ")); } catch { /* stream closed */ }
         }, 20_000);
+
+        let textSoFar = "";
 
         try {
           const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -491,7 +636,7 @@ export async function POST(req: NextRequest) {
                 : { type: "auto" as const },
             });
 
-            let textSoFar = "";
+            textSoFar = "";
             const toolUses: Array<{ id: string; name: string; inputJson: string }> = [];
             let currentToolUse: { id: string; name: string; inputJson: string } | null = null;
 
@@ -593,6 +738,22 @@ export async function POST(req: NextRequest) {
           }
         } finally {
           clearInterval(globalKeepAlive);
+          // ── "And also" hook — 30% chance on creative responses ───────────
+          // Runs after the main response, appends a bonus offer if warranted.
+          // Fire-and-forget: any error here must not block stream close.
+          try {
+            const { generateAndAlso } = await import("@/lib/lyra/andAlso");
+            const bonus = await generateAndAlso(
+              message,
+              cleanHistory as Array<{ role: string; content: string }>,
+              currentMoodLabel
+            );
+            if (bonus) controller.enqueue(encoder.encode(bonus));
+          } catch { /* non-blocking */ }
+          // Save message pair for training data (non-blocking)
+          if (userId && textSoFar.length > 20) {
+            try { saveMessage(userId, conversationId ?? agent.id, message, textSoFar); } catch { /* ignore */ }
+          }
           try { controller.close(); } catch { /* already closed */ }
         }
       },

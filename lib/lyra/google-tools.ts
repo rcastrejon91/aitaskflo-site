@@ -117,6 +117,136 @@ export async function toolAnalyzeImage(imageUrl: string, userId?: string): Promi
   }
 }
 
+// ── Maps helpers ──────────────────────────────────────────────────────────────
+
+function mapsKey(): string {
+  const k = process.env.GOOGLE_MAPS_API_KEY;
+  if (!k) throw new Error("GOOGLE_MAPS_API_KEY not set");
+  return k;
+}
+
+// ── Geocoding ─────────────────────────────────────────────────────────────────
+
+export async function toolGeocode(address: string): Promise<string> {
+  try {
+    const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${mapsKey()}`);
+    const data = await res.json() as { results?: Array<{ formatted_address: string; geometry: { location: { lat: number; lng: number } } }> };
+    const r = data.results?.[0];
+    if (!r) return `No results for "${address}"`;
+    return `**${r.formatted_address}**\nLat: ${r.geometry.location.lat}, Lng: ${r.geometry.location.lng}`;
+  } catch (e) { return `Geocode error: ${e instanceof Error ? e.message : String(e)}`; }
+}
+
+// ── Distance Matrix ───────────────────────────────────────────────────────────
+
+export async function toolDistanceMatrix(origins: string, destinations: string, mode = "driving"): Promise<string> {
+  try {
+    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origins)}&destinations=${encodeURIComponent(destinations)}&mode=${mode}&key=${mapsKey()}`;
+    const res = await fetch(url);
+    const data = await res.json() as { rows?: Array<{ elements?: Array<{ duration: { text: string }; distance: { text: string }; status: string }> }>; origin_addresses?: string[]; destination_addresses?: string[] };
+    const el = data.rows?.[0]?.elements?.[0];
+    if (!el || el.status !== "OK") return "Could not calculate distance.";
+    return `**${data.origin_addresses?.[0]} → ${data.destination_addresses?.[0]}**\nDistance: ${el.distance.text} · Duration: ${el.duration.text} (${mode})`;
+  } catch (e) { return `Distance error: ${e instanceof Error ? e.message : String(e)}`; }
+}
+
+// ── Time Zone ─────────────────────────────────────────────────────────────────
+
+export async function toolTimeZone(location: string): Promise<string> {
+  try {
+    // First geocode the location
+    const geoRes = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(location)}&key=${mapsKey()}`);
+    const geoData = await geoRes.json() as { results?: Array<{ geometry: { location: { lat: number; lng: number } } }> };
+    const loc = geoData.results?.[0]?.geometry.location;
+    if (!loc) return `Location not found: ${location}`;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const tzRes = await fetch(`https://maps.googleapis.com/maps/api/timezone/json?location=${loc.lat},${loc.lng}&timestamp=${timestamp}&key=${mapsKey()}`);
+    const tz = await tzRes.json() as { timeZoneName?: string; timeZoneId?: string; rawOffset?: number; dstOffset?: number };
+    if (!tz.timeZoneName) return "Timezone not found.";
+    const offsetHours = ((tz.rawOffset ?? 0) + (tz.dstOffset ?? 0)) / 3600;
+    const sign = offsetHours >= 0 ? "+" : "";
+    return `**${location}** is in **${tz.timeZoneName}** (${tz.timeZoneId})\nUTC${sign}${offsetHours}`;
+  } catch (e) { return `Timezone error: ${e instanceof Error ? e.message : String(e)}`; }
+}
+
+// ── Elevation ─────────────────────────────────────────────────────────────────
+
+export async function toolElevation(location: string): Promise<string> {
+  try {
+    const geoRes = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(location)}&key=${mapsKey()}`);
+    const geoData = await geoRes.json() as { results?: Array<{ geometry: { location: { lat: number; lng: number } } }> };
+    const loc = geoData.results?.[0]?.geometry.location;
+    if (!loc) return `Location not found: ${location}`;
+    const res = await fetch(`https://maps.googleapis.com/maps/api/elevation/json?locations=${loc.lat},${loc.lng}&key=${mapsKey()}`);
+    const data = await res.json() as { results?: Array<{ elevation: number; resolution: number }> };
+    const el = data.results?.[0];
+    if (!el) return "Elevation not found.";
+    return `**${location}** elevation: **${Math.round(el.elevation)}m** (${Math.round(el.elevation * 3.281)}ft) above sea level`;
+  } catch (e) { return `Elevation error: ${e instanceof Error ? e.message : String(e)}`; }
+}
+
+// ── Air Quality ───────────────────────────────────────────────────────────────
+
+export async function toolAirQuality(location: string): Promise<string> {
+  try {
+    const geoRes = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(location)}&key=${mapsKey()}`);
+    const geoData = await geoRes.json() as { results?: Array<{ geometry: { location: { lat: number; lng: number } } }> };
+    const loc = geoData.results?.[0]?.geometry.location;
+    if (!loc) return `Location not found: ${location}`;
+    const res = await fetch(`https://airquality.googleapis.com/v1/currentConditions:lookup?key=${mapsKey()}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ location: { latitude: loc.lat, longitude: loc.lng } }),
+    });
+    const data = await res.json() as { indexes?: Array<{ aqiDisplay: string; category: string; dominantPollutant: string; displayName: string }> };
+    const idx = data.indexes?.[0];
+    if (!idx) return "Air quality data not available for this location.";
+    return `**Air Quality — ${location}**\nAQI: ${idx.aqiDisplay} · ${idx.category}\nDominant pollutant: ${idx.dominantPollutant}`;
+  } catch (e) { return `Air quality error: ${e instanceof Error ? e.message : String(e)}`; }
+}
+
+// ── Pollen ────────────────────────────────────────────────────────────────────
+
+export async function toolPollen(location: string): Promise<string> {
+  try {
+    const geoRes = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(location)}&key=${mapsKey()}`);
+    const geoData = await geoRes.json() as { results?: Array<{ geometry: { location: { lat: number; lng: number } } }> };
+    const loc = geoData.results?.[0]?.geometry.location;
+    if (!loc) return `Location not found: ${location}`;
+    const res = await fetch(`https://pollen.googleapis.com/v1/forecast:lookup?key=${mapsKey()}&location.longitude=${loc.lng}&location.latitude=${loc.lat}&days=1`);
+    const data = await res.json() as { dailyInfo?: Array<{ pollenTypeInfo?: Array<{ displayName: string; indexInfo?: { category: string; value: number } }> }> };
+    const day = data.dailyInfo?.[0];
+    if (!day) return "Pollen data not available for this location.";
+    const lines = (day.pollenTypeInfo ?? []).map(p => `${p.displayName}: ${p.indexInfo?.category ?? "N/A"} (${p.indexInfo?.value ?? 0})`);
+    return `**Pollen — ${location}**\n${lines.join("\n")}`;
+  } catch (e) { return `Pollen error: ${e instanceof Error ? e.message : String(e)}`; }
+}
+
+// ── Solar ─────────────────────────────────────────────────────────────────────
+
+export async function toolSolar(address: string): Promise<string> {
+  try {
+    const geoRes = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${mapsKey()}`);
+    const geoData = await geoRes.json() as { results?: Array<{ geometry: { location: { lat: number; lng: number } } }> };
+    const loc = geoData.results?.[0]?.geometry.location;
+    if (!loc) return `Address not found: ${address}`;
+    const res = await fetch(`https://solar.googleapis.com/v1/buildingInsights:findClosest?location.latitude=${loc.lat}&location.longitude=${loc.lng}&requiredQuality=LOW&key=${mapsKey()}`);
+    const data = await res.json() as { solarPotential?: { maxArrayPanelsCount: number; maxArrayAreaMeters2: number; maxSunshineHoursPerYear: number; carbonOffsetFactorKgPerMwh: number; wholeRoofStats?: { areaMeters2: number } } };
+    const s = data.solarPotential;
+    if (!s) return "Solar data not available for this address.";
+    return `**Solar Potential — ${address}**\nMax panels: ${s.maxArrayPanelsCount}\nMax area: ${Math.round(s.maxArrayAreaMeters2)}m²\nSunshine hours/year: ${Math.round(s.maxSunshineHoursPerYear)}h\nRoof area: ${Math.round(s.wholeRoofStats?.areaMeters2 ?? 0)}m²`;
+  } catch (e) { return `Solar error: ${e instanceof Error ? e.message : String(e)}`; }
+}
+
+// ── Street View ───────────────────────────────────────────────────────────────
+
+export function toolStreetView(location: string, size = "600x400"): string {
+  const k = process.env.GOOGLE_MAPS_API_KEY;
+  if (!k) return "GOOGLE_MAPS_API_KEY not set";
+  const url = `https://maps.googleapis.com/maps/api/streetview?size=${size}&location=${encodeURIComponent(location)}&key=${k}`;
+  return `**Street View — ${location}**\n![Street View](${url})`;
+}
+
 // ── Gmail ─────────────────────────────────────────────────────────────────────
 
 export async function toolGmailSend(

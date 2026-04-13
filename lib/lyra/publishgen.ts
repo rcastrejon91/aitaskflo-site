@@ -10,7 +10,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import React from "react";
 import {
-  Document, Page, Text, View, Image, StyleSheet, pdf,
+  Document, Page, Text, View, Image, StyleSheet, renderToBuffer,
 } from "@react-pdf/renderer";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -331,9 +331,7 @@ export async function generateDocPdf(doc: PublishedDoc): Promise<Buffer> {
     CoverEl, TocEl, ...sectionEls
   );
 
-  const instance = pdf(docEl);
-  const blob = await instance.toBlob();
-  return Buffer.from(await blob.arrayBuffer());
+  return (await renderToBuffer(docEl)) as Buffer;
 }
 
 // ── Cloud delivery ────────────────────────────────────────────────────────────

@@ -248,6 +248,10 @@ export interface OrchestrationResult {
  * Returns null if Lyra should handle it herself (simple chat).
  */
 export function shouldOrchestrate(message: string): boolean {
+  // Never orchestrate media/creative generation — needs direct tool calls, not research agents
+  const mediaBypass = /\b(image|photo|picture|cover|book cover|art|illustration|gif|video|clip|music|song|audio|voice|cover art|write.*book|create.*book|make.*cover|draw|paint|grimoire|art pack|novel|story|fantasy|sci.fi|thriller|horror|romance|ebook|pdf|gumroad|sell it|list it|publish it|write a|write an)\b/i;
+  if (mediaBypass.test(message)) return false;
+
   const triggers = [
     /\b(search|find|look up|research)\b.{5,}\b(and|then|also)\b/i,
     /\b(email|send|reply|draft)\b.+\b(and|then|also)\b/i,

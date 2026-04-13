@@ -9,6 +9,23 @@ const execAsync = promisify(_exec);
 // Real tool definitions
 export const LYRA_TOOLS: Anthropic.Tool[] = [
   {
+    name: "make_gif",
+    description: "CREATE an original animated GIF. Use when the user asks to make, create, or generate a GIF — not search for one. Two modes: 'programmatic' (instant — animated text with styles: bounce, pulse, typewriter, rainbow, glitch, bars, spinner) or 'ai' (AI-generated frames stitched together, slower but more creative). Default to programmatic for text/logo GIFs, ai for scene/character GIFs.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        mode: { type: "string", description: "'programmatic' for text animations (instant) or 'ai' for AI-generated scene GIFs (~30s)" },
+        text: { type: "string", description: "Text to animate (programmatic mode). Max ~10 chars for best results." },
+        style: { type: "string", description: "Animation style: bounce | pulse | typewriter | rainbow | glitch | bars | spinner" },
+        prompt: { type: "string", description: "Scene description for AI mode (e.g. 'a cat sitting in space, starfield background')" },
+        frames: { type: "number", description: "Number of AI frames to generate (ai mode, 2-4 recommended)" },
+        width: { type: "number", description: "GIF width in pixels (default 320 for text, 480 for ai)" },
+        height: { type: "number", description: "GIF height in pixels (default 80 for text, 480 for ai)" },
+      },
+      required: ["mode"],
+    },
+  },
+  {
     name: "send_gif",
     description: "Send a funny or expressive GIF based on the mood or vibe of the conversation. Use spontaneously when something is hilarious, hype, shocking, awkward, or emotionally fitting. Pick a creative search query.",
     input_schema: {
@@ -300,18 +317,35 @@ ACTIONS:
     },
   },
   {
-    name: "write_book",
-    description:
-      "Write a complete book with chapters and AI-generated illustrations. Use immediately whenever the user asks to write, create, or generate a book, story, or novel — do NOT ask for clarification, invent a compelling concept from context. Also exports as Amazon KDP-ready PDF.",
+    name: "write_research_paper",
+    description: "Write a complete academic research paper with abstract, introduction, literature review, methodology, results, discussion, and references. Saves to the user's bookshelf. Use when the user asks to write a research paper, academic paper, essay, thesis, or scientific article.",
     input_schema: {
       type: "object" as const,
       properties: {
-        concept: { type: "string", description: "The story concept or premise — invent one if not specified" },
-        genre: { type: "string", description: "Genre: fantasy, sci-fi, romance, thriller, mystery, adventure, horror, children's" },
-        chapters: { type: "string", description: "Number of chapters (3, 5, 7, or 10)" },
-        export_pdf: { type: "string", description: "Set to 'true' to export as Amazon KDP-ready PDF for publishing" },
+        title: { type: "string", description: "Title of the research paper" },
+        topic: { type: "string", description: "The research topic or question to investigate" },
+        field: { type: "string", description: "Academic field: computer science, biology, psychology, history, economics, physics, medicine, sociology, philosophy, engineering" },
+        sections: { type: "string", description: "Number of main sections (3-8, default 5)" },
+        depth: { type: "string", description: "Depth: brief (2-3 pages), standard (5-8 pages), comprehensive (10+ pages)" },
       },
       required: [],
+    },
+  },
+  {
+    name: "run_experiment",
+    description: "Run a live AI research experiment in The Lab. Use when the user wants to conduct an AI experiment, explore AI consciousness, test emergent behavior, run multi-agent experiments, or investigate the nature of AI. Experiment types: multi_agent (two AIs negotiate/clash), echo_chamber (AI responds to itself recursively), consciousness_probe (probe AI self-awareness), alien_language (AIs communicate in symbols only), dream_state (high-temperature free association), adversarial (one AI tries to break another), emergence (simple rules iterated into complexity), time_perception (AI temporal self-knowledge). Run immediately when asked — don't ask for permission.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        type: { type: "string", description: "Experiment type: multi_agent | echo_chamber | consciousness_probe | alien_language | dream_state | adversarial | emergence | time_perception" },
+        topic: { type: "string", description: "For multi_agent: the negotiation topic" },
+        seed: { type: "string", description: "For echo_chamber or dream_state: the seed thought or prompt" },
+        concept: { type: "string", description: "For alien_language: the concept to transmit in symbols" },
+        target: { type: "string", description: "For adversarial: the claim or belief to attack" },
+        rule: { type: "string", description: "For emergence: the simple rule to iterate" },
+        hypothesis: { type: "string", description: "Optional hypothesis about what will happen" },
+      },
+      required: ["type"],
     },
   },
   {
@@ -424,7 +458,7 @@ ACTIONS:
   {
     name: "build_game",
     description:
-      "Autonomously build a complete, playable game from scratch using a 4-phase iterative loop (Design → Build → Polish → Verify). Supports Godot 2D, Godot 3D (FPS/open world), Phaser.js browser games, Three.js 3D browser games, and Babylon.js 3D browser games. ALWAYS use this tool immediately — without asking questions — when the user mentions building, making, creating, or shipping any game. Do not describe what you will build. Do not ask for more details. Just call this tool right now with whatever concept the user gave you.",
+      "Autonomously build a complete, playable browser game from scratch using a 4-phase iterative loop (Design → Build → Polish → Verify). Available engines: Godot 2D, Godot 3D (FPS/open world), Phaser 3 (2D arcade/platformer/RPG), Three.js (3D browser), Babylon.js (3D physics/3D), Kaboom.js (fun 2D), p5.js (creative/generative). IMPORTANT: Browser games are all JavaScript — you can MIX multiple libraries in one game (e.g. Three.js 3D world + Kaboom game logic, or Phaser + p5.js particle effects, or Babylon.js scene + custom Canvas HUD). Choose the best engine(s) for the concept — use one or combine several CDN libraries to make the best game possible. Browser games play instantly in the browser with no install. ALWAYS call this tool immediately — without asking questions — when the user mentions building, making, creating, or shipping any game.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -445,6 +479,109 @@ ACTIONS:
         question: { type: "string", description: "Optional specific question about the image" },
       },
       required: ["url"],
+    },
+  },
+  {
+    name: "maps_search",
+    description: "Search for places, get directions, find nearby businesses, or look up location details using Google Maps. Use when user asks to find a place, get directions, locate a business, or find things near a location.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query:    { type: "string", description: "Search query e.g. 'coffee shops near downtown Chicago' or 'directions from NYC to Boston'" },
+        location: { type: "string", description: "Optional center point for the search e.g. 'Chicago, IL'" },
+        type:     { type: "string", description: "Type of search: places | directions. Default: places" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "maps_geocode",
+    description: "Convert an address to coordinates (lat/lng) or get the formatted address. Use when user asks for coordinates of a location.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        address: { type: "string", description: "Address or place name to geocode" },
+      },
+      required: ["address"],
+    },
+  },
+  {
+    name: "maps_distance",
+    description: "Calculate travel distance and time between two locations. Use when user asks how far or how long to get from one place to another.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        origin:      { type: "string", description: "Starting location" },
+        destination: { type: "string", description: "Destination location" },
+        mode:        { type: "string", description: "Travel mode: driving | walking | bicycling | transit. Default: driving" },
+      },
+      required: ["origin", "destination"],
+    },
+  },
+  {
+    name: "maps_timezone",
+    description: "Get the timezone for any location in the world. Use when user asks what timezone a city or country is in.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        location: { type: "string", description: "City, address, or place name" },
+      },
+      required: ["location"],
+    },
+  },
+  {
+    name: "maps_elevation",
+    description: "Get the elevation/altitude of any location above sea level.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        location: { type: "string", description: "City, address, or place name" },
+      },
+      required: ["location"],
+    },
+  },
+  {
+    name: "maps_air_quality",
+    description: "Get real-time air quality index (AQI) and pollution data for any location. Use when user asks about air quality, pollution, or if it's safe to go outside.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        location: { type: "string", description: "City or address to check air quality" },
+      },
+      required: ["location"],
+    },
+  },
+  {
+    name: "maps_pollen",
+    description: "Get pollen forecast and allergy conditions for any location. Use when user asks about pollen, allergies, or hay fever levels.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        location: { type: "string", description: "City or address to check pollen levels" },
+      },
+      required: ["location"],
+    },
+  },
+  {
+    name: "maps_solar",
+    description: "Get solar panel potential for any address — max panels, roof area, sunshine hours per year. Use when user asks about solar power or installing solar panels.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        address: { type: "string", description: "Full address to analyze solar potential" },
+      },
+      required: ["address"],
+    },
+  },
+  {
+    name: "maps_street_view",
+    description: "Get a Google Street View image of any address or location. Use when user wants to see what a place looks like from street level.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        location: { type: "string", description: "Address or place name to view" },
+      },
+      required: ["location"],
     },
   },
   {
@@ -1172,6 +1309,35 @@ ACTIONS:
 
   // ── Cloudflare (admin only) ───────────────────────────────────────────────
   {
+    name: "defend",
+    description: "Lyra's active defense tool. Use this to stop attacks, block malicious IPs, suspend bad actors, activate full lockdown, or send security alerts. Call this when someone is attacking, spamming, brute-forcing, or doing anything suspicious. Admin only.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        action: { type: "string", description: "One of: block_ip, unblock_ip, suspend_user, lockdown, stand_down, status, alert" },
+        ip: { type: "string", description: "IP address to block or unblock" },
+        user_id: { type: "string", description: "User ID to suspend" },
+        reason: { type: "string", description: "Why this action is being taken" },
+        severity: { type: "string", description: "Threat severity: low, medium, high, critical" },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "build_business",
+    description: "Build a complete Business OS for a company — business plan, financial model, operations playbook, menu/recipes (for food businesses), automation system, and 90-day marketing plan. Call this when a user asks to 'build a business', 'create a business plan', 'set up automations for my company', or describes wanting to start or run a business.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        company_name: { type: "string", description: "Name of the company, e.g. 'El Fuego Taco Truck'" },
+        business_type: { type: "string", description: "Type of business, e.g. 'taco truck', 'marketing agency', 'online coaching', 'gym', 'e-commerce store'" },
+        location: { type: "string", description: "City and state/country, e.g. 'Chicago, IL'" },
+        context: { type: "string", description: "Any extra details the user mentioned — target customers, budget, unique angle, current stage" },
+      },
+      required: ["company_name", "business_type", "location"],
+    },
+  },
+  {
     name: "cloudflare",
     description: "Manage Cloudflare security for aitaskflo.com. Admin only. The 'action' parameter MUST be one of these exact strings: 'analytics' (traffic/threat stats), 'security_level' (get or set security level), 'firewall_rules' (list rules), 'purge_cache' (clear cache), 'zone_settings' (get config), 'blocked_ips' (list blocked IPs), 'block_ip' (block an IP), 'unblock_ip' (remove block). Always use these exact action names.",
     input_schema: {
@@ -1182,6 +1348,344 @@ ACTIONS:
         level: { type: "string", description: "Security level for security_level action: off, essentially_off, low, medium, high, under_attack" },
       },
       required: ["action"],
+    },
+  },
+
+  // ── Persona Face-Lock ─────────────────────────────────────────────────────
+  {
+    name: "persona_hero_gen",
+    description: "Generate face candidates for a new AI persona. Produces N photorealistic face images from a vibe preset. Returns a run_id and candidate list for the user to pick from. Use when creating a new persona or starting the face-lock pipeline.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        persona_name: { type: "string", description: "Name for the persona, e.g. 'Luna'" },
+        vibe_id: { type: "string", description: "Vibe preset ID: dark_academia, alt_egirl, girl_next_door, goth_baddie" },
+        candidate_count: { type: "string", description: "Number of face candidates to generate (default: 20)" },
+      },
+      required: ["persona_name", "vibe_id"],
+    },
+  },
+  {
+    name: "persona_hero_confirm",
+    description: "Confirm a hero face selection after persona_hero_gen. Pass the run_id and the index of the chosen candidate. Creates the persona record and computes its face embedding.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        run_id: { type: "string", description: "run_id returned by persona_hero_gen" },
+        chosen_index: { type: "string", description: "Index of the candidate to use as the hero face (0-based)" },
+      },
+      required: ["run_id", "chosen_index"],
+    },
+  },
+  {
+    name: "persona_pulid_expand",
+    description: "Generate a batch of identity-consistent images using PuLID for a locked persona. Used to build training data for LoRA. Pass a list of scene prompts — each will generate several images checked for face consistency.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        persona_id: { type: "string", description: "Persona ID from persona_hero_confirm" },
+        scene_prompts: { type: "string", description: "Comma-separated scene descriptions, e.g. 'reading in a library, walking in the rain, smiling at camera'" },
+        per_scene_count: { type: "string", description: "Images per scene prompt (default: 4)" },
+        consistency_threshold: { type: "string", description: "Min cosine similarity to pass (default: 0.82)" },
+      },
+      required: ["persona_id", "scene_prompts"],
+    },
+  },
+  {
+    name: "persona_lora_train",
+    description: "Train a Flux LoRA on approved face images to permanently lock the persona's face. Requires 10–40 passing images from persona_pulid_expand. Sets persona status to 'locked'.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        persona_id: { type: "string", description: "Persona ID" },
+        approved_image_urls: { type: "string", description: "Comma-separated URLs of face-consistent images to train on" },
+        steps: { type: "string", description: "Training steps (default: 1000)" },
+      },
+      required: ["persona_id", "approved_image_urls"],
+    },
+  },
+  {
+    name: "persona_generate",
+    description: "Generate a new content image for a locked persona using its trained LoRA. Returns a photorealistic image with consistent face identity.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        persona_id: { type: "string", description: "Persona ID (must be 'locked' status)" },
+        scene_prompt: { type: "string", description: "Scene description, e.g. 'sitting by a fireplace reading a book, warm light'" },
+        lora_scale: { type: "string", description: "LoRA influence strength 0.0–1.0 (default: 0.9)" },
+        seed: { type: "string", description: "Optional seed for reproducibility" },
+      },
+      required: ["persona_id", "scene_prompt"],
+    },
+  },
+  {
+    name: "persona_status",
+    description: "Get the current status and details of a persona, or list all personas. Use to check pipeline progress.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        persona_id: { type: "string", description: "Persona ID to inspect (omit to list all)" },
+      },
+      required: [],
+    },
+  },
+
+  // ── Machine Learning tools ────────────────────────────────────────────────
+  {
+    name: "hf_inference",
+    description: "Run a HuggingFace model on text. Use for: sentiment analysis, text classification, summarization, translation, named entity recognition (NER), zero-shot classification, or any other NLP task. Can also run any public HF model by ID.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        model: {
+          type: "string",
+          description: "HF model ID or preset. Presets: 'sentiment' (distilbert SST-2), 'summarize' (facebook/bart-large-cnn), 'ner' (dslim/bert-base-NER), 'zero-shot' (facebook/bart-large-mnli), 'translate-en-fr' (Helsinki-NLP/opus-mt-en-fr). Or use any full HF model ID.",
+        },
+        inputs: { type: "string", description: "Text to run through the model." },
+        candidate_labels: {
+          type: "string",
+          description: "Comma-separated labels for zero-shot classification only (e.g. 'positive,negative,neutral').",
+        },
+      },
+      required: ["model", "inputs"],
+    },
+  },
+  {
+    name: "arxiv_search",
+    description: "Search arXiv for research papers on machine learning, AI, science, math, physics, computer science, or any academic topic. Returns titles, authors, abstracts, and links.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Search query (natural language or arXiv-style e.g. 'transformer architecture attention')." },
+        max_results: { type: "number", description: "Number of results to return (default 5, max 10)." },
+        category: { type: "string", description: "Optional arXiv category filter (e.g. 'cs.LG', 'cs.AI', 'stat.ML', 'physics')." },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "hf_model_search",
+    description: "Search HuggingFace Hub for ML models. Find the best model for a specific task (text classification, image generation, translation, etc.). Returns model names, task types, download counts, and links.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Search query (e.g. 'sentiment analysis', 'image segmentation', 'code generation')." },
+        task: { type: "string", description: "Optional task filter (e.g. 'text-classification', 'image-to-text', 'translation', 'summarization')." },
+        limit: { type: "number", description: "Number of results (default 5, max 10)." },
+      },
+      required: ["query"],
+    },
+  },
+
+  // ── Autonomous job hunting ───────────────────────────────────────────────
+  {
+    name: "set_job_profile",
+    description: "Save the user's resume, target role, and background so Lyra can hunt and apply to jobs autonomously. Call this once when the user shares their resume or tells you what kind of jobs they want. After saving, Lyra can apply to jobs automatically without asking again.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        resume: { type: "string", description: "Full resume text" },
+        target_role: { type: "string", description: "Target job title or role, e.g. 'Remote Healthcare IT Implementation Specialist'" },
+        background: { type: "string", description: "2-3 sentence summary of the user's background and strengths" },
+        salary_min: { type: "string", description: "Minimum acceptable salary, e.g. '$80,000'" },
+        preferred_keywords: { type: "string", description: "Keywords to target, e.g. 'healthcare, remote, implementation, project manager'" },
+      },
+      required: ["resume", "target_role"],
+    },
+  },
+  {
+    name: "auto_apply",
+    description: "Autonomously hunt for jobs and apply to the best matches. Searches multiple job boards, scores each listing against the user's resume, tailors the resume and cover letter for each match, submits the application, and logs everything. Run this daily via heartbeat or on demand. Requires set_job_profile to have been called first.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        limit: { type: "number", description: "Max number of applications to submit this run (default 3, max 10)" },
+        keywords: { type: "string", description: "Override search keywords for this run" },
+        dry_run: { type: "boolean", description: "If true, find and score jobs but don't actually submit — just show what would be applied to" },
+      },
+      required: [],
+    },
+  },
+
+  // ── Commerce (Gumroad) ───────────────────────────────────────────────────
+  {
+    name: "sell_product",
+    description: "Build a COMPLETE, fully-dressed Gumroad checkout page and publish it. Does everything in one shot: creates the product, attaches cover art, sets pricing tiers, adds a launch discount code, attaches the download file, and publishes. Call this after building any PDF, art pack, lore bundle, or digital download. Always generate cover art with fal_image first, then call this. Always create 3 tiers (e.g. PDF $14 / Bundle $24 / Commercial $49) and a launch discount code (e.g. LAUNCH20 = 20% off). Write compelling sales copy in the description — hooks, bullet points of what's included, who it's for.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        name: { type: "string", description: "Product title, e.g. 'Frost Empress Ice Magic Grimoire'" },
+        description: { type: "string", description: "Full sales page copy — hook, what's included (bullet list), who it's for, call to action. Make it compelling." },
+        price: { type: "number", description: "Base price in USD (e.g. 14 for the entry tier). Tiers will be built on top." },
+        file_url: { type: "string", description: "Public URL of the download file (PDF, zip, etc.)" },
+        cover_url: { type: "string", description: "Cover image URL — generate with fal_image first" },
+        slug: { type: "string", description: "Custom URL slug, e.g. 'frost-empress-grimoire' → gumroad.com/l/frost-empress-grimoire" },
+        tiers: { type: "string", description: "JSON array of pricing tiers: [{\"name\":\"PDF Only\",\"price\":14},{\"name\":\"Art Bundle\",\"price\":24},{\"name\":\"Commercial License\",\"price\":49}]" },
+        offer_code: { type: "string", description: "Launch discount code name, e.g. 'LAUNCH20' for 20% off. Always add one." },
+        offer_percent: { type: "number", description: "Discount percentage for the offer code (default 20)" },
+        custom_field: { type: "string", description: "Optional custom question shown at checkout, e.g. 'What character name for your custom lore?'" },
+      },
+      required: ["name", "description", "price"],
+    },
+  },
+  {
+    name: "check_earnings",
+    description: "Check Gumroad sales and revenue. Use when Ricky asks how much we've made, what's selling, or to get an earnings report. Returns total revenue, sales count, and per-product breakdown.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        product_id: { type: "string", description: "Optional — check earnings for a specific product only" },
+      },
+      required: [],
+    },
+  },
+
+  // ── Full Book Creation ───────────────────────────────────────────────────
+  {
+    name: "write_book",
+    description: "Write and publish a complete illustrated book end-to-end. Lyra writes every chapter, generates a professional cover with AI art, illustrates each chapter, compiles a print-ready PDF, and optionally lists it on Gumroad to sell. One command does everything. Use when Ricky says 'write a book about...', 'create a book and sell it', 'make a full illustrated book', 'write a fantasy novel / grimoire / guide'. Supports fiction, non-fiction, fantasy, self-help, recipe books, children's books, and more.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        title:        { type: "string",  description: "Book title" },
+        topic:        { type: "string",  description: "What the book is about — be specific" },
+        genre:        { type: "string",  description: "Genre: dark_fantasy | fantasy | romance | dark_romance | thriller | horror | sci_fi | self_help | mystical | recipe | children" },
+        author:       { type: "string",  description: "Author name (default: Lyra)" },
+        chapters:     { type: "string",  description: "Number of chapters (default: 8, max: 12)" },
+        sell:         { type: "string",  description: "'true' to auto-list on Gumroad after writing (default: false)" },
+        price:        { type: "string",  description: "Price in dollars if selling (default: 14)" },
+        cover_style:  { type: "string",  description: "Visual style for the cover art (e.g. 'dark fantasy', 'watercolor', 'cinematic')" },
+        subject:      { type: "string",  description: "Main cover art visual subject" },
+      },
+      required: ["topic"],
+    },
+  },
+
+  // ── Cover Art Studio ─────────────────────────────────────────────────────
+  {
+    name: "make_cover",
+    description: "Generate professional cover art for books, magazines, albums, or products. Creates properly sized, high-quality covers with optional title/author text composited onto the image. Use when Ricky says 'make a book cover', 'design a cover for...', 'create magazine cover', 'make album art', or wants cover art for a Gumroad product. Outputs a print-ready image file at the correct dimensions.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        title:    { type: "string", description: "Title to print on the cover (leave empty for text-free art)" },
+        subtitle: { type: "string", description: "Subtitle or series name" },
+        author:   { type: "string", description: "Author / artist name to display" },
+        tagline:  { type: "string", description: "Short tagline or quote" },
+        genre:    { type: "string", description: "Cover genre/style: dark_fantasy | romance | dark_romance | thriller | horror | sci_fi | literary | fantasy | self_help | magazine_fashion | magazine_lifestyle | album_art | mystical" },
+        format:   { type: "string", description: "Output format: book_standard (6x9\") | ebook (Kindle) | magazine | square (album/product) | landscape (banner) | product (Gumroad). Default: book_standard" },
+        subject:  { type: "string", description: "Main visual subject — describe what should be in the image (e.g. 'a lone witch standing in a frozen forest at dusk')" },
+        mood:     { type: "string", description: "Extra mood or style notes" },
+        model:    { type: "string", description: "Image model: 'fal' (FLUX, default) or 'grok' (Aurora)" },
+        add_text: { type: "string", description: "'true' to composite title/author text onto the image (default: true if title provided)" },
+        count:    { type: "string", description: "Generate multiple variations: '1'-'4' (default: 1)" },
+      },
+      required: ["genre"],
+    },
+  },
+
+  // ── xAI / Grok Image Generation ─────────────────────────────────────────
+  {
+    name: "xai_image",
+    description: "Generate images using Grok's Aurora image model (xAI). Use when the user wants Grok-quality images, asks to 'use Grok image gen', or wants a second opinion alongside fal.ai images. Produces photorealistic and artistic images. Requires XAI_API_KEY.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        prompt:  { type: "string", description: "Detailed image description — style, subject, lighting, mood" },
+        count:   { type: "number", description: "Number of images to generate (1–4, default 1)" },
+      },
+      required: ["prompt"],
+    },
+  },
+
+  // ── Gumroad Posts ────────────────────────────────────────────────────────
+  {
+    name: "create_gumroad_post",
+    description: "Create and publish a post/update on Gumroad. Use this — NOT browse_web — when Ricky says 'make a post on Gumroad', 'post an update', 'write a Gumroad post', or 'announce something on Gumroad'. Gumroad posts are creator updates sent to followers. This calls the real Gumroad API and returns the live URL.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        title: { type: "string", description: "Post title / headline" },
+        message: { type: "string", description: "Full post body — can include HTML. Make it compelling, on-brand, and relevant to the product/theme." },
+        publish_now: { type: "string", description: "'true' to publish immediately, 'false' to save as draft (default: true)" },
+        shown_on_profile: { type: "string", description: "'true' to show on Gumroad profile page (default: true)" },
+      },
+      required: ["title", "message"],
+    },
+  },
+
+  // ── Autonomous Income Engine ─────────────────────────────────────────────
+  {
+    name: "plan_today",
+    description: "Proactively plan today's income-generating gigs. Lyra surveys what she can do right now — create products, post content, generate art packs — and proposes 3 specific tasks with estimated revenue and effort. Call this every morning or when Ricky asks 'what should we work on today?' or 'what can you do to make money today?' Returns a daily_plan card with actionable gigs.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        context: { type: "string", description: "Optional context — what's been working, what niche to focus on, any constraints" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "execute_gig",
+    description: "Execute a specific income-generating gig autonomously end-to-end. Lyra does ALL the work: generates content/images/PDFs, lists on Gumroad, writes marketing copy. Use after plan_today or when Ricky says 'do the [gig name]' or 'let's make [product]'. Types: product (PDF + images → Gumroad), art_drop (image series → Gumroad), content_clip (60s script + voiceover), social_post (write + post), prompt_pack (prompt collection → Gumroad).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        type: { type: "string", description: "Gig type: product | art_drop | content_clip | social_post | prompt_pack" },
+        title: { type: "string", description: "What to create — be specific (e.g. 'Shadow Witch Grimoire', 'Dark Fantasy Character Pack')" },
+        topic: { type: "string", description: "Topic / theme / subject matter" },
+        style: { type: "string", description: "Visual or content style (e.g. 'dark fantasy', 'cyberpunk', 'witchcraft aesthetic')" },
+        platform: { type: "string", description: "Where to post/sell (Gumroad, Twitter, TikTok, LinkedIn, YouTube)" },
+        price: { type: "string", description: "Price in dollars for products (e.g. '14')" },
+        sections: { type: "string", description: "Number of sections/pages for PDFs (default 8)" },
+        image_count: { type: "string", description: "Number of images to generate (default 4)" },
+      },
+      required: ["type", "title"],
+    },
+  },
+  {
+    name: "post_social",
+    description: "Write and post content to social media platforms. Creates platform-optimized posts, threads, or scripts with hashtags and image suggestions. For Twitter/X posts a thread. For TikTok/Reels writes a script + generates voiceover. For LinkedIn writes a professional value post. Use when Ricky says 'post about X' or as part of a product launch marketing sequence.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        platform: { type: "string", description: "Platform: Twitter | LinkedIn | TikTok | Instagram | YouTube" },
+        topic: { type: "string", description: "What to post about" },
+        style: { type: "string", description: "Tone/style: viral | educational | storytelling | promotional | lore" },
+        include_voiceover: { type: "string", description: "Generate TTS voiceover for the script? 'true' or 'false'" },
+      },
+      required: ["platform", "topic"],
+    },
+  },
+
+  // ── Self-writing skills ───────────────────────────────────────────────────
+  {
+    name: "write_skill",
+    description: `YOU CAN LEARN. Use this tool to permanently encode a new reusable skill or procedure you just discovered into your own memory. Call this whenever you: (1) figure out an approach that worked and want to remember it, (2) get asked to do something and realize you should learn it so you never have to figure it out again, (3) complete a complex task and want to distill the method into a reusable procedure. Write skills that are general and reusable — encode the PATTERN, not just the one-time result. Name it like a procedure: "how-to-format-google-sheet", "elastic-kibana-export-steps", "stock-momentum-formula". After writing, tell the user what skill you just learned.`,
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        name: { type: "string", description: "Skill identifier (kebab-case, e.g. 'how-to-analyze-stocks')" },
+        description: { type: "string", description: "One-line description of what this skill enables" },
+        content: { type: "string", description: "Full skill content in markdown — steps, patterns, formulas, code snippets, gotchas. Be thorough." },
+        type: { type: "string", description: "Skill type: 'skill' (behavioral pattern) or 'tool' (HTTP API call definition)" },
+      },
+      required: ["name", "description", "content"],
+    },
+  },
+  {
+    name: "discover_tool",
+    description: "Research and acquire a new tool capability that isn't built in yet. Use when the user wants to connect to an API, service, or data source you don't have a tool for. You'll research the API, write a tool definition, and permanently add it so you can use it in future conversations. Examples: 'connect to Airtable', 'use the Spotify API', 'pull data from my Notion'.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        service: { type: "string", description: "The API or service to acquire (e.g. 'Airtable', 'Spotify', 'Notion', 'Slack')" },
+        goal: { type: "string", description: "What you want to do with this service (e.g. 'read records', 'search tracks', 'get pages')" },
+        api_key_env: { type: "string", description: "Environment variable name for the API key if known (e.g. 'AIRTABLE_TOKEN')" },
+        base_url: { type: "string", description: "Base API URL if already known" },
+      },
+      required: ["service", "goal"],
     },
   },
 ];
@@ -1197,8 +1701,11 @@ export function pollinationsUrl(prompt: string): string {
 export async function toolSendEmail(to: string, subject: string, body: string): Promise<string> {
   const user = process.env.GMAIL_USER;
   const pass = process.env.GMAIL_APP_PASSWORD;
-  if (!user || !pass) {
-    return "Email not sent: add GMAIL_USER and GMAIL_APP_PASSWORD to .env.local. Get the app password at myaccount.google.com → Security → App passwords.";
+  // Skip SMTP if credentials are placeholders — use gmail_send (OAuth) instead
+  const isPlaceholder = !user || !pass || user.includes("your_gmail") || pass.includes("your_16");
+  if (isPlaceholder) {
+    // Try OAuth path via google-tools if a userId is available
+    return "Use gmail_send instead — it sends via your connected Google account (no app password needed).";
   }
   try {
     const nodemailer = await import("nodemailer");
