@@ -47,7 +47,8 @@ export async function createProduct(shop: string, token: string, product: {
     method: "POST",
     body: JSON.stringify({ product }),
   });
-  const data = await res.json() as { product: Record<string, unknown> };
+  const data = await res.json() as { product?: Record<string, unknown>; errors?: unknown };
+  if (!data.product) throw new Error(`Shopify error: ${JSON.stringify(data.errors ?? data)}`);
   return data.product;
 }
 

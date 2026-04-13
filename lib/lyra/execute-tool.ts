@@ -1533,13 +1533,18 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
             productImageUrl = `${baseUrl3}/downloads/${imgFile}`;
           } catch { /* no image, continue without */ }
         }
-        const product = await createProduct(shop, access_token, {
-          title: input.product_title ?? "New Product",
-          body_html: input.product_description ?? "",
-          tags: input.product_tags ?? "",
-          variants: [{ price: input.product_price ?? "19.99" }],
-          images: productImageUrl ? [{ src: productImageUrl }] : [],
-        }) as { id: string; title: string };
+        let product: { id: string; title: string };
+        try {
+          product = await createProduct(shop, access_token, {
+            title: input.product_title ?? "New Product",
+            body_html: input.product_description ?? "",
+            tags: input.product_tags ?? "",
+            variants: [{ price: input.product_price ?? "19.99" }],
+            images: productImageUrl ? [{ src: productImageUrl }] : [],
+          }) as { id: string; title: string };
+        } catch (e) {
+          return `❌ Could not create Shopify product: ${e instanceof Error ? e.message : String(e)}`;
+        }
         if (productImageUrl) controller.enqueue(encoder.encode(`\n__IMG__${productImageUrl}__IMG__`));
         return `✅ Product created: **${product.title}** (ID: ${product.id}) on ${shop} with image`;
       }
