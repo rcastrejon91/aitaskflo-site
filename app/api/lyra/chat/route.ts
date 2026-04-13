@@ -64,6 +64,28 @@ export async function POST(req: NextRequest) {
     // Sanitize history early because multiple context builders depend on it.
     // Empty assistant messages from interrupted streams cause downstream API errors.
     const rawHistory: Array<{ role: string; content: string }> = Array.isArray(history) ? history : [];
+
+    // Strip noisy tool-progress lines from assistant messages so they don't flood the context window.
+    // Progress lines look like: "📄 Writing: Chapter One…", "✅ Cover ready.", "__IMG__url__IMG__", JSON blobs, etc.
+    function compressAssistantMessage(text: string): string {
+      const lines = text.split("\n");
+      // Keep lines that are meaningful prose — strip progress/status/json/image lines
+      const meaningful = lines.filter(line => {
+        const t = line.trim();
+        if (!t) return false;
+        if (/^__IMG__/.test(t)) return false; // image embed markers
+        if (/^\s*[\u2600-\u27BF\uFE00-\uFE0F\u{1F300}-\u{1F9FF}]/u.test(t) && t.length < 80) return false; // short emoji progress lines
+        if (/^\s*[\u{1F4C4}\u{2705}\u{26A0}\u{1F6D2}\u{1F3A8}\u{1F4D6}]/u.test(t)) return false; // 📄✅⚠️🛒🎨📖
+        if (/^\s*\{/.test(t) && t.includes('"tool"')) return false; // JSON tool cards
+        if (/^(Structuring|Generating cover|Writing:|Illustrating:|Compiling|Listing on Gumroad)/i.test(t)) return false;
+        return true;
+      });
+      // If we stripped too much, keep the last 3 meaningful lines as a summary
+      const result = meaningful.join("\n").trim();
+      // Hard cap at 600 chars per assistant message to protect context window
+      return result.length > 600 ? result.slice(0, 600) + "…" : result;
+    }
+
     const cleanHistory = rawHistory
       .filter((m) => {
         const text = typeof m.content === "string" ? m.content.trim() : "";
@@ -76,7 +98,36 @@ export async function POST(req: NextRequest) {
           acc.push(msg);
         }
         return acc;
-      }, []);
+      }, [])
+      .map(m => ({
+        role: m.role,
+        content: m.role === "assistant" ? compressAssistantMessage(m.content) : m.content,
+      }))
+      .filter(m => m.content.length > 0);
+
+    // Build a plain-language summary of what happened in this conversation so far
+    // and inject it into the system prompt so Lyra never forgets what she did
+    const conversationDone: string[] = [];
+    for (let i = 0; i < rawHistory.length; i++) {
+      const m = rawHistory[i];
+      if (m.role === "assistant") {
+        const t = m.content ?? "";
+        if (/write_book|Frostbound|Grimoire|is complete.*chapters|✅ Listed on Gumroad/i.test(t)) {
+          const titleMatch = t.match(/"([^"]{3,60})" is complete/);
+          const gumMatch = t.match(/gumroad\.com\/l\/([\w-]+)/i);
+          conversationDone.push(`- Wrote and published a book${titleMatch ? ` "${titleMatch[1]}"` : ""}${gumMatch ? ` → gumroad.com/l/${gumMatch[1]}` : ""}`);
+        }
+        if (/art pack.*live|Art Pack.*Gumroad|dark.*fantasy.*art/i.test(t)) {
+          conversationDone.push(`- Created and listed an art pack on Gumroad`);
+        }
+        if (/cover.*ready|✅ Cover/i.test(t)) {
+          conversationDone.push(`- Generated cover art`);
+        }
+      }
+    }
+    const conversationSummary = conversationDone.length > 0
+      ? `\n\nCONVERSATION CONTEXT — things you have already done in this session:\n${conversationDone.join("\n")}\nDo NOT say you haven't done these things. You did them. Reference them naturally.`
+      : "";
 
     // ── Prompt injection scan ─────────────────────────────────────────────
     const scan = scanChatMessage(message);
@@ -438,7 +489,7 @@ export async function POST(req: NextRequest) {
       }
     } catch { /* non-blocking */ }
 
-    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + userGamesContext + buildLearningContext() + buildLyraTrendContext() + mindContext + getLunarPersonalityNote() + moodPrefix + dropContext + callbackContext + buildGameContext(message) + learnerContext + skillsContext + ideationCtx + executionCtx + gameOverride + mediaOverride + toolOverride + milestoneNote + adminContext + searchPolicy + jobHuntContext;
+    const systemPrompt = agent.systemPrompt + personaAddendum + orchestratorAddendum + memoryContext + userGamesContext + buildLearningContext() + buildLyraTrendContext() + mindContext + getLunarPersonalityNote() + moodPrefix + dropContext + callbackContext + buildGameContext(message) + learnerContext + skillsContext + ideationCtx + executionCtx + gameOverride + mediaOverride + toolOverride + milestoneNote + adminContext + searchPolicy + jobHuntContext + conversationSummary;
 
     // ── Multi-agent orchestration check ───────────────────────────────────
     if (userId && shouldOrchestrate(message)) {

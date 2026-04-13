@@ -1491,6 +1491,153 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
     }
   }
 
+  // ── Shopify Store Manager ─────────────────────────────────────────────────
+  if (name === "shopify_store") {
+    const { getShopToken, listProducts, createProduct, updateProduct, deleteProduct, listOrders, createDiscountCode, listThemes, getStoreSummary } = await import("@/lib/lyra/shopify");
+    const resolvedUserId = userId ?? "admin-1";
+    const shopRow = getShopToken(resolvedUserId, input.shop);
+    if (!shopRow) {
+      const installUrl = `${process.env.NEXTAUTH_URL}/api/shopify/install?shop=YOUR_STORE.myshopify.com`;
+      return `No Shopify store connected. Install the app at: ${installUrl}\n\nReplace YOUR_STORE with your actual store name.`;
+    }
+    const { shop, access_token } = shopRow;
+
+    switch (input.action) {
+      case "summary": {
+        const summary = await getStoreSummary(shop, access_token);
+        return `📊 **${shop} — Store Summary**\n\n- Orders: ${summary.totalOrders}\n- Revenue: ${summary.totalRevenue}\n- Products: ${summary.productCount}\n- Customers: ${summary.customerCount}`;
+      }
+      case "list_products": {
+        const products = await listProducts(shop, access_token) as Array<{ id: string; title: string; variants?: Array<{ price: string }> }>;
+        if (!products.length) return "No products found in this store.";
+        return `**Products in ${shop}:**\n\n${products.map(p => `- ${p.title} — $${p.variants?.[0]?.price ?? "?"} (ID: ${p.id})`).join("\n")}`;
+      }
+      case "create_product": {
+        const product = await createProduct(shop, access_token, {
+          title: input.product_title ?? "New Product",
+          body_html: input.product_description ?? "",
+          tags: input.product_tags ?? "",
+          variants: [{ price: input.product_price ?? "19.99" }],
+          images: input.product_image_url ? [{ src: input.product_image_url }] : [],
+        }) as { id: string; title: string };
+        return `✅ Product created: **${product.title}** (ID: ${product.id}) on ${shop}`;
+      }
+      case "update_product": {
+        if (!input.product_id) return "product_id is required for update";
+        const updated = await updateProduct(shop, access_token, input.product_id, {
+          title: input.product_title,
+          body_html: input.product_description,
+          tags: input.product_tags,
+        }) as { title: string };
+        return `✅ Product updated: **${updated.title}**`;
+      }
+      case "delete_product": {
+        if (!input.product_id) return "product_id is required";
+        await deleteProduct(shop, access_token, input.product_id);
+        return `✅ Product ${input.product_id} deleted from ${shop}`;
+      }
+      case "list_orders": {
+        const orders = await listOrders(shop, access_token, input.order_status ?? "any") as Array<{ name: string; total_price: string; financial_status: string }>;
+        if (!orders.length) return "No orders found.";
+        return `**Recent Orders — ${shop}:**\n\n${orders.slice(0, 10).map(o => `- ${o.name} — $${o.total_price} (${o.financial_status})`).join("\n")}`;
+      }
+      case "create_discount": {
+        await createDiscountCode(shop, access_token, {
+          code: input.discount_code ?? "SAVE10",
+          valueType: (input.discount_type as "percentage" | "fixed_amount") ?? "percentage",
+          value: parseFloat(input.discount_value ?? "10"),
+        });
+        return `✅ Discount code **${input.discount_code ?? "SAVE10"}** created on ${shop}`;
+      }
+      case "list_themes": {
+        const themes = await listThemes(shop, access_token) as Array<{ id: string; name: string; role: string }>;
+        return `**Themes on ${shop}:**\n\n${themes.map(t => `- ${t.name} (${t.role}) — ID: ${t.id}`).join("\n")}`;
+      }
+      case "connect_store": {
+        const installUrl = `${process.env.NEXTAUTH_URL}/api/shopify/install?shop=${input.shop ?? "YOUR_STORE.myshopify.com"}`;
+        return `To connect your Shopify store, visit:\n\n${installUrl}\n\nThis will authorize Lyra to manage your store.`;
+      }
+      default:
+        return `Unknown action: ${input.action}. Available: summary, list_products, create_product, update_product, delete_product, list_orders, create_discount, list_themes, connect_store`;
+    }
+  }
+
+  if (name === "shopify_create_store") {
+    const description = input.description ?? "general store";
+    const productCount = parseInt(input.product_count ?? "5", 10) || 5;
+    const priceRange = input.price_range ?? "$15-$60";
+
+    const progress = (msg: string) => { try { controller.enqueue(encoder.encode(`\n${msg}`)); } catch { /* closed */ } };
+
+    progress(`🏪 Planning your ${description}…`);
+
+    // Use Claude to plan the store
+    const Anthropic2 = (await import("@anthropic-ai/sdk")).default;
+    const client2 = new Anthropic2({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const planMsg = await client2.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1500,
+      messages: [{
+        role: "user",
+        content: `Plan a Shopify store for: "${description}". Price range: ${priceRange}. Create ${productCount} products.
+
+Return ONLY valid JSON:
+{
+  "store_name": "catchy store name",
+  "tagline": "short tagline",
+  "niche": "specific niche",
+  "products": [
+    {
+      "title": "product name",
+      "description": "2-3 sentence HTML description",
+      "price": "29.99",
+      "tags": "tag1, tag2",
+      "image_prompt": "product photo prompt for AI generation"
+    }
+  ],
+  "launch_discount": "LAUNCH20",
+  "seo_description": "store meta description"
+}`
+      }]
+    });
+
+    const planText = planMsg.content[0].type === "text" ? planMsg.content[0].text : "{}";
+    const planMatch = planText.match(/\{[\s\S]*\}/);
+    let plan: {
+      store_name?: string; tagline?: string; products?: Array<{ title: string; description: string; price: string; tags: string; image_prompt: string }>;
+      launch_discount?: string;
+    } = {};
+    try { plan = JSON.parse(planMatch?.[0] ?? "{}"); } catch { /* ignore */ }
+
+    const storeName = plan.store_name ?? description;
+    const products = plan.products ?? [];
+
+    progress(`✅ Store concept: **${storeName}**`);
+    progress(`🛍️ Creating ${products.length} products…`);
+
+    // Generate product images with fal.ai
+    const { falImageGen } = await import("@/lib/lyra/fal-tools");
+    const createdProducts: Array<{ title: string; price: string; imageUrl?: string }> = [];
+
+    for (const p of products) {
+      progress(`📦 Creating: ${p.title}…`);
+      let imageUrl = "";
+      try {
+        imageUrl = await falImageGen(`${p.image_prompt}, product photography, white background, professional`, "fast");
+      } catch { /* no image */ }
+      createdProducts.push({ title: p.title, price: p.price, imageUrl });
+    }
+
+    const installUrl = `${process.env.NEXTAUTH_URL}/api/shopify/install`;
+    const productList = createdProducts.map((p, i) => `${i + 1}. **${p.title}** — $${p.price}`).join("\n");
+
+    if (createdProducts[0]?.imageUrl) {
+      controller.enqueue(encoder.encode(`\n__IMG__${createdProducts[0].imageUrl}__IMG__`));
+    }
+
+    return `🏪 **${storeName}** is ready to launch!\n\n**Products planned:**\n${productList}\n\n**Launch discount:** ${plan.launch_discount ?? "LAUNCH20"}\n\n**To connect your Shopify store and auto-populate everything:**\n👉 ${installUrl}?shop=YOUR_STORE.myshopify.com\n\nOnce connected, say "populate my store with these products" and Lyra will create them all automatically.`;
+  }
+
   if (name === "make_cover") {
     const { generateCover, FORMAT_SIZES } = await import("@/lib/lyra/coverart");
 
