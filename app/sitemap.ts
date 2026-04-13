@@ -5,11 +5,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
 
   return [
-    { url: siteUrl, lastModified: now, changeFrequency: "weekly", priority: 1 },
-    { url: `${siteUrl}/pricing`, lastModified: now, changeFrequency: "monthly", priority: 0.9 },
-    { url: `${siteUrl}/login`, lastModified: now, changeFrequency: "yearly", priority: 0.6 },
-    { url: `${siteUrl}/games`, lastModified: now, changeFrequency: "daily", priority: 0.7 },
-    { url: `${siteUrl}/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
-    { url: `${siteUrl}/terms`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
+    // Core
+    { url: siteUrl,                      lastModified: now, changeFrequency: "weekly",  priority: 1.0 },
+    { url: `${siteUrl}/pricing`,         lastModified: now, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${siteUrl}/login`,           lastModified: now, changeFrequency: "yearly",  priority: 0.6 },
+    // Marketing / public
+    { url: `${siteUrl}/agency`,          lastModified: now, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${siteUrl}/investors`,       lastModified: now, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${siteUrl}/careers`,         lastModified: now, changeFrequency: "weekly",  priority: 0.6 },
+    // Features / demos (publicly accessible)
+    { url: `${siteUrl}/demo`,            lastModified: now, changeFrequency: "weekly",  priority: 0.8 },
+    { url: `${siteUrl}/feed`,            lastModified: now, changeFrequency: "daily",   priority: 0.7 },
+    { url: `${siteUrl}/games`,           lastModified: now, changeFrequency: "daily",   priority: 0.7 },
+    { url: `${siteUrl}/play`,            lastModified: now, changeFrequency: "weekly",  priority: 0.6 },
+    { url: `${siteUrl}/book`,            lastModified: now, changeFrequency: "weekly",  priority: 0.6 },
+    // Legal
+    { url: `${siteUrl}/privacy`,         lastModified: now, changeFrequency: "yearly",  priority: 0.3 },
+    { url: `${siteUrl}/terms`,           lastModified: now, changeFrequency: "yearly",  priority: 0.3 },
   ];
 }

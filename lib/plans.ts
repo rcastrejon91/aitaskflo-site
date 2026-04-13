@@ -11,14 +11,14 @@ export const PLANS = {
     price: 29,
     messagesPerDay: Infinity,
     stripePriceId: process.env.STRIPE_PRO_PRICE_ID ?? null,
-    features: ["Unlimited messages", "Image generation", "Web search", "Email drafting", "CRM (HubSpot)", "Job search & resume tools", "QR code generation", "Full persistent memory", "Priority routing"],
+    features: ["Unlimited messages", "Ghost Writer (8 formats)", "Image generation", "Web search", "Email drafting", "CRM (HubSpot)", "Job search & resume tools", "QR code generation", "Full persistent memory", "Priority routing"],
   },
   business: {
     name: "Business",
     price: 49,
     messagesPerDay: Infinity,
     stripePriceId: process.env.STRIPE_BUSINESS_PRICE_ID ?? null,
-    features: ["Everything in Pro", "API access", "Multiple users", "Analytics dashboard", "White-label option", "Priority support", "Custom integrations"],
+    features: ["Everything in Pro", "Social media post generator", "API access", "Multiple users", "Analytics dashboard", "White-label option", "Priority support", "Custom integrations"],
   },
   agency_starter: {
     name: "Starter",

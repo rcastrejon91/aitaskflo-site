@@ -4,19 +4,29 @@ import { useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { SupportWidget } from "@/components/lyra/SupportWidget";
 import {
   ArrowLeft, Settings, LogOut, ChevronLeft, ChevronRight,
-  MessageSquare, GraduationCap, Truck, Gamepad2, Play, BookOpen,
-  Briefcase, Building2, Users, TrendingUp, Rss, FlaskConical, Sparkles, Brain,
+  MessageSquare, GraduationCap, Truck, Gamepad2, Play, BookOpen, Library,
+  Briefcase, Building2, Users, TrendingUp, Rss, FlaskConical, Sparkles, Brain, Search, PenLine, Store, Wand2, ClipboardList, Zap, Heart,
 } from "lucide-react";
 
 const NAV_TABS = [
-  { href: "/lyra",      icon: MessageSquare, label: "Chat"      },
-  { href: "/learn",     icon: GraduationCap, label: "Learn"     },
-  { href: "/trucker",   icon: Truck,         label: "Trucker"   },
-  { href: "/games",     icon: Gamepad2,      label: "Games"     },
-  { href: "/play",      icon: Play,          label: "Play"      },
-  { href: "/book",      icon: BookOpen,      label: "Book"      },
+  { href: "/lyra",       icon: MessageSquare, label: "Chat"      },
+  { href: "/write",      icon: PenLine,       label: "Write"     },
+  { href: "/business",   icon: Store,         label: "Business"  },
+  { href: "/learn",      icon: GraduationCap, label: "Learn"     },
+  { href: "/trucker",    icon: Truck,         label: "Trucker"   },
+  { href: "/games",      icon: Gamepad2,      label: "Games"     },
+  { href: "/play",       icon: Play,          label: "Play"      },
+  { href: "/book",       icon: BookOpen,      label: "Book"      },
+  { href: "/bookshelf",  icon: Library,       label: "Shelf"     },
+  { href: "/lab",        icon: FlaskConical,  label: "Lab"       },
+  { href: "/skills",     icon: Wand2,         label: "Skills"    },
+  { href: "/shop",       icon: Sparkles,      label: "Shop"      },
+  { href: "/jobs",       icon: ClipboardList, label: "Jobs"      },
+  { href: "/gigs",       icon: Zap,           label: "Gigs"      },
+  { href: "/personal",   icon: Heart,         label: "Personal"  },
   { href: "/biz",       icon: Briefcase,     label: "Biz"       },
   { href: "/agency",    icon: Building2,     label: "Agency"    },
   { href: "/careers",   icon: Users,         label: "Careers"   },
@@ -24,6 +34,7 @@ const NAV_TABS = [
   { href: "/feed",      icon: Rss,           label: "Feed"      },
   { href: "/demo",      icon: FlaskConical,  label: "Demo"      },
   { href: "/memory",    icon: Brain,         label: "Memory"    },
+  { href: "/searches",  icon: Search,        label: "Searches"  },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -115,6 +126,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1">
         {children}
       </main>
+
+      {/* Support widget — always visible */}
+      <SupportWidget />
     </div>
   );
 }

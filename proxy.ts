@@ -63,7 +63,22 @@ function checkRateLimit(req: NextRequest): NextResponse | null {
 // ── Auth middleware ───────────────────────────────────────────────────────────
 const { auth } = NextAuth(authConfig);
 
-export default auth((req) => {
+// ── Blocked IP check ─────────────────────────────────────────────────────────
+// Import lazily to avoid edge runtime issues with better-sqlite3
+async function checkBlockedIp(ip: string): Promise<boolean> {
+  try {
+    const { isIpBlocked } = await import("@/lib/lyra/db");
+    return isIpBlocked(ip);
+  } catch { return false; }
+}
+
+export default auth(async (req) => {
+  // Check if IP is locally blocked first
+  const ip = getIp(req);
+  if (ip !== "unknown" && await checkBlockedIp(ip)) {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
+
   // Rate limit before auth checks
   const rateLimited = checkRateLimit(req);
   if (rateLimited) return rateLimited;
@@ -82,7 +97,7 @@ export default auth((req) => {
 
   // Public routes — no auth required
   const pathname = req.nextUrl.pathname;
-  const publicPaths = ["/play", "/api/game/build"];
+  const publicPaths = ["/play", "/api/game/build", "/api/lyra/sms", "/api/lyra/daily-text"];
   if (publicPaths.some(p => pathname.startsWith(p))) {
     return NextResponse.next();
   }
@@ -100,6 +115,8 @@ export default auth((req) => {
 export const config = {
   matcher: [
     "/lyra/:path*",
+    "/write/:path*",
+    "/business/:path*",
     "/api/lyra/:path*",
     "/api/wl/:path*",
     "/api/kb/:path*",

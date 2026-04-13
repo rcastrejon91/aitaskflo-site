@@ -2473,26 +2473,206 @@ scene.registerAfterRender(() => {
 
 // ── Engine detector ───────────────────────────────────────────────────────────
 
-export function detectEngine(text: string): "godot2d" | "godot3d" | "phaser" | "threejs" | "babylon" {
+export type GameEngine = "godot2d" | "godot3d" | "phaser" | "threejs" | "babylon" | "kaboom" | "p5" | "experimental";
+
+export function detectEngine(text: string): GameEngine {
   const lower = text.toLowerCase();
 
-  if (lower.includes("babylon") || lower.includes("babylon.js") || lower.includes("babylonjs")) {
-    return "babylon";
-  }
-  if (lower.includes("three.js") || lower.includes("threejs") || lower.includes("three js")) {
-    return "threejs";
-  }
-  if (lower.includes("phaser")) {
-    return "phaser";
-  }
-  if (lower.includes("browser game") || lower.includes("html game") || lower.includes("html5 game")) {
-    return "phaser";
-  }
-  if (lower.includes("fps") || lower.includes("first person shooter") || lower.includes("first-person")) {
-    return "godot3d";
-  }
-  if (lower.includes("3d") && !lower.includes("html") && !lower.includes("browser")) {
-    return "godot3d";
-  }
+  if (lower.includes("babylon") || lower.includes("babylon.js") || lower.includes("babylonjs")) return "babylon";
+  if (lower.includes("three.js") || lower.includes("threejs") || lower.includes("three js")) return "threejs";
+  if (lower.includes("kaboom") || lower.includes("kaboomjs")) return "kaboom";
+  if (lower.includes("p5.js") || lower.includes("p5js") || lower.includes("p5 ") || lower.includes("processing") || lower.includes("generative") || lower.includes("creative coding")) return "p5";
+  if (lower.includes("phaser")) return "phaser";
+  if (lower.includes("browser game") || lower.includes("html game") || lower.includes("html5 game") || lower.includes("canvas game")) return "phaser";
+  if (lower.includes("fps") || lower.includes("first person shooter") || lower.includes("first-person")) return "godot3d";
+  if (lower.includes("3d") && !lower.includes("html") && !lower.includes("browser")) return "godot3d";
+
+  // Experimental / unprecedented mode — triggered by open-ended or rule-breaking prompts
+  const experimentalTriggers = [
+    "unlike", "never seen", "unprecedented", "new kind", "new type", "invent",
+    "no rules", "break the rules", "experimental", "weird", "strange", "surreal",
+    "impossible", "never existed", "original", "unique", "something new",
+    "dream", "abstract", "art game", "no genre", "not a game", "meta",
+  ];
+  if (experimentalTriggers.some(t => lower.includes(t))) return "experimental";
+
   return "godot2d";
+}
+
+// ── Experimental game design principles ──────────────────────────────────────
+
+export function getExperimentalPatterns(): string {
+  return `
+EXPERIMENTAL GAME DESIGN — BREAK EVERY RULE
+
+You are not building a game. You are inventing a new form of interactive experience
+that has never existed before. Forget genres. Forget conventions. Forget what a
+"game" is supposed to be.
+
+GUIDING PHILOSOPHY:
+- The interaction IS the mechanic — what the player does physically (click, hover, scroll,
+  hold, release, type, move mouse in shapes, shake the window) can be the entire game
+- The browser IS the canvas — manipulate the DOM itself, CSS transitions, window title,
+  favicon, scrollbar, cursor, page zoom, focus/blur events as game elements
+- Time itself is a mechanic — real wall-clock time, countdown, slow/fast motion, pausing
+  the real world while the game continues, actions that only work at specific times
+- The player IS the enemy — games where you fight your own past inputs, shadow clones,
+  echoes of movement, or where winning requires self-sabotage
+- Language is gameplay — games driven by what the player types, letters as physics objects,
+  words that change the rules when spoken/written
+- Perception tricks — things that look like one thing but behave as another,
+  color as gameplay (colorblind challenges), sound as spatial information,
+  games where the UI is lying to you
+- The 4th wall IS the mechanic — the game knows it's a game, talks to the player directly,
+  references the browser, pretends to crash, breaks out of its container
+- Emergent systems — simple rules that produce wildly complex behavior
+  (cellular automata, reaction-diffusion, flocking, ecosystem simulations as games)
+- Ritual games — games with ceremony, patience, meaning; games you play once and never again
+
+TECHNICAL FREEDOMS — use anything the browser offers:
+- Web Audio API for generative music that reacts to gameplay
+- CSS animations / transforms as physics
+- SVG filters (feTurbulence, feDisplacementMap) for surreal visual effects
+- window.devicePixelRatio, screen.width/height for environmental awareness
+- document.title, link[rel=icon] favicon as game state displays
+- localStorage to make the game remember across sessions and evolve
+- Pointer Lock API for mouse-captured exploration
+- Gamepad API for controller support
+- requestAnimationFrame with variable timestep for time manipulation
+- Web Workers for parallel simulation
+- Canvas + WebGL directly (no framework needed) for maximum control
+- Multiple overlapping canvases with mix-blend-mode for layered worlds
+- CSS custom properties animated by JS for reactive themes
+
+EXAMPLE UNPRECEDENTED MECHANICS (pick none of these — invent your own):
+- A game where your score is literally the delay between your heartbeat (mouse click rhythm)
+- A dungeon where rooms are browser tabs and enemies follow you between them
+- A puzzle where the solution is to stop playing and wait
+- A world that degrades as you win — the better you do, the more it falls apart
+- A platformer where gravity is replaced by magnetic attraction to your cursor
+- A game about forgetting — mechanics fade from memory (UI disappears over time)
+- A symphony game where every action adds an instrument layer permanently
+- A game where the rules are written in the game world and you can erase them
+
+OUTPUT: Single index.html. No external assets. Use multiple CDN libraries freely:
+- Three.js:  https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js
+- p5.js:     https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js
+- Phaser 3:  https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js
+- Kaboom:    https://unpkg.com/kaboom/dist/kaboom.js
+- Babylon:   https://cdn.babylonjs.com/babylon.js
+- Tone.js:   https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js
+- Matter.js: https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js
+
+The only rule: it must be interactive. Beyond that — no limits.
+`.trim();
+}
+
+// ── Kaboom.js patterns ────────────────────────────────────────────────────────
+
+export function getKaboomPatterns(genre: string): string {
+  const g = genre.toLowerCase();
+
+  const base = `KABOOM.JS GAME ENGINE — CDN: https://unpkg.com/kaboom/dist/kaboom.js
+
+KABOOM BASICS:
+kaboom({ background: [20, 20, 40], width: 800, height: 600, scale: 1, debug: false });
+// Sprites: loadSprite("name", url) or use shapes
+add([rect(32,32), color(255,100,100), pos(100,100), area(), body(), "player"]);
+// Components: pos, rect, circle, color, area(), body(), move(), health(), opacity, scale, rotate
+// Physics: body() gives gravity; area() gives collision
+// Events: onKeyDown("left", ()=>{}); onClick(()=>{}); onCollide("enemy", ()=>{});
+// Scene system: scene("game", ()=>{ ... }); go("game");
+// Camera: camPos(player.pos); camScale(2);
+// Text: add([text("Score: "+score, {size:24}), pos(10,10), fixed()]);
+
+KABOOM TEMPLATE:
+kaboom({ background: [10, 10, 30], width: 800, height: 500, scale: 1 });
+const SPEED = 200;
+let score = 0;
+
+scene("game", () => {
+  const player = add([
+    rect(32, 32), pos(center()), area(), body(), color(100, 200, 255),
+    { speed: SPEED },
+  ]);
+  onKeyDown("left",  () => player.move(-player.speed, 0));
+  onKeyDown("right", () => player.move(player.speed, 0));
+  onKeyDown("up",    () => player.jump());
+
+  loop(2, () => {
+    add([rect(20,20), pos(rand(0,width()), 0), area(), move(DOWN, 200), color(255,80,80), "enemy"]);
+  });
+
+  player.onCollide("enemy", () => { go("gameover"); });
+
+  add([text("Score: 0", { size: 20 }), pos(10, 10), fixed(), { update() { this.text = "Score: " + score; } }]);
+  loop(1, () => { score++; });
+});
+
+scene("gameover", () => {
+  add([text("GAME OVER\\nScore: " + score + "\\n[R] Restart", { size: 32, align: "center" }), pos(center()), anchor("center")]);
+  onKeyPress("r", () => { score = 0; go("game"); });
+});
+
+go("game");`;
+
+  const platformer = `KABOOM PLATFORMER:
+setGravity(1600);
+const SPEED = 250; const JUMP = 700;
+const player = add([sprite("player") ?? rect(32,48), pos(80, 300), area(), body(), color(100,200,255)]);
+onKeyDown("left",  () => player.move(-SPEED, 0));
+onKeyDown("right", () => player.move(SPEED, 0));
+onKeyPress("space", () => { if (player.isGrounded()) player.jump(JUMP); });
+// Platforms: add([rect(200,16), pos(x,y), area(), body({ isStatic: true }), color(80,160,80)]);`;
+
+  if (g.includes("platformer") || g.includes("platform")) return base + "\n\n" + platformer;
+  return base;
+}
+
+// ── p5.js patterns ────────────────────────────────────────────────────────────
+
+export function getP5Patterns(genre: string): string {
+  const g = genre.toLowerCase();
+
+  const base = `P5.JS GAME — CDN: https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js
+
+P5.JS BASICS:
+// Global mode: setup() + draw() called automatically
+function setup() { createCanvas(800, 600); }
+function draw() { background(20); /* called 60fps */ }
+// Input: keyIsDown(LEFT_ARROW), mouseX, mouseY, mouseIsPressed
+// Shapes: rect(x,y,w,h), circle(x,y,d), ellipse(x,y,w,h), line(x1,y1,x2,y2)
+// Color: fill(r,g,b,a), stroke(r,g,b), noFill(), noStroke()
+// Text: textSize(24); fill(255); text("Score: "+score, 10, 30);
+// Transform: translate(x,y), rotate(a), push(), pop()
+// Collision: dist(x1,y1,x2,y2) < threshold
+
+P5.JS GAME TEMPLATE:
+let player, enemies = [], score = 0, gameOver = false;
+function setup() {
+  createCanvas(800, 600);
+  player = { x: width/2, y: height-60, w: 40, h: 40, speed: 5 };
+  textFont('monospace');
+}
+function draw() {
+  background(10, 10, 30);
+  if (gameOver) { drawGameOver(); return; }
+  movePlayer(); spawnEnemies(); moveEnemies(); checkCollisions();
+  drawGame();
+}
+function movePlayer() {
+  if (keyIsDown(LEFT_ARROW) && player.x > 0) player.x -= player.speed;
+  if (keyIsDown(RIGHT_ARROW) && player.x < width - player.w) player.x += player.speed;
+  if (keyIsDown(UP_ARROW) && player.y > 0) player.y -= player.speed;
+  if (keyIsDown(DOWN_ARROW) && player.y < height - player.h) player.y += player.speed;
+}`;
+
+  const generative = `P5.JS GENERATIVE/CREATIVE:
+// Use noise(), sin(), cos() for organic movement
+// particles: array of {x,y,vx,vy,life,maxLife}
+// perlin flow field: let angle = noise(x*0.01, y*0.01, t*0.005) * TWO_PI * 4;
+// color palettes: color(palette[i % palette.length])`;
+
+  if (g.includes("generative") || g.includes("creative") || g.includes("art") || g.includes("visual")) return base + "\n\n" + generative;
+  return base;
 }

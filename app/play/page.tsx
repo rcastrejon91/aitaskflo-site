@@ -97,10 +97,15 @@ export default function PlayPage() {
             <div>
               <h2 className="text-xl font-semibold mb-2">No build found</h2>
               <p className="text-white/50 text-sm">
-                The game hasn&apos;t been exported yet. Enter your admin password and click
-                Build to compile it with Godot 4.4.
+                The 13th Witch hasn&apos;t been exported yet. Build it below — or play AI-built games in the marketplace.
               </p>
             </div>
+            <a
+              href="/games"
+              className="block w-full bg-violet-600 hover:bg-violet-500 text-white py-2.5 rounded-xl font-semibold text-sm transition-colors text-center"
+            >
+              🎮 Browse AI Games Marketplace
+            </a>
             <div className="space-y-3">
               <input
                 type="password"

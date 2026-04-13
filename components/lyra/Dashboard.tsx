@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Send, Loader2, Lightbulb, GitBranch,
   Zap, ArrowLeft, CheckCircle, AlertCircle, X, LogOut, SlidersHorizontal, Settings,
-  MessageSquare, Truck, Gamepad2, BookOpen, Play, Building2, Briefcase, Users, TrendingUp, GraduationCap, Rss, FlaskConical, Brain, ChevronLeft, ChevronRight,
+  MessageSquare, Truck, Gamepad2, BookOpen, Library, Play, Building2, Briefcase, Users, TrendingUp, GraduationCap, Rss, FlaskConical, Brain, ChevronLeft, ChevronRight, Search, PenLine, Store,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
@@ -421,11 +421,14 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
 
   const NAV_TABS = [
     { href: "/lyra",      icon: MessageSquare, label: "Chat"      },
+    { href: "/write",     icon: PenLine,       label: "Write"     },
+    { href: "/business",  icon: Store,         label: "Business"  },
     { href: "/learn",     icon: GraduationCap, label: "Learn"     },
     { href: "/trucker",   icon: Truck,         label: "Trucker"   },
-    { href: "/games",     icon: Gamepad2,      label: "Games"     },
-    { href: "/play",      icon: Play,          label: "Play"      },
-    { href: "/book",      icon: BookOpen,      label: "Book"      },
+    { href: "/games",      icon: Gamepad2,      label: "Games"     },
+    { href: "/play",       icon: Play,          label: "Play"      },
+    { href: "/book",       icon: BookOpen,      label: "Book"      },
+    { href: "/bookshelf",  icon: Library,       label: "Shelf"     },
     { href: "/biz",       icon: Briefcase,     label: "Biz"       },
     { href: "/agency",    icon: Building2,     label: "Agency"    },
     { href: "/careers",   icon: Users,         label: "Careers"   },
@@ -433,6 +436,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
     { href: "/feed",      icon: Rss,           label: "Feed"      },
     { href: "/demo",      icon: FlaskConical,  label: "Demo"      },
     { href: "/memory",    icon: Brain,         label: "Memory"    },
+    { href: "/searches",  icon: Search,        label: "Searches"  },
   ];
 
   const activeAgent = data.activeAgent;

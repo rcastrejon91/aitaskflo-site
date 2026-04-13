@@ -174,18 +174,34 @@ function VideoCard({ raw }: { raw: string }) {
 function AudioCard({ raw }: { raw: string }) {
   let obj: Record<string, string>;
   try { obj = JSON.parse(raw); } catch { return null; }
-  const { url, type, voice, prompt, preview } = obj;
+  const { url, type, voice, prompt, preview, lyrics, style } = obj;
   if (!url) return null;
-  const label = type === "music" ? "Music Generated" : "Speech Generated";
-  const detail = type === "speech" ? (voice ? `Voice: ${voice}` : "") : (prompt ?? "");
+
+  const proxyUrl = `/api/lyra/audio-proxy?url=${encodeURIComponent(url)}`;
+
+  const label =
+    type === "music" ? "Music Generated" :
+    type === "song"  ? "Song Generated" :
+    "Speech Generated";
+
+  const icon =
+    type === "music" ? "🎵" :
+    type === "song"  ? "🎤" :
+    "🔊";
+
+  const detail =
+    type === "speech" ? (voice ? `Voice: ${voice}` : "") :
+    type === "song"   ? (style ? `${style}${lyrics ? ` · "${lyrics.slice(0, 60)}…"` : ""}` : "") :
+    (prompt ?? "");
+
   return (
     <div className="mt-3 rounded-2xl overflow-hidden border border-sky-500/25 bg-gradient-to-br from-sky-950/60 to-blue-950/30">
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-sky-500/20">
         <span className="flex items-center gap-2 text-xs font-semibold tracking-wide text-sky-300">
-          <span className="text-sm">{type === "music" ? "🎵" : "🔊"}</span>
+          <span className="text-sm">{icon}</span>
           {label}
         </span>
-        <a href={url} target="_blank" rel="noopener noreferrer"
+        <a href={proxyUrl} download rel="noopener noreferrer"
           className="flex items-center gap-1 text-[10px] text-white/35 hover:text-sky-300 transition-colors">
           <Download className="w-3 h-3" /> Download
         </a>
@@ -194,7 +210,13 @@ function AudioCard({ raw }: { raw: string }) {
         {(detail || preview) && (
           <p className="text-[10px] text-white/35 italic truncate">{detail || preview}</p>
         )}
-        <audio controls src={url} className="w-full" style={{ filter: "invert(0.8) hue-rotate(200deg)" }} />
+        <audio
+          controls
+          src={proxyUrl}
+          className="w-full"
+          style={{ filter: "invert(0.8) hue-rotate(200deg)" }}
+          preload="metadata"
+        />
       </div>
     </div>
   );
@@ -210,6 +232,19 @@ function ToolCard({ raw }: { raw: string }) {
 
     // Specialized cards
     if (tool === "book") return <BookCard raw={raw} />;
+    if (tool === "research_paper") return <ResearchPaperCard raw={raw} />;
+    if (tool === "experiment_result") return <ExperimentCard raw={raw} />;
+    if (tool === "skill_learned") return <SkillLearnedCard raw={raw} />;
+    if (tool === "tool_acquired") return <ToolAcquiredCard raw={raw} />;
+    if (tool === "product_listed") return <ProductListedCard raw={raw} />;
+    if (tool === "earnings_report") return <EarningsCard raw={raw} />;
+    if (tool === "cover_art") return <CoverArtCard raw={raw} />;
+    if (tool === "gumroad_post") return <GumroadPostCard raw={raw} />;
+    if (tool === "daily_plan") return <DailyPlanCard raw={raw} />;
+    if (tool === "gig_complete") return <GigCompleteCard raw={raw} />;
+    if (tool === "job_profile_saved") return <JobProfileCard raw={raw} />;
+    if (tool === "jobs_applied") return <JobsAppliedCard raw={raw} />;
+    if (tool === "job_hunt_preview") return <JobHuntPreviewCard raw={raw} />;
     if (tool === "comic") return <ComicCard raw={raw} />;
     if (tool === "document") return <DocumentCard raw={raw} />;
     if (tool === "game_build") return <GameBuildCard raw={raw} />;
@@ -636,6 +671,652 @@ ${ch.content.split("\n").filter(Boolean).map((p) => `<p>${p}</p>`).join("")}
           Next <ChevronRight className="w-3.5 h-3.5" />
         </button>
       </div>
+    </div>
+  );
+}
+
+// ── Research Paper Card ───────────────────────────────────────────────────────
+
+interface PaperData {
+  title: string; subtitle?: string; authors?: string[]; field?: string;
+  abstract?: string; keywords?: string[];
+  sections?: Array<{ number: number; heading: string; content: string }>;
+  references?: Array<{ id: number; citation: string }>;
+  bookId?: string;
+}
+
+const EXP_META: Record<string, { icon: string; color: string }> = {
+  multi_agent:         { icon: "⚔",  color: "#f97316" },
+  echo_chamber:        { icon: "∞",  color: "#8b5cf6" },
+  consciousness_probe: { icon: "◎",  color: "#06b6d4" },
+  alien_language:      { icon: "⌬",  color: "#10b981" },
+  dream_state:         { icon: "◐",  color: "#ec4899" },
+  adversarial:         { icon: "☍",  color: "#ef4444" },
+  emergence:           { icon: "✦",  color: "#eab308" },
+  time_perception:     { icon: "⧗",  color: "#a78bfa" },
+};
+
+function fmtMd(t: string) {
+  return t
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\n\n---\n\n/g, '<hr style="border-color:rgba(255,255,255,0.08);margin:12px 0"/>')
+    .replace(/\n/g, "<br/>");
+}
+
+function ExperimentCard({ raw }: { raw: string }) {
+  const [showLog, setShowLog] = useState(false);
+  let data: { type: string; label: string; id?: string; log?: string; result?: string };
+  try { data = JSON.parse(raw); } catch { return null; }
+
+  const meta = EXP_META[data.type] ?? { icon: "⚗", color: "#8b5cf6" };
+
+  return (
+    <div className="rounded-xl border overflow-hidden my-2" style={{ borderColor: meta.color + "30", background: meta.color + "08" }}>
+      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${meta.color}20` }}>
+        <div className="flex items-center gap-2">
+          <span style={{ color: meta.color, fontSize: 16 }}>{meta.icon}</span>
+          <span className="text-sm font-semibold text-white">{data.label}</span>
+          <span className="text-xs px-2 py-0.5 rounded-full text-white/50" style={{ background: meta.color + "15" }}>Lab Experiment</span>
+        </div>
+        <a href="/lab" className="text-xs text-white/30 hover:text-white/60 transition-colors">View in Lab →</a>
+      </div>
+      {data.result && (
+        <div className="px-4 py-3">
+          <p className="text-xs text-white/40 uppercase tracking-widest mb-2">Analysis</p>
+          <div className="text-sm text-white/80 leading-relaxed" dangerouslySetInnerHTML={{ __html: fmtMd(data.result) }} />
+        </div>
+      )}
+      {data.log && (
+        <div className="px-4 pb-3">
+          <button
+            onClick={() => setShowLog(v => !v)}
+            className="text-xs text-white/30 hover:text-white/60 transition-colors"
+          >
+            {showLog ? "Hide transcript ↑" : "Show transcript ↓"}
+          </button>
+          {showLog && (
+            <div className="mt-2 text-xs text-white/50 leading-relaxed max-h-64 overflow-y-auto pr-1"
+              dangerouslySetInnerHTML={{ __html: fmtMd(data.log) }} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProductListedCard({ raw }: { raw: string }) {
+  let data: { name: string; price: string; url: string; id: string; tiers?: string; offer_code?: string; offer_percent?: string };
+  try { data = JSON.parse(raw); } catch { return null; }
+
+  return (
+    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 overflow-hidden my-2">
+      <div className="px-4 py-3 flex items-center justify-between border-b border-emerald-500/10">
+        <div className="flex items-center gap-2">
+          <span className="text-emerald-400 text-lg">🛒</span>
+          <div>
+            <p className="text-sm font-semibold text-white">{data.name}</p>
+            <p className="text-xs text-emerald-400/70">Live on Gumroad · starts at {data.price}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <a href="/shop" className="text-xs text-white/30 hover:text-white/60 transition-colors">Dashboard →</a>
+          {data.url && (
+            <a href={data.url} target="_blank" rel="noopener noreferrer"
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors border border-emerald-500/30">
+              View Listing →
+            </a>
+          )}
+        </div>
+      </div>
+      <div className="px-4 py-2.5 flex flex-wrap gap-4 text-xs">
+        {data.tiers && (
+          <div>
+            <span className="text-white/30 mr-1">Tiers:</span>
+            <span className="text-white/60">{data.tiers}</span>
+          </div>
+        )}
+        {data.offer_code && (
+          <div>
+            <span className="text-white/30 mr-1">Launch code:</span>
+            <code className="text-amber-400 font-mono">{data.offer_code}</code>
+            <span className="text-white/30 ml-1">({data.offer_percent}% off)</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EarningsCard({ raw }: { raw: string }) {
+  let data: { total_revenue: string; total_sales: string; products: string };
+  try { data = JSON.parse(raw); } catch { return null; }
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden my-2">
+      <div className="px-4 py-3 flex items-center justify-between border-b border-white/5">
+        <div className="flex items-center gap-2">
+          <span className="text-emerald-400">💰</span>
+          <span className="text-sm font-semibold text-white">Earnings Report</span>
+        </div>
+        <a href="/shop" className="text-xs text-white/30 hover:text-white/60 transition-colors">Full Dashboard →</a>
+      </div>
+      <div className="px-4 py-3 flex gap-6">
+        <div>
+          <div className="text-xl font-bold text-emerald-400">{data.total_revenue}</div>
+          <div className="text-xs text-white/30">Revenue</div>
+        </div>
+        <div>
+          <div className="text-xl font-bold text-white">{data.total_sales}</div>
+          <div className="text-xs text-white/30">Sales</div>
+        </div>
+        <div>
+          <div className="text-xl font-bold text-white">{data.products}</div>
+          <div className="text-xs text-white/30">Products</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CoverArtCard({ raw }: { raw: string }) {
+  let data: { title: string; format: string; genre: string; covers: Array<{ url: string; withText: boolean }>; count: number };
+  try { data = JSON.parse(raw); } catch { return null; }
+  const color = "#8b5cf6";
+
+  return (
+    <div className="rounded-xl border overflow-hidden my-2" style={{ borderColor: color + "30", background: color + "08" }}>
+      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${color}20` }}>
+        <div className="flex items-center gap-2">
+          <span style={{ fontSize: 16 }}>🎨</span>
+          <span className="text-sm font-semibold text-white">{data.title}</span>
+          <span className="text-xs px-2 py-0.5 rounded-full text-white/50" style={{ background: color + "15" }}>{data.format}</span>
+        </div>
+        <span className="text-xs text-white/30">{data.genre.replace(/_/g, " ")}</span>
+      </div>
+      <div className="px-4 py-3 flex gap-3 overflow-x-auto">
+        {(data.covers ?? []).map((c, i) => (
+          <a key={i} href={c.url} target="_blank" rel="noopener noreferrer"
+            className="flex-shrink-0 rounded-lg overflow-hidden relative group"
+            style={{ width: 120, height: 180 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={c.url} alt="" className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <ExternalLink className="w-5 h-5 text-white" />
+            </div>
+            {c.withText && (
+              <span className="absolute bottom-1 right-1 text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.7)", color: "rgba(255,255,255,0.7)" }}>text</span>
+            )}
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GumroadPostCard({ raw }: { raw: string }) {
+  let data: { title: string; published: boolean; url: string; preview: string };
+  try { data = JSON.parse(raw); } catch { return null; }
+  const color = "#f37936"; // Gumroad orange
+
+  return (
+    <div className="rounded-xl border overflow-hidden my-2" style={{ borderColor: color + "30", background: color + "08" }}>
+      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${color}20` }}>
+        <div className="flex items-center gap-2">
+          <span style={{ fontSize: 16 }}>📢</span>
+          <span className="text-sm font-semibold text-white">{data.title}</span>
+          <span className="text-xs px-2 py-0.5 rounded-full text-white/50" style={{ background: color + "15" }}>
+            {data.published ? "Published" : "Draft"}
+          </span>
+        </div>
+        <a href={data.url} target="_blank" rel="noopener noreferrer"
+          className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
+          style={{ background: color + "20", color }}>
+          View Post →
+        </a>
+      </div>
+      {data.preview && (
+        <div className="px-4 py-3">
+          <p className="text-sm text-white/60 leading-relaxed">{data.preview}{data.preview.length >= 160 ? "…" : ""}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DailyPlanCard({ raw }: { raw: string }) {
+  let data: {
+    date: string;
+    plans: Array<{ type: string; title: string; description: string; estimatedRevenue: string; effort: string; platform: string; why: string }>;
+    already_done: number;
+    total_revenue: string;
+  };
+  try { data = JSON.parse(raw); } catch { return null; }
+
+  const effortColor: Record<string, string> = { low: "#10b981", medium: "#f59e0b", high: "#ef4444" };
+  const typeIcon: Record<string, string> = { product: "📄", art_drop: "🎨", content_clip: "🎬", social_post: "📱", prompt_pack: "✨" };
+
+  return (
+    <div className="rounded-xl border overflow-hidden my-2" style={{ borderColor: "#6366f130", background: "#6366f108" }}>
+      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid #6366f120" }}>
+        <div className="flex items-center gap-2">
+          <span style={{ fontSize: 16 }}>🚀</span>
+          <span className="text-sm font-semibold text-white">Today&apos;s Income Plan</span>
+          <span className="text-xs px-2 py-0.5 rounded-full text-white/50" style={{ background: "#6366f115" }}>{data.date}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          {data.total_revenue !== "$0.00" && (
+            <span className="text-xs text-green-400 font-medium">{data.total_revenue} earned</span>
+          )}
+          <a href="/gigs" className="text-xs text-white/30 hover:text-white/60 transition-colors">View All →</a>
+        </div>
+      </div>
+      <div className="px-4 py-3 flex flex-col gap-3">
+        {(data.plans ?? []).map((p, i) => (
+          <div key={i} className="rounded-lg p-3" style={{ background: "rgba(255,255,255,0.04)" }}>
+            <div className="flex items-start justify-between gap-2 mb-1.5">
+              <div className="flex items-center gap-2">
+                <span>{typeIcon[p.type] ?? "⚡"}</span>
+                <span className="text-sm font-semibold text-white">{p.title}</span>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-xs text-green-400 font-medium">{p.estimatedRevenue}</span>
+                <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: (effortColor[p.effort] ?? "#6366f1") + "20", color: effortColor[p.effort] ?? "#6366f1" }}>
+                  {p.effort}
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-white/50 mb-1">{p.description}</p>
+            <p className="text-xs text-white/30 italic">{p.why}</p>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-xs px-2 py-0.5 rounded-full text-white/40" style={{ background: "rgba(255,255,255,0.05)" }}>{p.platform}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full text-white/40" style={{ background: "rgba(255,255,255,0.05)" }}>{p.type.replace("_", " ")}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="px-4 pb-3">
+        <p className="text-xs text-white/30">Say <em className="text-white/50">"do gig 1"</em> or <em className="text-white/50">"execute [title]"</em> and Lyra handles everything.</p>
+      </div>
+    </div>
+  );
+}
+
+function GigCompleteCard({ raw }: { raw: string }) {
+  let data: {
+    gig_type: string;
+    title: string;
+    output_url?: string;
+    platform?: string;
+    price?: string;
+    status?: string;
+    hook?: string;
+    script?: string;
+    cta?: string;
+    hashtags?: string[];
+    voiceover_url?: string;
+    content?: string;
+    image_prompt?: string;
+    images?: string[];
+  };
+  try { data = JSON.parse(raw); } catch { return null; }
+  const [expanded, setExpanded] = useState(false);
+
+  const typeColors: Record<string, string> = {
+    product: "#10b981", art_drop: "#6366f1", content_clip: "#f59e0b",
+    social_post: "#3b82f6", prompt_pack: "#8b5cf6",
+  };
+  const color = typeColors[data.gig_type] ?? "#10b981";
+  const typeLabel: Record<string, string> = {
+    product: "Product Live", art_drop: "Art Drop Live", content_clip: "Clip Ready",
+    social_post: "Post Ready", prompt_pack: "Prompt Pack Live",
+  };
+
+  return (
+    <div className="rounded-xl border overflow-hidden my-2" style={{ borderColor: color + "30", background: color + "08" }}>
+      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${color}20` }}>
+        <div className="flex items-center gap-2">
+          <span style={{ color, fontSize: 16 }}>✅</span>
+          <span className="text-sm font-semibold text-white">{data.title}</span>
+          <span className="text-xs px-2 py-0.5 rounded-full text-white/50" style={{ background: color + "15" }}>
+            {typeLabel[data.gig_type] ?? "Done"}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {data.price && <span className="text-xs font-bold" style={{ color }}>{data.price}</span>}
+          {data.output_url && (
+            <a href={data.output_url} target="_blank" rel="noopener noreferrer"
+              className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
+              style={{ background: color + "20", color }}>
+              {data.status === "live" ? "View Listing →" : "Open →"}
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* Content clip details */}
+      {data.gig_type === "content_clip" && data.hook && (
+        <div className="px-4 py-3">
+          <p className="text-xs text-white/40 mb-1">Hook</p>
+          <p className="text-sm text-white/80 font-medium mb-3">{data.hook}</p>
+          <button onClick={() => setExpanded(v => !v)} className="text-xs text-white/30 hover:text-white/60 transition-colors">
+            {expanded ? "Hide script ↑" : "View full script ↓"}
+          </button>
+          {expanded && (
+            <pre className="mt-2 text-xs text-white/60 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
+              {data.script}
+            </pre>
+          )}
+          {data.voiceover_url && (
+            <div className="mt-3">
+              <audio controls src={data.voiceover_url} className="w-full h-8" style={{ filter: "invert(1) hue-rotate(180deg)" }} />
+            </div>
+          )}
+          {data.hashtags && data.hashtags.length > 0 && (
+            <p className="mt-2 text-xs" style={{ color }}>{data.hashtags.join(" ")}</p>
+          )}
+        </div>
+      )}
+
+      {/* Social post details */}
+      {data.gig_type === "social_post" && data.content && (
+        <div className="px-4 py-3">
+          <button onClick={() => setExpanded(v => !v)} className="text-xs text-white/30 hover:text-white/60 transition-colors">
+            {expanded ? "Hide post ↑" : "View post ↓"}
+          </button>
+          {expanded && (
+            <pre className="mt-2 text-xs text-white/70 leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto">
+              {data.content}
+            </pre>
+          )}
+          {data.hashtags && data.hashtags.length > 0 && (
+            <p className="mt-1 text-xs" style={{ color }}>{data.hashtags.join(" ")}</p>
+          )}
+        </div>
+      )}
+
+      {/* Art drop images */}
+      {data.gig_type === "art_drop" && data.images && data.images.length > 0 && (
+        <div className="px-4 py-3 flex gap-2 overflow-x-auto">
+          {data.images.map((url, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={i} src={url} alt="" className="h-20 rounded-lg object-cover flex-shrink-0" style={{ width: 80 }} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function JobProfileCard({ raw }: { raw: string }) {
+  let data: { role: string; location: string; salary: string; skills: string; summary?: string };
+  try { data = JSON.parse(raw); } catch { return null; }
+  const color = "#6366f1";
+  return (
+    <div className="rounded-xl border overflow-hidden my-2" style={{ borderColor: color + "30", background: color + "08" }}>
+      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${color}20` }}>
+        <div className="flex items-center gap-2">
+          <span style={{ color, fontSize: 16 }}>💼</span>
+          <span className="text-sm font-semibold text-white">Job Profile Saved</span>
+          <span className="text-xs px-2 py-0.5 rounded-full text-white/50" style={{ background: color + "15" }}>Active</span>
+        </div>
+        <a href="/jobs" className="text-xs text-white/30 hover:text-white/60 transition-colors">View Jobs →</a>
+      </div>
+      <div className="px-4 py-3 grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-xs text-white/40 mb-0.5">Target Role</p>
+          <p className="text-sm text-white/80">{data.role}</p>
+        </div>
+        <div>
+          <p className="text-xs text-white/40 mb-0.5">Location</p>
+          <p className="text-sm text-white/80">{data.location}</p>
+        </div>
+        <div>
+          <p className="text-xs text-white/40 mb-0.5">Salary Target</p>
+          <p className="text-sm text-white/80">{data.salary}</p>
+        </div>
+        <div>
+          <p className="text-xs text-white/40 mb-0.5">Key Skills</p>
+          <p className="text-sm text-white/80">{data.skills}</p>
+        </div>
+      </div>
+      {data.summary && (
+        <div className="px-4 pb-3">
+          <p className="text-xs text-white/50 leading-relaxed">{data.summary}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function JobsAppliedCard({ raw }: { raw: string }) {
+  let data: { applied: number; total_found: number; jobs: Array<{ title: string; company: string; url?: string; status: string; score?: number }> };
+  try { data = JSON.parse(raw); } catch { return null; }
+  const color = "#10b981";
+  return (
+    <div className="rounded-xl border overflow-hidden my-2" style={{ borderColor: color + "30", background: color + "08" }}>
+      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${color}20` }}>
+        <div className="flex items-center gap-2">
+          <span style={{ color, fontSize: 16 }}>🚀</span>
+          <span className="text-sm font-semibold text-white">Applied to {data.applied} Jobs</span>
+          <span className="text-xs px-2 py-0.5 rounded-full text-white/50" style={{ background: color + "15" }}>{data.total_found} found</span>
+        </div>
+        <a href="/jobs" className="text-xs text-white/30 hover:text-white/60 transition-colors">View Tracker →</a>
+      </div>
+      <div className="px-4 py-3 flex flex-col gap-2">
+        {(data.jobs || []).map((j, i) => (
+          <div key={i} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2" style={{ background: "rgba(255,255,255,0.04)" }}>
+            <div className="min-w-0">
+              <p className="text-sm text-white/80 font-medium truncate">{j.title}</p>
+              <p className="text-xs text-white/40">{j.company}</p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {j.score !== undefined && (
+                <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: color + "20", color: color }}>{j.score}%</span>
+              )}
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{
+                background: j.status === "applied" ? "#3b82f620" : j.status === "manual_needed" ? "#f59e0b20" : "#6366f120",
+                color: j.status === "applied" ? "#3b82f6" : j.status === "manual_needed" ? "#f59e0b" : "#6366f1",
+              }}>{j.status.replace("_", " ")}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function JobHuntPreviewCard({ raw }: { raw: string }) {
+  let data: { total_found: number; top_jobs: Array<{ title: string; company: string; score: number; reason: string }> };
+  try { data = JSON.parse(raw); } catch { return null; }
+  const color = "#8b5cf6";
+  return (
+    <div className="rounded-xl border overflow-hidden my-2" style={{ borderColor: color + "30", background: color + "08" }}>
+      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${color}20` }}>
+        <div className="flex items-center gap-2">
+          <span style={{ color, fontSize: 16 }}>🔍</span>
+          <span className="text-sm font-semibold text-white">Job Hunt Preview</span>
+          <span className="text-xs px-2 py-0.5 rounded-full text-white/50" style={{ background: color + "15" }}>{data.total_found} matches</span>
+        </div>
+        <a href="/jobs" className="text-xs text-white/30 hover:text-white/60 transition-colors">View All →</a>
+      </div>
+      <div className="px-4 py-3 flex flex-col gap-2">
+        {(data.top_jobs || []).map((j, i) => (
+          <div key={i} className="rounded-lg px-3 py-2" style={{ background: "rgba(255,255,255,0.04)" }}>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-sm text-white/80 font-medium">{j.title} — {j.company}</p>
+              <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: color + "20", color }}>{j.score}%</span>
+            </div>
+            <p className="text-xs text-white/40">{j.reason}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SkillLearnedCard({ raw }: { raw: string }) {
+  const [expanded, setExpanded] = useState(false);
+  let data: { name: string; description: string; type: string; content?: string };
+  try { data = JSON.parse(raw); } catch { return null; }
+
+  const isToolType = data.type === "tool";
+  const color = isToolType ? "#f59e0b" : "#10b981";
+  const icon = isToolType ? "⚡" : "✨";
+  const label = isToolType ? "Tool Definition" : "Skill Learned";
+
+  return (
+    <div className="rounded-xl border overflow-hidden my-2" style={{ borderColor: color + "30", background: color + "08" }}>
+      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${color}20` }}>
+        <div className="flex items-center gap-2">
+          <span style={{ color, fontSize: 16 }}>{icon}</span>
+          <span className="text-sm font-semibold text-white">{data.name}</span>
+          <span className="text-xs px-2 py-0.5 rounded-full text-white/50" style={{ background: color + "15" }}>{label}</span>
+        </div>
+        <a href="/skills" className="text-xs text-white/30 hover:text-white/60 transition-colors">View Skills →</a>
+      </div>
+      <div className="px-4 py-3">
+        <p className="text-sm text-white/70">{data.description}</p>
+      </div>
+      {data.content && (
+        <div className="px-4 pb-3">
+          <button onClick={() => setExpanded(v => !v)} className="text-xs text-white/30 hover:text-white/60 transition-colors">
+            {expanded ? "Hide content ↑" : "Show content ↓"}
+          </button>
+          {expanded && (
+            <pre className="mt-2 text-xs text-white/50 leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap font-mono">
+              {data.content}
+            </pre>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ToolAcquiredCard({ raw }: { raw: string }) {
+  const [expanded, setExpanded] = useState(false);
+  let data: { name: string; service: string; description: string; content?: string };
+  try { data = JSON.parse(raw); } catch { return null; }
+
+  const color = "#f59e0b";
+
+  return (
+    <div className="rounded-xl border overflow-hidden my-2" style={{ borderColor: color + "30", background: color + "08" }}>
+      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${color}20` }}>
+        <div className="flex items-center gap-2">
+          <span style={{ color, fontSize: 16 }}>🔌</span>
+          <span className="text-sm font-semibold text-white">{data.service}</span>
+          <span className="text-xs px-2 py-0.5 rounded-full text-white/50" style={{ background: color + "15" }}>New Tool Acquired</span>
+        </div>
+        <a href="/skills" className="text-xs text-white/30 hover:text-white/60 transition-colors">View Tools →</a>
+      </div>
+      <div className="px-4 py-3">
+        <p className="text-sm text-white/70">{data.description}</p>
+        <p className="text-xs text-white/40 mt-1">Saved as: <code className="font-mono">{data.name}</code></p>
+      </div>
+      {data.content && (
+        <div className="px-4 pb-3">
+          <button onClick={() => setExpanded(v => !v)} className="text-xs text-white/30 hover:text-white/60 transition-colors">
+            {expanded ? "Hide definition ↑" : "Show definition ↓"}
+          </button>
+          {expanded && (
+            <div className="mt-2 text-xs text-white/50 leading-relaxed max-h-48 overflow-y-auto"
+              dangerouslySetInnerHTML={{ __html: fmtMd(data.content) }} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ResearchPaperCard({ raw }: { raw: string }) {
+  const [page, setPage] = useState(0);
+
+  let paper: PaperData;
+  try { paper = JSON.parse(raw) as PaperData; }
+  catch { return <pre className="text-xs text-gray-400 whitespace-pre-wrap">{raw}</pre>; }
+
+  const sections = paper.sections ?? [];
+  const refs = paper.references ?? [];
+  const totalPages = 1 + sections.length + (refs.length > 0 ? 1 : 0);
+
+  function renderPage() {
+    if (page === 0) {
+      return (
+        <div className="space-y-3">
+          <div className="flex items-start gap-2">
+            <span className="text-2xl">📄</span>
+            <div>
+              <h2 className="text-base font-bold text-white leading-snug">{paper.title}</h2>
+              {paper.subtitle && <p className="text-violet-300 text-xs mt-0.5">{paper.subtitle}</p>}
+              {paper.authors && <p className="text-gray-500 text-xs mt-1">by {paper.authors.join(", ")}</p>}
+            </div>
+          </div>
+          {paper.abstract && (
+            <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+              <p className="text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wider">Abstract</p>
+              <p className="text-gray-300 text-xs leading-relaxed">{paper.abstract}</p>
+            </div>
+          )}
+          {paper.keywords && (
+            <div className="flex flex-wrap gap-1">
+              {paper.keywords.map((k, i) => (
+                <span key={i} className="px-2 py-0.5 rounded-full text-xs bg-cyan-900/30 text-cyan-300 border border-cyan-700/30">{k}</span>
+              ))}
+            </div>
+          )}
+          <div className="text-xs text-gray-500">{sections.length} sections · {refs.length} references</div>
+        </div>
+      );
+    }
+    if (page === 1 + sections.length && refs.length > 0) {
+      return (
+        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">References</p>
+          {refs.map((r) => (
+            <p key={r.id} className="text-gray-400 text-xs leading-relaxed">
+              <span className="text-gray-600">[{r.id}] </span>{r.citation}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    const section = sections[page - 1];
+    if (!section) return null;
+    return (
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold text-white">{section.heading}</h3>
+        <div className="text-gray-300 text-xs leading-relaxed max-h-56 overflow-y-auto pr-1 whitespace-pre-wrap">{section.content}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-cyan-700/30 bg-gradient-to-br from-cyan-950/30 to-gray-900 p-4 my-2 max-w-lg">
+      <div className="min-h-[120px]">{renderPage()}</div>
+      <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/10">
+        <button
+          onClick={() => setPage((p) => Math.max(0, p - 1))}
+          disabled={page === 0}
+          className="text-xs text-gray-500 hover:text-white disabled:opacity-30 transition-colors"
+        >← Prev</button>
+        <div className="flex gap-1">
+          {Array.from({ length: totalPages }).map((_, i) => (
+            <button key={i} onClick={() => setPage(i)}
+              className={`w-1.5 h-1.5 rounded-full transition-colors ${i === page ? "bg-cyan-400" : "bg-gray-600"}`} />
+          ))}
+        </div>
+        <button
+          onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+          disabled={page === totalPages - 1}
+          className="text-xs text-gray-500 hover:text-white disabled:opacity-30 transition-colors"
+        >Next →</button>
+      </div>
+      {paper.bookId && (
+        <a href="/bookshelf" className="block text-center text-xs text-cyan-500 hover:text-cyan-300 mt-2 transition-colors">
+          📚 View in bookshelf →
+        </a>
+      )}
     </div>
   );
 }

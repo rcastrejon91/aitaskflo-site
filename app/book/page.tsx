@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BookOpen, Sparkles, Download, ChevronLeft, ChevronRight, Loader2, ArrowLeft } from "lucide-react";
+import { BookOpen, Sparkles, Download, ChevronLeft, ChevronRight, Loader2, ArrowLeft, Library } from "lucide-react";
 import Link from "next/link";
 
 interface Chapter {
@@ -183,6 +183,10 @@ ${book.chapters.map((ch, i) => `
             <BookOpen className="w-5 h-5 text-violet-400" />
             <h1 className="text-lg font-semibold">Lyra Book Studio</h1>
           </div>
+          <Link href="/bookshelf" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ml-2"
+            style={{ background: "rgba(109,40,217,0.15)", border: "1px solid rgba(109,40,217,0.25)", color: "rgb(167,139,250)" }}>
+            <Library className="w-3.5 h-3.5" /> My Shelf
+          </Link>
           {book && (
             <button onClick={downloadBook} className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
               style={{ background: "rgba(109,40,217,0.2)", border: "1px solid rgba(109,40,217,0.3)", color: "rgb(167,139,250)" }}>

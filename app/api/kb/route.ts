@@ -8,6 +8,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { ingestDocument, listDocuments, deleteDocument, getKbStats, clearKnowledgeBase } from "@/lib/lyra/knowledge-base";
+import { scanFileContent } from "@/lib/lyra/content-scanner";
+import { logSecurityEvent } from "@/lib/lyra/db";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = [
@@ -35,15 +37,39 @@ export async function POST(req: NextRequest) {
   }
 
   let content: string;
+  let buffer: Uint8Array;
   try {
-    content = await file.text();
+    const arrayBuffer = await file.arrayBuffer();
+    buffer = new Uint8Array(arrayBuffer);
+    content = new TextDecoder().decode(buffer);
   } catch {
     return NextResponse.json({ error: "Could not read file" }, { status: 400 });
   }
 
   if (!content.trim()) return NextResponse.json({ error: "File is empty" }, { status: 400 });
 
-  const doc = await ingestDocument(slug, file.name, fileType, content);
+  // ── Security scan ──────────────────────────────────────────────────────────
+  const scan = scanFileContent(content, fileType, buffer);
+
+  if (!scan.safe) {
+    const userId = (session.user as { id?: string })?.id ?? "unknown";
+    logSecurityEvent(
+      "malicious_upload",
+      scan.severity as "low" | "medium" | "high" | "critical",
+      `Blocked upload: ${file.name} — ${scan.threats.join(", ")}`,
+      undefined,
+      userId
+    );
+    return NextResponse.json({
+      error: `File rejected: ${scan.threats[0]}. Remove malicious content and try again.`,
+      threats: scan.threats,
+    }, { status: 422 });
+  }
+
+  // Use sanitized version for HTML files
+  const safeContent = scan.sanitized ?? content;
+
+  const doc = await ingestDocument(slug, file.name, fileType, safeContent);
   return NextResponse.json({ success: true, doc });
 }
 
