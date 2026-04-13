@@ -1513,14 +1513,35 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
         return `**Products in ${shop}:**\n\n${products.map(p => `- ${p.title} — $${p.variants?.[0]?.price ?? "?"} (ID: ${p.id})`).join("\n")}`;
       }
       case "create_product": {
+        // Auto-generate product image if none provided
+        let productImageUrl = input.product_image_url ?? "";
+        if (!productImageUrl) {
+          try {
+            controller.enqueue(encoder.encode(`\n🎨 Generating product image for "${input.product_title}"…`));
+            const { falImageGen } = await import("@/lib/lyra/fal-tools");
+            const imagePrompt = `${input.product_title}, product photography, clean white background, professional ecommerce photo, high quality`;
+            productImageUrl = await falImageGen(imagePrompt, "fast");
+            // Save locally so URL doesn't expire
+            const fsp3 = await import("fs/promises");
+            const np3 = await import("path");
+            const imgDir = np3.default.join(process.cwd(), "public", "downloads");
+            await fsp3.default.mkdir(imgDir, { recursive: true });
+            const imgFile = `${(input.product_title ?? "product").replace(/[^a-z0-9]/gi, "-").toLowerCase()}-shopify.jpg`;
+            const imgBuf = Buffer.from(await (await fetch(productImageUrl)).arrayBuffer());
+            await fsp3.default.writeFile(np3.default.join(imgDir, imgFile), imgBuf);
+            const baseUrl3 = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+            productImageUrl = `${baseUrl3}/downloads/${imgFile}`;
+          } catch { /* no image, continue without */ }
+        }
         const product = await createProduct(shop, access_token, {
           title: input.product_title ?? "New Product",
           body_html: input.product_description ?? "",
           tags: input.product_tags ?? "",
           variants: [{ price: input.product_price ?? "19.99" }],
-          images: input.product_image_url ? [{ src: input.product_image_url }] : [],
+          images: productImageUrl ? [{ src: productImageUrl }] : [],
         }) as { id: string; title: string };
-        return `✅ Product created: **${product.title}** (ID: ${product.id}) on ${shop}`;
+        if (productImageUrl) controller.enqueue(encoder.encode(`\n__IMG__${productImageUrl}__IMG__`));
+        return `✅ Product created: **${product.title}** (ID: ${product.id}) on ${shop} with image`;
       }
       case "update_product": {
         if (!input.product_id) return "product_id is required for update";
