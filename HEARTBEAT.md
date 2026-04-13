@@ -52,5 +52,13 @@ Check these on every tick. If nothing needs attention, reply HEARTBEAT_OK.
   interval: 48h
   prompt: Create a 60-second lore reel script for social media. Pick a compelling fantasy/mystical topic from our current product lineup or something trending. Call execute_gig with type="content_clip", platform="TikTok", style="dark fantasy lore". Report the script and voiceover to Ricky with posting instructions.
 
+- name: shopify-store-loop
+  interval: 24h
+  prompt: Run the autonomous Shopify store loop. Call shopify_hunt_trends with auto_create=true to research trending products and add the top one to the store. Then call shopify_store with action=summary to check store performance. If any products have 0 sales after 14 days, remove them with shopify_store action=delete_product. Report a brief summary to Ricky — new products added, products removed, current store stats.
+
+- name: shopify-printful-drop
+  interval: 7d
+  prompt: Create a new print-on-demand product for the Shopify store. Call shopify_hunt_trends to find a trending wearable design opportunity, then call shopify_printful to create a t-shirt or hoodie with an AI-generated design. Price it competitively. Report the new product to Ricky.
+
 ## Active hours
 09:00 - 23:00 America/Chicago

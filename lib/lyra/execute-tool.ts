@@ -1583,6 +1583,87 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
     }
   }
 
+  if (name === "shopify_printful") {
+    if (!process.env.PRINTFUL_API_KEY) return "PRINTFUL_API_KEY not set — sign up at printful.com and add the key to environment variables.";
+    const progress = (msg: string) => { try { controller.enqueue(encoder.encode(`\n${msg}`)); } catch { /* closed */ } };
+    const productType = (input.product_type ?? "unisex_tshirt") as keyof typeof import("@/lib/lyra/printful").POPULAR_PRODUCTS;
+    const designPrompt = input.design_prompt ?? `${input.name}, graphic design, high contrast, detailed illustration, print ready`;
+
+    progress(`🎨 Generating design for "${input.name}"…`);
+    let designUrl = "";
+    try {
+      const { falImageGen } = await import("@/lib/lyra/fal-tools");
+      designUrl = await falImageGen(`${designPrompt}, transparent background, vector style, print on demand design`, "fast");
+      // Save locally
+      const fsp4 = await import("fs/promises");
+      const np4 = await import("path");
+      const dir4 = np4.default.join(process.cwd(), "public", "downloads");
+      await fsp4.default.mkdir(dir4, { recursive: true });
+      const fname4 = `${(input.name ?? "design").replace(/[^a-z0-9]/gi, "-").toLowerCase()}-print.jpg`;
+      const buf4 = Buffer.from(await (await fetch(designUrl)).arrayBuffer());
+      await fsp4.default.writeFile(np4.default.join(dir4, fname4), buf4);
+      designUrl = `${process.env.NEXTAUTH_URL}/downloads/${fname4}`;
+      controller.enqueue(encoder.encode(`\n__IMG__${designUrl}__IMG__`));
+    } catch { progress(`⚠️ Design generation failed, using placeholder`); }
+
+    progress(`👕 Creating Printful product…`);
+    try {
+      const { createStoreProduct } = await import("@/lib/lyra/printful");
+      const result = await createStoreProduct({
+        name: input.name ?? "New Product",
+        description: input.description ?? "",
+        imageUrl: designUrl,
+        productType,
+        retailPrice: parseFloat(input.price ?? "34.99"),
+      });
+      return `✅ **${input.name}** created on Printful — it will sync to your Shopify store automatically. Printful handles printing and shipping for every order.`;
+    } catch (e) {
+      return `Printful error: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+
+  if (name === "shopify_hunt_trends") {
+    const progress = (msg: string) => { try { controller.enqueue(encoder.encode(`\n${msg}`)); } catch { /* closed */ } };
+    progress(`🔍 Hunting for trending products…`);
+    const { huntTrends } = await import("@/lib/lyra/trend-hunter");
+    const count = parseInt(input.count ?? "5", 10) || 5;
+    const trends = await huntTrends(input.niche, count);
+    if (!trends.length) return "Could not find trend data right now. Try again or specify a niche.";
+
+    const summary = trends.map((t, i) => `
+**${i + 1}. ${t.name}** — $${t.suggestedPrice}
+- Type: ${t.productType} | Demand: ${t.demandScore}/10 | Competition: ${t.competitionScore}/10 | Margin: ${t.estimatedMargin}%
+- Audience: ${t.targetAudience}
+- Ad angle: "${t.adAngle}"
+- Why now: ${t.reasoning}
+`).join("\n");
+
+    // Auto-create top product if requested
+    if (input.auto_create === "true" && trends[0]) {
+      const top = trends[0];
+      progress(`\n🚀 Auto-creating top product: "${top.name}"…`);
+      try {
+        const { falImageGen } = await import("@/lib/lyra/fal-tools");
+        const imgUrl = await falImageGen(top.designPrompt, "fast");
+        const resolvedUserId = userId ?? "admin-1";
+        const { getShopToken, createProduct } = await import("@/lib/lyra/shopify");
+        const shopRow = getShopToken(resolvedUserId);
+        if (shopRow) {
+          await createProduct(shopRow.shop, shopRow.access_token, {
+            title: top.name,
+            body_html: `<p>${top.reasoning}</p><p>Perfect for: ${top.targetAudience}</p>`,
+            tags: top.niche,
+            variants: [{ price: top.suggestedPrice.toFixed(2) }],
+            images: imgUrl ? [{ src: imgUrl }] : [],
+          });
+          progress(`✅ "${top.name}" added to your Shopify store!`);
+        }
+      } catch { /* non-blocking */ }
+    }
+
+    return `📈 **Trending Products Research**\n${summary}\n\nSay "create [product name]" to add any of these to your store, or "auto create the top one" to let Lyra do it.`;
+  }
+
   if (name === "shopify_create_store") {
     const description = input.description ?? "general store";
     const productCount = parseInt(input.product_count ?? "5", 10) || 5;
