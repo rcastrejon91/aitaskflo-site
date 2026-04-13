@@ -1584,9 +1584,9 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
   }
 
   if (name === "shopify_printful") {
-    if (!process.env.PRINTFUL_API_KEY) return "PRINTFUL_API_KEY not set — sign up at printful.com and add the key to environment variables.";
+    if (!process.env.PRINTIFY_API_KEY) return "PRINTIFY_API_KEY not set — add it to environment variables.";
     const progress = (msg: string) => { try { controller.enqueue(encoder.encode(`\n${msg}`)); } catch { /* closed */ } };
-    const productType = (input.product_type ?? "unisex_tshirt") as keyof typeof import("@/lib/lyra/printful").POPULAR_PRODUCTS;
+    const productType = (input.product_type ?? "unisex_tshirt") as keyof typeof import("@/lib/lyra/printify").POPULAR_BLUEPRINTS;
     const designPrompt = input.design_prompt ?? `${input.name}, graphic design, high contrast, detailed illustration, print ready`;
 
     progress(`🎨 Generating design for "${input.name}"…`);
@@ -1606,19 +1606,27 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
       controller.enqueue(encoder.encode(`\n__IMG__${designUrl}__IMG__`));
     } catch { progress(`⚠️ Design generation failed, using placeholder`); }
 
-    progress(`👕 Creating Printful product…`);
+    progress(`👕 Creating Printify product…`);
     try {
-      const { createStoreProduct } = await import("@/lib/lyra/printful");
-      const result = await createStoreProduct({
-        name: input.name ?? "New Product",
+      const { listShops, quickCreateMerch } = await import("@/lib/lyra/printify");
+      const shops = await listShops();
+      if (!shops.length) return "No Printify shops found — connect your Shopify store at printify.com first.";
+      const shopId = shops[0].id;
+
+      const result = await quickCreateMerch({
+        shopId,
+        title: input.name ?? "New Product",
         description: input.description ?? "",
         imageUrl: designUrl,
         productType,
         retailPrice: parseFloat(input.price ?? "34.99"),
+        tags: ["lyra", "print-on-demand"],
       });
-      return `✅ **${input.name}** created on Printful — it will sync to your Shopify store automatically. Printful handles printing and shipping for every order.`;
+
+      if (!result.success) return `Printify error: ${result.message}`;
+      return `✅ **${input.name}** created on Printify and published to your Shopify store. Printify handles printing and shipping for every order.\n\n${result.message}`;
     } catch (e) {
-      return `Printful error: ${e instanceof Error ? e.message : String(e)}`;
+      return `Printify error: ${e instanceof Error ? e.message : String(e)}`;
     }
   }
 

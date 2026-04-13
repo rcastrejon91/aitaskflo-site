@@ -1714,13 +1714,13 @@ ACTIONS:
   },
   {
     name: "shopify_printful",
-    description: "Create a print-on-demand product (t-shirt, hoodie, mug, poster, tote bag, sticker, phone case) using Printful. Lyra generates the design with fal.ai, creates the Printful product, and syncs it to Shopify. Use when user wants to sell clothes, merch, or physical products without inventory.",
+    description: "Create a print-on-demand product (t-shirt, hoodie, mug, poster, tote bag, sticker, phone case) using Printify. Lyra generates the design with fal.ai, creates the Printify product, and publishes it to Shopify. Printify handles printing and shipping for every order — no inventory needed. Use when user wants to sell clothes, merch, or physical products.",
     input_schema: {
       type: "object" as const,
       properties: {
         name: { type: "string", description: "Product name e.g. 'Dark Fantasy Wolf Hoodie'" },
         description: { type: "string", description: "Product description" },
-        product_type: { type: "string", description: "unisex_tshirt | premium_tshirt | hoodie | zip_hoodie | tote_bag | mug | poster_small | poster_large | sticker" },
+        product_type: { type: "string", description: "unisex_tshirt | premium_tshirt | hoodie | zip_hoodie | tote_bag | mug | poster | sticker | tank_top" },
         design_prompt: { type: "string", description: "fal.ai prompt for the design — be specific about style, colors, subject" },
         price: { type: "string", description: "Retail price e.g. 34.99" },
       },
