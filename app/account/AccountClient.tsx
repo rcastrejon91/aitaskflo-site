@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
-import { ArrowLeft, Sparkles, User, CreditCard, LogOut, ExternalLink, CheckCircle, AlertCircle, Crown, Monitor, Copy, Check } from "lucide-react";
+import { ArrowLeft, Sparkles, User, CreditCard, LogOut, ExternalLink, CheckCircle, AlertCircle, Crown, Monitor, Copy, Check, Heart, X, Plus } from "lucide-react";
 
 interface Props {
   user: { name?: string | null; email?: string | null; image?: string | null };
@@ -27,6 +27,59 @@ export default function AccountClient({ user, subscription, userId }: Props & { 
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalError, setPortalError] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
+
+  // ── Lyra preferences ──
+  const [manualInterests, setManualInterests] = useState<string[]>([]);
+  const [tonePref, setTonePref] = useState("");
+  const [avoidTopics, setAvoidTopics] = useState("");
+  const [tagInput, setTagInput] = useState("");
+  const [prefSaving, setPrefSaving] = useState(false);
+  const [prefSaved, setPrefSaved] = useState(false);
+  const [prefError, setPrefError] = useState("");
+  const prefLoaded = useRef(false);
+
+  useEffect(() => {
+    if (prefLoaded.current) return;
+    prefLoaded.current = true;
+    fetch("/api/lyra/interests/preferences")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.manual_interests) setManualInterests(d.manual_interests);
+        if (d.tone_preference) setTonePref(d.tone_preference);
+        if (d.avoid_topics) setAvoidTopics(d.avoid_topics);
+      })
+      .catch(() => {});
+  }, []);
+
+  function addTag() {
+    const tag = tagInput.trim().toLowerCase().replace(/[^a-z0-9 \-]/g, "").slice(0, 40);
+    if (!tag || manualInterests.includes(tag) || manualInterests.length >= 30) return;
+    setManualInterests((prev) => [...prev, tag]);
+    setTagInput("");
+  }
+
+  function removeTag(tag: string) {
+    setManualInterests((prev) => prev.filter((t) => t !== tag));
+  }
+
+  async function savePreferences() {
+    setPrefSaving(true);
+    setPrefError("");
+    try {
+      const res = await fetch("/api/lyra/interests/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ manual_interests: manualInterests, tone_preference: tonePref, avoid_topics: avoidTopics }),
+      });
+      if (!res.ok) throw new Error();
+      setPrefSaved(true);
+      setTimeout(() => setPrefSaved(false), 2500);
+    } catch {
+      setPrefError("Couldn't save. Try again.");
+    } finally {
+      setPrefSaving(false);
+    }
+  }
 
   function copyText(text: string, key: string) {
     navigator.clipboard.writeText(text);
@@ -202,6 +255,102 @@ export default function AccountClient({ user, subscription, userId }: Props & { 
                 <ExternalLink className="w-3 h-3" />
                 Install Lyra Extension
               </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Tell Lyra about you */}
+        <div className="rounded-2xl p-6 mb-4" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}>
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(109,40,217,0.15)", border: "1px solid rgba(109,40,217,0.25)" }}>
+              <Heart className="w-4 h-4 text-violet-300" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-white">Tell Lyra about you</h2>
+              <p className="text-xs text-white/35">Optional — Lyra already learns from conversations</p>
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-5">
+            {/* Interests */}
+            <div>
+              <label className="block text-[10px] text-white/40 uppercase tracking-widest mb-2">Interests</label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {manualInterests.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
+                    style={{ background: "rgba(109,40,217,0.18)", border: "1px solid rgba(109,40,217,0.3)", color: "rgb(196,181,253)" }}
+                  >
+                    {tag}
+                    <button onClick={() => removeTag(tag)} className="text-violet-300/50 hover:text-violet-200 transition-colors ml-0.5">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
+                  placeholder="e.g. music, startups, sci-fi…"
+                  maxLength={40}
+                  className="flex-1 px-3 py-2 rounded-lg text-sm text-white placeholder-white/20 outline-none transition-colors"
+                  style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.07)" }}
+                />
+                <button
+                  onClick={addTag}
+                  disabled={!tagInput.trim()}
+                  className="px-3 py-2 rounded-lg text-sm transition-all disabled:opacity-30"
+                  style={{ background: "rgba(109,40,217,0.2)", border: "1px solid rgba(109,40,217,0.3)", color: "rgb(196,181,253)" }}
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Tone */}
+            <div>
+              <label className="block text-[10px] text-white/40 uppercase tracking-widest mb-2">Preferred tone</label>
+              <input
+                value={tonePref}
+                onChange={(e) => setTonePref(e.target.value)}
+                placeholder="e.g. casual and direct, no corporate speak…"
+                maxLength={200}
+                className="w-full px-3 py-2 rounded-lg text-sm text-white placeholder-white/20 outline-none transition-colors"
+                style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.07)" }}
+              />
+            </div>
+
+            {/* Avoid */}
+            <div>
+              <label className="block text-[10px] text-white/40 uppercase tracking-widest mb-2">Things to avoid</label>
+              <input
+                value={avoidTopics}
+                onChange={(e) => setAvoidTopics(e.target.value)}
+                placeholder="e.g. motivational quotes, long bullet lists…"
+                maxLength={200}
+                className="w-full px-3 py-2 rounded-lg text-sm text-white placeholder-white/20 outline-none transition-colors"
+                style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.07)" }}
+              />
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={savePreferences}
+                disabled={prefSaving}
+                className="px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                style={{ background: "rgba(109,40,217,0.2)", border: "1px solid rgba(109,40,217,0.35)", color: "rgb(196,181,253)" }}
+              >
+                {prefSaving ? "Saving…" : "Save"}
+              </button>
+              {prefSaved && (
+                <span className="flex items-center gap-1 text-xs text-emerald-400">
+                  <Check className="w-3.5 h-3.5" /> Saved
+                </span>
+              )}
+              {prefError && <span className="text-xs text-red-400">{prefError}</span>}
             </div>
           </div>
         </div>

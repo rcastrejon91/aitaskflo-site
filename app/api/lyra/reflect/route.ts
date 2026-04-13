@@ -3,9 +3,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@/auth";
 import { saveConversation, upsertFact, upsertUser } from "@/lib/lyra/db";
 import { getAgent, saveAgent } from "@/lib/lyra/agents";
-import { shouldEvolve } from "@/lib/lyra/reflections";
+import { shouldEvolve, generateReflection } from "@/lib/lyra/reflections";
 import { evolveAgent } from "@/lib/lyra/evolution";
 import { storeMemory } from "@/lib/lyra/memories";
+import { incrementInterests } from "@/lib/lyra/interests";
 
 // How long to wait before retrying a failed evolution attempt (24 hours)
 const EVOLUTION_COOLDOWN_MS = 24 * 60 * 60 * 1000;
@@ -105,23 +106,35 @@ For facts: extract things like preferred_language, occupation, location, interes
       }
     }
 
-    // ── Increment reflectionCount ──────────────────────────────────────────────
-    const agent = getAgent(agentId);
-    if (agent) {
-      await saveAgent({ ...agent, reflectionCount: agent.reflectionCount + 1 });
+    // ── Generate full reflection (stores to reflections.json + scores the convo) ─
+    let reflection = null;
+    try {
+      reflection = await generateReflection(
+        conversationId,
+        agentId,
+        transcript.map((m: { role: string; content: string }) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        }))
+      );
+
+      // ── Implicit interest extraction ────────────────────────────────────────
+      // After each reflection, update the user's interest profile from topic tags
+      if (userId && reflection.topicTags && reflection.topicTags.length > 0) {
+        incrementInterests(userId, reflection.topicTags);
+      }
+    } catch (err) {
+      console.error("[Lyra Reflect] generateReflection failed:", err instanceof Error ? err.message : String(err));
+      // Don't fail the whole request — facts + summary still got saved above
     }
 
     // ── Auto-evolution (with cooldown to prevent infinite retry loops) ────────
-    // If shouldEvolve() returns true but evolution keeps failing, the childrenIds
-    // array stays empty and the condition stays true forever. We stamp a last-
-    // attempt timestamp on the agent and skip re-triggering within COOLDOWN window.
     if (shouldEvolve(agentId)) {
       const freshAgent = getAgent(agentId);
       const lastAttempt: number = (freshAgent as { lastEvolutionAttemptAt?: number })?.lastEvolutionAttemptAt ?? 0;
       const cooldownPassed = Date.now() - lastAttempt > EVOLUTION_COOLDOWN_MS;
 
       if (cooldownPassed) {
-        // Stamp the attempt time BEFORE firing so parallel requests don't pile up
         if (freshAgent) {
           await saveAgent({ ...freshAgent, lastEvolutionAttemptAt: Date.now() } as typeof freshAgent & { lastEvolutionAttemptAt: number });
         }
@@ -135,7 +148,12 @@ For facts: extract things like preferred_language, occupation, location, interes
       }
     }
 
-    return NextResponse.json({ summary: parsed.summary, facts: parsed.facts ?? [] });
+    return NextResponse.json({
+      summary: parsed.summary,
+      facts: parsed.facts ?? [],
+      reflection,
+      evolutionReady: shouldEvolve(agentId),
+    });
   } catch (error) {
     const detail = error instanceof Error
       ? { message: error.message, error: JSON.stringify((error as { error?: unknown }).error ?? null) }

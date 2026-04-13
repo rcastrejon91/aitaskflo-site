@@ -20,14 +20,17 @@ interface Game {
 }
 
 const ENGINE_LABELS: Record<string, string> = {
-  phaser: "Phaser 3",
-  threejs: "Three.js",
-  babylon: "Babylon.js",
-  godot2d: "Godot 2D",
-  godot3d: "Godot 3D",
+  phaser:       "Phaser 3",
+  threejs:      "Three.js",
+  babylon:      "Babylon.js",
+  kaboom:       "Kaboom.js",
+  p5:           "p5.js",
+  experimental: "✦ Experimental",
+  godot2d:      "Godot 2D",
+  godot3d:      "Godot 3D",
 };
 
-const BROWSER_ENGINES = new Set(["phaser", "threejs", "babylon"]);
+const BROWSER_ENGINES = new Set(["phaser", "threejs", "babylon", "kaboom", "p5", "experimental"]);
 
 function StarRating({ slug, initialRating, initialAvg, initialCount }: {
   slug: string;
@@ -146,7 +149,7 @@ export default function GamePage() {
   }
 
   const isBrowser = BROWSER_ENGINES.has(game.engine);
-  const gameUrl = `/games/${slug}/index.html`;
+  const gameUrl = `/api/games/${slug}/files/index.html`;
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
   const fullGameUrl = `${baseUrl}${gameUrl}`;
 

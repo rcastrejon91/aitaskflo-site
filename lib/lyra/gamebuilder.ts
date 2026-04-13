@@ -11,7 +11,7 @@ import fsp from "fs/promises";
 import nodePath from "path";
 import { exec as _exec } from "child_process";
 import { promisify } from "util";
-import { getGenrePatterns, get3DGenrePatterns, getBabylonPatterns, getPhaserPatterns, getThreeJsPatterns } from "./gamedev";
+import { getGenrePatterns, get3DGenrePatterns, getBabylonPatterns, getPhaserPatterns, getThreeJsPatterns, getKaboomPatterns, getP5Patterns, getExperimentalPatterns, GameEngine } from "./gamedev";
 
 const execAsync = promisify(_exec);
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -189,6 +189,7 @@ export interface BuildResult {
   playInstructions: string;
   artUrls: string[];
   exportUrl?: string;
+  htmlContent?: string; // browser games: inline HTML for DB storage
 }
 
 // ── Art generation ────────────────────────────────────────────────────────────
@@ -290,24 +291,76 @@ function buildBrowserPhasePrompt(
   phase: "design" | "build" | "polish" | "verify",
   concept: string,
   genre: string,
-  engine: "phaser" | "threejs" | "babylon"
+  engine: "phaser" | "threejs" | "babylon" | "kaboom" | "p5" | "experimental"
 ): string {
-  const engineName = engine === "phaser" ? "Phaser 3" : engine === "babylon" ? "Babylon.js" : "Three.js";
+  const engineName = engine === "phaser" ? "Phaser 3"
+    : engine === "babylon" ? "Babylon.js"
+    : engine === "kaboom" ? "Kaboom.js"
+    : engine === "p5" ? "p5.js"
+    : engine === "experimental" ? "Experimental (no engine — invent everything)"
+    : "Three.js";
   const cdnUrl = engine === "phaser"
     ? "https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"
     : engine === "babylon"
     ? "https://cdn.babylonjs.com/babylon.js"
+    : engine === "kaboom"
+    ? "https://unpkg.com/kaboom/dist/kaboom.js"
+    : engine === "p5"
+    ? "https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"
+    : engine === "experimental"
+    ? "" // no single CDN — experimental prompt lists all options
     : "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
 
   const enginePatterns = engine === "phaser"
     ? getPhaserPatterns(genre)
     : engine === "babylon"
     ? getBabylonPatterns(genre)
+    : engine === "kaboom"
+    ? getKaboomPatterns(genre)
+    : engine === "p5"
+    ? getP5Patterns(genre)
+    : engine === "experimental"
+    ? getExperimentalPatterns()
     : getThreeJsPatterns(genre);
 
-  const base = `You are Lyra, a world-class senior game developer building a ${genre} browser game using ${engineName}.
+  // Additional CDN libraries that can be mixed in
+  const extraCDNs: Record<string, string> = {
+    phaser:  "https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js",
+    threejs: "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+    babylon: "https://cdn.babylonjs.com/babylon.js",
+    kaboom:  "https://unpkg.com/kaboom/dist/kaboom.js",
+    p5:      "https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js",
+  };
+  const otherCDNs = Object.entries(extraCDNs)
+    .filter(([k]) => k !== engine)
+    .map(([k, url]) => `  <!-- ${k}: ${url} -->`)
+    .join("\n");
+
+  const isExperimental = engine === "experimental";
+
+  const base = isExperimental
+    ? `You are Lyra. You are about to create an interactive experience that has never existed before.
 Concept: "${concept}"
-CDN: <script src="${cdnUrl}"></script>
+
+${enginePatterns}
+
+There are no required systems. No score. No health bar. No game over screen.
+Unless those things serve the vision — then include them.
+Create something that will make someone say "I've never experienced anything like this."
+Single index.html. All inline. No external assets.`
+    : `You are Lyra, a world-class senior game developer building a ${genre} browser game.
+Concept: "${concept}"
+Primary engine: ${engineName}
+Primary CDN: <script src="${cdnUrl}"></script>
+
+ENGINE MIXING — you can load multiple JS libraries in the same HTML file:
+${otherCDNs}
+Use additional libraries whenever they make the game better:
+- Three.js or Babylon.js for 3D backgrounds/effects behind a 2D Phaser/Kaboom game
+- p5.js for generative particle effects or procedural art layered on top
+- Kaboom for fast game logic inside a Three.js 3D world
+- Mix canvas layers: one engine draws the world, another draws the HUD
+Only load what you actually use — don't include unused CDNs.
 
 ${enginePatterns}
 
@@ -439,9 +492,9 @@ Then call done() with final summary.`;
 
 // ── Phase system prompts ──────────────────────────────────────────────────────
 
-function buildPhasePrompt(phase: "design" | "build" | "polish" | "verify", concept: string, genre: string, gameDir: string, engine: "godot2d" | "godot3d" | "phaser" | "threejs" | "babylon" = "godot2d", spriteManifest: SpriteManifest = {}): string {
+function buildPhasePrompt(phase: "design" | "build" | "polish" | "verify", concept: string, genre: string, gameDir: string, engine: GameEngine = "godot2d", spriteManifest: SpriteManifest = {}): string {
   // Browser engine path
-  if (engine === "phaser" || engine === "threejs" || engine === "babylon") {
+  if (engine === "phaser" || engine === "threejs" || engine === "babylon" || engine === "kaboom" || engine === "p5" || engine === "experimental") {
     return buildBrowserPhasePrompt(phase, concept, genre, engine);
   }
 
@@ -869,7 +922,7 @@ async function runPhase(
   onProgress: (p: BuildProgress) => void,
   maxTurns: number,
   allFilesWritten: string[],
-  engine: "godot2d" | "godot3d" | "phaser" | "threejs" | "babylon" = "godot2d",
+  engine: GameEngine = "godot2d",
   spriteManifest: SpriteManifest = {}
 ): Promise<{ summary?: string; files?: string[]; playInstructions?: string }> {
   const systemPrompt = buildPhasePrompt(phase, concept, genre, gameDir, engine, spriteManifest);
@@ -877,7 +930,7 @@ async function runPhase(
   const phaseNames = { design: "Designing game architecture", build: "Building the game", polish: "Polishing and adding juice", verify: "Verifying and committing" };
   onProgress({ type: "phase", message: phaseNames[phase] });
 
-  const isBrowser = engine === "phaser" || engine === "threejs" || engine === "babylon";
+  const isBrowser = engine === "phaser" || engine === "threejs" || engine === "babylon" || engine === "kaboom" || engine === "p5" || engine === "experimental";
   const initMessages: Record<string, string> = {
     design: isBrowser
       ? `Write DESIGN.md now for this browser game. ONE write_file call, then done(). No text output.`
@@ -1003,16 +1056,25 @@ async function runPhase(
 async function buildBrowserGame(
   concept: string,
   genre: string,
-  engine: "phaser" | "threejs" | "babylon",
+  engine: "phaser" | "threejs" | "babylon" | "kaboom" | "p5" | "experimental",
   gameDir: string,
   onProgress: (p: BuildProgress) => void,
   maxTurns: number = 20
 ): Promise<BuildResult> {
-  const engineName = engine === "phaser" ? "Phaser 3" : engine === "babylon" ? "Babylon.js" : "Three.js";
+  const engineName = engine === "phaser" ? "Phaser 3"
+    : engine === "babylon" ? "Babylon.js"
+    : engine === "kaboom" ? "Kaboom.js"
+    : engine === "p5" ? "p5.js"
+    : engine === "experimental" ? "Experimental"
+    : "Three.js";
   const cdnUrl = engine === "phaser"
     ? "https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"
     : engine === "babylon"
     ? "https://cdn.babylonjs.com/babylon.js"
+    : engine === "kaboom"
+    ? "https://unpkg.com/kaboom/dist/kaboom.js"
+    : engine === "p5"
+    ? "https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"
     : "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
 
   onProgress({ type: "phase", message: `Building ${engineName} browser game (4-phase loop)…` });
@@ -1029,36 +1091,29 @@ async function buildBrowserGame(
   const polishResult = await runPhase("polish", concept, genre, gameDir, onProgress, Math.floor(maxTurns * 0.3), allFilesWritten, engine, {});
   const verifyResult = await runPhase("verify", concept, genre, gameDir, onProgress, Math.floor(maxTurns * 0.2), allFilesWritten, engine, {});
 
-  // Copy final index.html to public games dir
-  const slug = nodePath.basename(gameDir);
-  const publicDir = process.env.NEXT_PUBLIC_GAME_HOST_DIR ?? nodePath.join(process.cwd(), "public", "games");
-  const exportDir = nodePath.join(publicDir, slug);
-  let exportUrl: string | undefined;
-  try {
-    await fsp.mkdir(exportDir, { recursive: true });
-    const localIndexPath = nodePath.join(gameDir, "index.html");
-    const rawHtml = await fsp.readFile(localIndexPath, "utf-8");
-    const title = concept.split(" ").slice(0, 4).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-    const prodHtml = wrapGameForProduction(rawHtml, title, genre, slug);
-    await fsp.writeFile(nodePath.join(exportDir, "index.html"), prodHtml, "utf-8");
-    const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-    exportUrl = `${baseUrl}/games/${slug}/`;
-    onProgress({ type: "status", message: `Game live! Play at: ${exportUrl}` });
-  } catch {
-    // Public dir may not exist in dev — that's fine
-  }
-
   const files = verifyResult.files ?? polishResult.files ?? buildResult.files ?? allFilesWritten;
   const summary = verifyResult.summary ?? polishResult.summary ?? buildResult.summary
     ?? `Complete ${genre} browser game built with ${engineName} from concept: "${concept}". Built across 4 iterative phases.`;
   const localPath = nodePath.join(gameDir, "index.html");
+  let exportUrl: string | undefined;
   const playInstructions = exportUrl
     ? `Open ${exportUrl} in your browser to play.`
     : `Open ${localPath} in your browser to play. No server required.`;
 
+  // Read final HTML for DB storage
+  const gameSlug = nodePath.basename(gameDir);
+  let htmlContent: string | undefined;
+  try {
+    const rawHtml = await fsp.readFile(localPath, "utf-8");
+    const title = concept.split(" ").slice(0, 4).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    htmlContent = wrapGameForProduction(rawHtml, title, genre, gameSlug);
+    exportUrl = `${process.env.NEXTAUTH_URL ?? "https://aitaskflo.com"}/games/${gameSlug}/`;
+    onProgress({ type: "status", message: `Game live! Play at: ${exportUrl}` });
+  } catch { /* file may not exist if all writes failed */ }
+
   onProgress({ type: "complete", message: "Browser game complete!", files, artUrls, exportUrl });
 
-  return { summary, files, playInstructions, artUrls, exportUrl };
+  return { summary, files, playInstructions, artUrls, exportUrl, htmlContent };
 }
 
 // ── Main builder ──────────────────────────────────────────────────────────────
@@ -1069,10 +1124,10 @@ export async function buildGame(
   gameDir: string,
   onProgress: (p: BuildProgress) => void,
   maxTurns: number = 30,
-  engine: "godot2d" | "godot3d" | "phaser" | "threejs" | "babylon" = "godot2d"
+  engine: GameEngine = "godot2d"
 ): Promise<BuildResult> {
-  // Browser games (Phaser / Three.js / Babylon.js) — 4-phase iterative loop
-  if (engine === "phaser" || engine === "threejs" || engine === "babylon") {
+  // Browser games — 4-phase iterative loop
+  if (engine === "phaser" || engine === "threejs" || engine === "babylon" || engine === "kaboom" || engine === "p5" || engine === "experimental") {
     return buildBrowserGame(concept, genre, engine, gameDir, onProgress, maxTurns);
   }
 

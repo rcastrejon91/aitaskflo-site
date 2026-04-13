@@ -9,6 +9,11 @@ export interface DbUser {
   name: string | null;
   first_seen: string;
   last_seen: string;
+  interests: string | null;        // JSON: string[] of topic tags
+  interest_weights: string | null; // JSON: Record<string, number> tag → cumulative weight
+  manual_interests: string | null; // JSON: string[] user-added interest tags
+  tone_preference: string | null;  // free text: how user wants Lyra to sound
+  avoid_topics: string | null;     // free text: things Lyra should avoid
 }
 
 export interface DbConversation {
@@ -48,7 +53,7 @@ type BetterSqlite3Db = any;
 let _db: BetterSqlite3Db | null = null;
 let _dbFailed = false;
 
-function getDb(): BetterSqlite3Db | null {
+export function getDb(): BetterSqlite3Db | null {
   if (_dbFailed) return null;
   if (_db) return _db;
 
@@ -116,6 +121,64 @@ function initSchema(db: BetterSqlite3Db) {
     CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id, timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_facts_user ON facts(user_id);
     CREATE INDEX IF NOT EXISTS idx_crm_name ON crm_contacts(name);
+
+    CREATE TABLE IF NOT EXISTS search_history (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    TEXT,
+      query      TEXT NOT NULL,
+      results    INTEGER DEFAULT 0,
+      searched_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_search_history_user ON search_history(user_id, searched_at DESC);
+
+    CREATE TABLE IF NOT EXISTS personas (
+      id              TEXT PRIMARY KEY,
+      name            TEXT NOT NULL,
+      vibe_id         TEXT NOT NULL,
+      status          TEXT NOT NULL DEFAULT 'bootstrapping',
+      ai_disclosed    INTEGER NOT NULL DEFAULT 1,
+      hero_image_url  TEXT,
+      hero_seed       INTEGER,
+      hero_prompt     TEXT,
+      hero_embedding  TEXT,
+      lora_url        TEXT,
+      lora_trigger    TEXT,
+      training_images TEXT,
+      similarity_avg  REAL,
+      welcome_dm      TEXT,
+      created_at      TEXT NOT NULL,
+      locked_at       TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_personas_status ON personas(status);
+
+    CREATE TABLE IF NOT EXISTS blocked_ips (
+      ip          TEXT PRIMARY KEY,
+      reason      TEXT NOT NULL,
+      blocked_by  TEXT DEFAULT 'lyra',
+      cf_rule_id  TEXT,
+      blocked_at  TEXT NOT NULL,
+      expires_at  TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS security_events (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      type        TEXT NOT NULL,
+      ip          TEXT,
+      user_id     TEXT,
+      details     TEXT,
+      severity    TEXT DEFAULT 'medium',
+      resolved    INTEGER DEFAULT 0,
+      occurred_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_security_events_time ON security_events(occurred_at DESC);
+
+    CREATE TABLE IF NOT EXISTS suspended_users (
+      user_id     TEXT PRIMARY KEY,
+      reason      TEXT NOT NULL,
+      suspended_by TEXT DEFAULT 'lyra',
+      suspended_at TEXT NOT NULL,
+      expires_at  TEXT
+    );
 
     CREATE TABLE IF NOT EXISTS auth_users (
       id         TEXT PRIMARY KEY,
@@ -239,6 +302,143 @@ function initSchema(db: BetterSqlite3Db) {
     `);
   } catch { /* ignore */ }
 
+  // Migrate users table — interests columns (additive)
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN interests TEXT`);
+  } catch { /* column already exists */ }
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN interest_weights TEXT`);
+  } catch { /* column already exists */ }
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN manual_interests TEXT`);
+  } catch { /* column already exists */ }
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN tone_preference TEXT`);
+  } catch { /* column already exists */ }
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN avoid_topics TEXT`);
+  } catch { /* column already exists */ }
+
+  // Semantic embeddings table
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS lyra_embeddings (
+        entity_type TEXT NOT NULL,
+        entity_id   TEXT NOT NULL,
+        content     TEXT NOT NULL,
+        embedding   TEXT NOT NULL,
+        created_at  TEXT NOT NULL,
+        PRIMARY KEY (entity_type, entity_id)
+      )
+    `);
+  } catch { /* ignore */ }
+
+  // Response feedback table
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS lyra_feedback (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id           TEXT NOT NULL,
+        rating            INTEGER NOT NULL,
+        user_message      TEXT NOT NULL,
+        assistant_message TEXT NOT NULL,
+        created_at        TEXT NOT NULL
+      )
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_feedback_user ON lyra_feedback(user_id, created_at DESC)`);
+  } catch { /* ignore */ }
+
+  // Message store for training data
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS lyra_messages (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id         TEXT NOT NULL,
+        conversation_id TEXT NOT NULL,
+        user_message    TEXT NOT NULL,
+        assistant_message TEXT NOT NULL,
+        model           TEXT DEFAULT 'claude-sonnet-4-6',
+        created_at      TEXT NOT NULL
+      )
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_messages_user ON lyra_messages(user_id, created_at DESC)`);
+  } catch { /* ignore */ }
+
+  // lyra_books — bookshelf persistence
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS lyra_books (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL,
+        type        TEXT NOT NULL DEFAULT 'book',
+        title       TEXT NOT NULL,
+        subtitle    TEXT,
+        author      TEXT,
+        genre       TEXT,
+        description TEXT,
+        cover_url   TEXT,
+        content     TEXT NOT NULL,
+        pdf_path    TEXT,
+        word_count  INTEGER DEFAULT 0,
+        created_at  TEXT NOT NULL
+      )
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_books_user ON lyra_books(user_id, created_at DESC)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_books_type ON lyra_books(user_id, type)`);
+  } catch { /* ignore */ }
+
+  // lyra_skills — self-written skills and dynamic tools
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS lyra_skills (
+        id          TEXT PRIMARY KEY,
+        name        TEXT NOT NULL UNIQUE,
+        description TEXT NOT NULL,
+        type        TEXT NOT NULL DEFAULT 'skill',
+        status      TEXT NOT NULL DEFAULT 'pending',
+        content     TEXT NOT NULL,
+        uses        INTEGER DEFAULT 0,
+        successes   INTEGER DEFAULT 0,
+        created_at  TEXT NOT NULL,
+        last_used   TEXT
+      )
+    `);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS lyra_skill_log (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        skill_name TEXT NOT NULL,
+        success    INTEGER NOT NULL DEFAULT 1,
+        note       TEXT,
+        used_at    TEXT NOT NULL
+      )
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_skills_name ON lyra_skills(name)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_skills_status ON lyra_skills(status)`);
+  } catch { /* ignore */ }
+
+  // lyra_experiments — AI research lab
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS lyra_experiments (
+        id           TEXT PRIMARY KEY,
+        user_id      TEXT NOT NULL,
+        type         TEXT NOT NULL,
+        title        TEXT NOT NULL,
+        hypothesis   TEXT,
+        status       TEXT NOT NULL DEFAULT 'running',
+        result       TEXT,
+        log          TEXT,
+        metadata     TEXT,
+        created_at   TEXT NOT NULL,
+        finished_at  TEXT
+      )
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_exp_user ON lyra_experiments(user_id, created_at DESC)`);
+  } catch { /* ignore */ }
+
+  // Add game_content column to marketplace_games (stores browser game HTML inline)
+  try { db.exec(`ALTER TABLE marketplace_games ADD COLUMN game_content TEXT`); } catch { /* already exists */ }
+
   // Migrate existing facts table to add new columns if they don't exist
   try {
     db.exec(`ALTER TABLE facts ADD COLUMN importance INTEGER DEFAULT 3`);
@@ -314,6 +514,21 @@ function initSchema(db: BetterSqlite3Db) {
     `);
   } catch { /* ignore */ }
 
+  // ── Daily Drops (additive) ─────────────────────────────────────────────────
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS lyra_drops (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL,
+        content     TEXT NOT NULL,
+        type        TEXT NOT NULL DEFAULT 'concept',
+        delivered   INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_drops_user ON lyra_drops(user_id, delivered, created_at DESC);
+    `);
+  } catch { /* ignore */ }
+
   // ── Agent Job Queue (additive) ─────────────────────────────────────────────
   try {
     db.exec(`
@@ -336,6 +551,41 @@ function initSchema(db: BetterSqlite3Db) {
       CREATE INDEX IF NOT EXISTS idx_jobs_status ON agent_jobs(status, created_at DESC);
     `);
   } catch { /* ignore */ }
+}
+
+// ── Message persistence (training data) ──────────────────────────────────────
+
+export function saveMessage(
+  userId: string,
+  conversationId: string,
+  userMessage: string,
+  assistantMessage: string,
+  model = "claude-sonnet-4-6"
+): void {
+  const db = getDb();
+  if (!db) return;
+  // Skip trivially short exchanges
+  if (userMessage.trim().length < 5 || assistantMessage.trim().length < 20) return;
+  try {
+    db.prepare(`
+      INSERT INTO lyra_messages (user_id, conversation_id, user_message, assistant_message, model, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(userId, conversationId, userMessage.slice(0, 4000), assistantMessage.slice(0, 8000), model, new Date().toISOString());
+  } catch { /* ignore */ }
+}
+
+export function getMessages(userId?: string, limit = 500): Array<{
+  id: number; user_id: string; conversation_id: string;
+  user_message: string; assistant_message: string; model: string; created_at: string;
+}> {
+  const db = getDb();
+  if (!db) return [];
+  try {
+    if (userId) {
+      return db.prepare("SELECT * FROM lyra_messages WHERE user_id = ? ORDER BY created_at DESC LIMIT ?").all(userId, limit) as ReturnType<typeof getMessages>;
+    }
+    return db.prepare("SELECT * FROM lyra_messages ORDER BY created_at DESC LIMIT ?").all(limit) as ReturnType<typeof getMessages>;
+  } catch { return []; }
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
@@ -870,6 +1120,44 @@ export function buildMemoryContext(userId: string, currentMessage?: string): str
       conversations.forEach((c) => { if (c.summary) parts.push(`  • [${c.timestamp.split("T")[0]}] ${c.summary}`); });
     }
 
+    // Inject top interests if available
+    if (user.interest_weights) {
+      try {
+        const weights = JSON.parse(user.interest_weights) as Record<string, number>;
+        const topInterests = Object.entries(weights)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([tag]) => tag);
+        if (topInterests.length > 0) {
+          parts.push(`\nUser's known interests (most frequent first): ${topInterests.join(", ")}`);
+        }
+      } catch { /* ignore malformed JSON */ }
+    }
+
+    // Inject manual preferences if set
+    if (user.manual_interests) {
+      try {
+        const tags = JSON.parse(user.manual_interests) as string[];
+        if (tags.length > 0) {
+          parts.push(`\nUser explicitly told me they're interested in: ${tags.join(", ")}`);
+        }
+      } catch { /* ignore */ }
+    }
+    if (user.tone_preference) {
+      parts.push(`\nUser's preferred tone/style: ${user.tone_preference}`);
+    }
+    if (user.avoid_topics) {
+      parts.push(`\nUser asked me to avoid: ${user.avoid_topics}`);
+    }
+
+    // Inject learned response preferences from feedback
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { buildFeedbackContext } = require("./feedback") as { buildFeedbackContext: (id: string) => string };
+      const feedbackCtx = buildFeedbackContext(userId);
+      if (feedbackCtx) parts.push(feedbackCtx);
+    } catch { /* ignore */ }
+
     parts.push("--- END MEMORY ---");
     return parts.join("\n");
   } catch {
@@ -944,22 +1232,24 @@ export function saveMarketplaceGame(game: {
   engine: string;
   concept?: string;
   thumbnail_url?: string;
+  game_content?: string;
 }): MarketplaceGame | null {
   const db = getDb();
   if (!db) return null;
   try {
     const now = new Date().toISOString();
     db.prepare(`
-      INSERT INTO marketplace_games (slug, title, genre, engine, concept, thumbnail_url, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO marketplace_games (slug, title, genre, engine, concept, thumbnail_url, game_content, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(slug) DO UPDATE SET
         title = excluded.title,
         genre = excluded.genre,
         engine = excluded.engine,
         concept = COALESCE(excluded.concept, concept),
         thumbnail_url = COALESCE(excluded.thumbnail_url, thumbnail_url),
+        game_content = COALESCE(excluded.game_content, game_content),
         updated_at = excluded.updated_at
-    `).run(game.slug, game.title, game.genre, game.engine, game.concept ?? null, game.thumbnail_url ?? null, now, now);
+    `).run(game.slug, game.title, game.genre, game.engine, game.concept ?? null, game.thumbnail_url ?? null, game.game_content ?? null, now, now);
     return (db.prepare("SELECT * FROM marketplace_games WHERE slug = ?").get(game.slug) as MarketplaceGame) ?? null;
   } catch (err) {
     console.error("[Lyra DB] saveMarketplaceGame error:", err instanceof Error ? err.message : err);
@@ -975,6 +1265,15 @@ export function getMarketplaceGame(slug: string): MarketplaceGame | null {
   } catch {
     return null;
   }
+}
+
+export function getGameContent(slug: string): string | null {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    const row = db.prepare("SELECT game_content FROM marketplace_games WHERE slug = ?").get(slug) as { game_content: string | null } | undefined;
+    return row?.game_content ?? null;
+  } catch { return null; }
 }
 
 export function listMarketplaceGames(sort: "trending" | "newest" | "top_rated" = "trending", limit = 50): MarketplaceGame[] {
@@ -1116,3 +1415,586 @@ export function updateComputerSession(id: string, fields: Partial<ComputerSessio
   try { db.prepare(`UPDATE computer_sessions SET ${sets}, updated_at = ? WHERE id = ?`).run(...vals); }
   catch { /* ignore */ }
 }
+
+// ── Search history ────────────────────────────────────────────────────────────
+
+export function logSearch(userId: string | undefined, query: string, resultCount: number): void {
+  const db = getDb();
+  if (!db) return;
+  try {
+    db.prepare(
+      "INSERT INTO search_history (user_id, query, results, searched_at) VALUES (?, ?, ?, ?)"
+    ).run(userId ?? null, query, resultCount, new Date().toISOString());
+  } catch { /* ignore */ }
+}
+
+export interface SearchEntry {
+  id: number;
+  user_id: string | null;
+  query: string;
+  results: number;
+  searched_at: string;
+}
+
+export function getSearchHistory(limit = 200): SearchEntry[] {
+  const db = getDb();
+  if (!db) return [];
+  try {
+    return db.prepare(
+      "SELECT * FROM search_history ORDER BY searched_at DESC LIMIT ?"
+    ).all(limit) as SearchEntry[];
+  } catch { return []; }
+}
+
+// ── Personas ──────────────────────────────────────────────────────────────────
+
+export interface PersonaRow {
+  id: string;
+  name: string;
+  vibe_id: string;
+  status: "bootstrapping" | "hero_selected" | "pulid_expanding" | "lora_training" | "locked" | "failed" | "retired";
+  ai_disclosed: number;
+  hero_image_url: string | null;
+  hero_seed: number | null;
+  hero_prompt: string | null;
+  hero_embedding: string | null; // JSON float array
+  lora_url: string | null;
+  lora_trigger: string | null;
+  training_images: string | null; // JSON string[]
+  similarity_avg: number | null;
+  welcome_dm: string | null;
+  created_at: string;
+  locked_at: string | null;
+}
+
+export function insertPersona(p: PersonaRow): void {
+  const db = getDb();
+  if (!db) return;
+  try {
+    db.prepare(`INSERT OR REPLACE INTO personas
+      (id,name,vibe_id,status,ai_disclosed,hero_image_url,hero_seed,hero_prompt,hero_embedding,lora_url,lora_trigger,training_images,similarity_avg,welcome_dm,created_at,locked_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(p.id,p.name,p.vibe_id,p.status,p.ai_disclosed,p.hero_image_url,p.hero_seed,p.hero_prompt,p.hero_embedding,p.lora_url,p.lora_trigger,p.training_images,p.similarity_avg,p.welcome_dm,p.created_at,p.locked_at);
+  } catch { /* ignore */ }
+}
+
+export function updatePersona(id: string, fields: Partial<PersonaRow>): void {
+  const db = getDb();
+  if (!db) return;
+  const sets = Object.keys(fields).map(k => `${k} = ?`).join(", ");
+  const vals = [...Object.values(fields), id];
+  try { db.prepare(`UPDATE personas SET ${sets} WHERE id = ?`).run(...vals); } catch { /* ignore */ }
+}
+
+export function getPersona(id: string): PersonaRow | null {
+  const db = getDb();
+  if (!db) return null;
+  try { return db.prepare("SELECT * FROM personas WHERE id = ?").get(id) as PersonaRow | null; } catch { return null; }
+}
+
+export function listPersonas(): PersonaRow[] {
+  const db = getDb();
+  if (!db) return [];
+  try { return db.prepare("SELECT * FROM personas ORDER BY created_at DESC").all() as PersonaRow[]; } catch { return []; }
+}
+
+// ── Defender ─────────────────────────────────────────────────────────────────
+
+export function blockIp(ip: string, reason: string, blockedBy = "lyra", cfRuleId?: string, expiresAt?: string): void {
+  const db = getDb();
+  if (!db) return;
+  try {
+    db.prepare(
+      "INSERT OR REPLACE INTO blocked_ips (ip, reason, blocked_by, cf_rule_id, blocked_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run(ip, reason, blockedBy, cfRuleId ?? null, new Date().toISOString(), expiresAt ?? null);
+  } catch { /* ignore */ }
+}
+
+export function unblockIp(ip: string): void {
+  const db = getDb();
+  if (!db) return;
+  try { db.prepare("DELETE FROM blocked_ips WHERE ip = ?").run(ip); } catch { /* ignore */ }
+}
+
+export function isIpBlocked(ip: string): boolean {
+  const db = getDb();
+  if (!db) return false;
+  try {
+    const row = db.prepare("SELECT ip, expires_at FROM blocked_ips WHERE ip = ?").get(ip) as { ip: string; expires_at: string | null } | undefined;
+    if (!row) return false;
+    if (row.expires_at && new Date(row.expires_at) < new Date()) {
+      db.prepare("DELETE FROM blocked_ips WHERE ip = ?").run(ip);
+      return false;
+    }
+    return true;
+  } catch { return false; }
+}
+
+export function getBlockedIps(): Array<{ ip: string; reason: string; blocked_by: string; blocked_at: string; expires_at: string | null }> {
+  const db = getDb();
+  if (!db) return [];
+  try {
+    return db.prepare("SELECT ip, reason, blocked_by, blocked_at, expires_at FROM blocked_ips ORDER BY blocked_at DESC").all() as Array<{ ip: string; reason: string; blocked_by: string; blocked_at: string; expires_at: string | null }>;
+  } catch { return []; }
+}
+
+export function logSecurityEvent(type: string, severity: "low" | "medium" | "high" | "critical", details: string, ip?: string, userId?: string): void {
+  const db = getDb();
+  if (!db) return;
+  try {
+    db.prepare(
+      "INSERT INTO security_events (type, ip, user_id, details, severity, occurred_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run(type, ip ?? null, userId ?? null, details, severity, new Date().toISOString());
+  } catch { /* ignore */ }
+}
+
+export function getSecurityEvents(limit = 100): Array<{ id: number; type: string; ip: string | null; user_id: string | null; details: string; severity: string; resolved: number; occurred_at: string }> {
+  const db = getDb();
+  if (!db) return [];
+  try {
+    return db.prepare("SELECT * FROM security_events ORDER BY occurred_at DESC LIMIT ?").all(limit) as Array<{ id: number; type: string; ip: string | null; user_id: string | null; details: string; severity: string; resolved: number; occurred_at: string }>;
+  } catch { return []; }
+}
+
+export function suspendUser(userId: string, reason: string, suspendedBy = "lyra", expiresAt?: string): void {
+  const db = getDb();
+  if (!db) return;
+  try {
+    db.prepare(
+      "INSERT OR REPLACE INTO suspended_users (user_id, reason, suspended_by, suspended_at, expires_at) VALUES (?, ?, ?, ?, ?)"
+    ).run(userId, reason, suspendedBy, new Date().toISOString(), expiresAt ?? null);
+  } catch { /* ignore */ }
+}
+
+export function isUserSuspended(userId: string): boolean {
+  const db = getDb();
+  if (!db) return false;
+  try {
+    const row = db.prepare("SELECT user_id, expires_at FROM suspended_users WHERE user_id = ?").get(userId) as { user_id: string; expires_at: string | null } | undefined;
+    if (!row) return false;
+    if (row.expires_at && new Date(row.expires_at) < new Date()) {
+      db.prepare("DELETE FROM suspended_users WHERE user_id = ?").run(userId);
+      return false;
+    }
+    return true;
+  } catch { return false; }
+}
+
+// ── Bookshelf ──────────────────────────────────────────────────────────────────
+
+export interface DbBook {
+  id: string;
+  user_id: string;
+  type: string;           // 'book' | 'research_paper' | 'comic' | 'document'
+  title: string;
+  subtitle: string | null;
+  author: string | null;
+  genre: string | null;
+  description: string | null;
+  cover_url: string | null;
+  content: string;        // JSON string of chapters / sections
+  pdf_path: string | null;
+  word_count: number;
+  created_at: string;
+}
+
+export function saveBook(fields: {
+  userId: string;
+  type: string;
+  title: string;
+  subtitle?: string;
+  author?: string;
+  genre?: string;
+  description?: string;
+  coverUrl?: string;
+  content: object;
+  pdfPath?: string;
+  wordCount?: number;
+}): string {
+  const db = getDb();
+  if (!db) throw new Error("DB unavailable");
+  const id = randomUUID();
+  db.prepare(`
+    INSERT INTO lyra_books (id, user_id, type, title, subtitle, author, genre, description, cover_url, content, pdf_path, word_count, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, fields.userId, fields.type, fields.title,
+    fields.subtitle ?? null, fields.author ?? null, fields.genre ?? null,
+    fields.description ?? null, fields.coverUrl ?? null,
+    JSON.stringify(fields.content), fields.pdfPath ?? null,
+    fields.wordCount ?? 0, new Date().toISOString()
+  );
+  return id;
+}
+
+export function listBooks(userId: string, type?: string): DbBook[] {
+  const db = getDb();
+  if (!db) return [];
+  try {
+    if (type) {
+      return db.prepare("SELECT * FROM lyra_books WHERE user_id = ? AND type = ? ORDER BY created_at DESC").all(userId, type) as DbBook[];
+    }
+    return db.prepare("SELECT * FROM lyra_books WHERE user_id = ? ORDER BY created_at DESC").all(userId) as DbBook[];
+  } catch { return []; }
+}
+
+export function getBook(id: string): DbBook | null {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    return (db.prepare("SELECT * FROM lyra_books WHERE id = ?").get(id) as DbBook | undefined) ?? null;
+  } catch { return null; }
+}
+
+export function deleteBook(id: string, userId: string): boolean {
+  const db = getDb();
+  if (!db) return false;
+  try {
+    const result = db.prepare("DELETE FROM lyra_books WHERE id = ? AND user_id = ?").run(id, userId);
+    return result.changes > 0;
+  } catch { return false; }
+}
+
+// ── Lab experiments ────────────────────────────────────────────────────────────
+
+export interface DbExperiment {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  hypothesis: string | null;
+  status: "running" | "completed" | "failed";
+  result: string | null;
+  log: string | null;
+  metadata: string | null;
+  created_at: string;
+  finished_at: string | null;
+}
+
+export function saveExperiment(fields: {
+  userId: string;
+  type: string;
+  title: string;
+  hypothesis?: string;
+  metadata?: Record<string, unknown>;
+}): string {
+  const db = getDb();
+  if (!db) return "";
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO lyra_experiments (id, user_id, type, title, hypothesis, status, metadata, created_at)
+    VALUES (?, ?, ?, ?, ?, 'running', ?, ?)
+  `).run(id, fields.userId, fields.type, fields.title, fields.hypothesis ?? null,
+    fields.metadata ? JSON.stringify(fields.metadata) : null, now);
+  return id;
+}
+
+export function updateExperiment(id: string, fields: {
+  status?: "running" | "completed" | "failed";
+  result?: string;
+  log?: string;
+}) {
+  const db = getDb();
+  if (!db) return;
+  const updates: string[] = [];
+  const vals: unknown[] = [];
+  if (fields.status) { updates.push("status = ?"); vals.push(fields.status); }
+  if (fields.result !== undefined) { updates.push("result = ?"); vals.push(fields.result); }
+  if (fields.log !== undefined) { updates.push("log = ?"); vals.push(fields.log); }
+  if (fields.status === "completed" || fields.status === "failed") {
+    updates.push("finished_at = ?"); vals.push(new Date().toISOString());
+  }
+  if (!updates.length) return;
+  vals.push(id);
+  db.prepare(`UPDATE lyra_experiments SET ${updates.join(", ")} WHERE id = ?`).run(...(vals as Parameters<typeof db.prepare>[0][]));
+}
+
+export function listExperiments(userId: string, limit = 20): DbExperiment[] {
+  const db = getDb();
+  if (!db) return [];
+  try {
+    return db.prepare("SELECT * FROM lyra_experiments WHERE user_id = ? ORDER BY created_at DESC LIMIT ?")
+      .all(userId, limit) as DbExperiment[];
+  } catch { return []; }
+}
+
+export function getExperiment(id: string): DbExperiment | null {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    return (db.prepare("SELECT * FROM lyra_experiments WHERE id = ?").get(id) as DbExperiment | undefined) ?? null;
+  } catch { return null; }
+}
+
+// ── Job Applications ──────────────────────────────────────────────────────────
+
+function ensureJobsTable(db: import("better-sqlite3").Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS lyra_job_applications (
+      id TEXT PRIMARY KEY,
+      job_id TEXT,
+      title TEXT NOT NULL,
+      company TEXT NOT NULL,
+      url TEXT NOT NULL,
+      status TEXT DEFAULT 'applied',
+      resume_used TEXT,
+      cover_letter TEXT,
+      applied_at TEXT DEFAULT (datetime('now')),
+      follow_up_at TEXT,
+      followed_up INTEGER DEFAULT 0,
+      notes TEXT,
+      salary TEXT,
+      source TEXT
+    );
+    CREATE TABLE IF NOT EXISTS lyra_job_profile (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+}
+
+export interface DbJobApplication {
+  id: string; job_id?: string; title: string; company: string; url: string;
+  status: string; resume_used?: string; cover_letter?: string;
+  applied_at: string; follow_up_at?: string; followed_up: number;
+  notes?: string; salary?: string; source?: string;
+}
+
+export function saveJobApplication(fields: {
+  title: string; company: string; url: string; job_id?: string;
+  resume_used?: string; cover_letter?: string; salary?: string; source?: string;
+}): string {
+  const db = getDb(); if (!db) return "";
+  try {
+    ensureJobsTable(db);
+    const id = Math.random().toString(36).slice(2);
+    const followUpAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    db.prepare(`INSERT OR IGNORE INTO lyra_job_applications
+      (id,job_id,title,company,url,resume_used,cover_letter,salary,source,follow_up_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?)`)
+      .run(id, fields.job_id ?? null, fields.title, fields.company, fields.url,
+        fields.resume_used ?? null, fields.cover_letter ?? null,
+        fields.salary ?? null, fields.source ?? null, followUpAt);
+    return id;
+  } catch { return ""; }
+}
+
+export function listJobApplications(status?: string): DbJobApplication[] {
+  const db = getDb(); if (!db) return [];
+  try {
+    ensureJobsTable(db);
+    if (status) return db.prepare("SELECT * FROM lyra_job_applications WHERE status=? ORDER BY applied_at DESC").all(status) as DbJobApplication[];
+    return db.prepare("SELECT * FROM lyra_job_applications ORDER BY applied_at DESC").all() as DbJobApplication[];
+  } catch { return []; }
+}
+
+export function updateJobStatus(id: string, status: string, notes?: string): void {
+  const db = getDb(); if (!db) return;
+  try {
+    ensureJobsTable(db);
+    db.prepare("UPDATE lyra_job_applications SET status=?, notes=? WHERE id=?")
+      .run(status, notes ?? null, id);
+  } catch { /* non-fatal */ }
+}
+
+export function getJobsDueFollowUp(): DbJobApplication[] {
+  const db = getDb(); if (!db) return [];
+  try {
+    ensureJobsTable(db);
+    return db.prepare(`SELECT * FROM lyra_job_applications
+      WHERE followed_up=0 AND status='applied' AND follow_up_at <= datetime('now')`)
+      .all() as DbJobApplication[];
+  } catch { return []; }
+}
+
+export function markFollowedUp(id: string): void {
+  const db = getDb(); if (!db) return;
+  try {
+    ensureJobsTable(db);
+    db.prepare("UPDATE lyra_job_applications SET followed_up=1 WHERE id=?").run(id);
+  } catch { /* non-fatal */ }
+}
+
+export function saveJobProfile(resume: string, targetRole: string, background: string): void {
+  const db = getDb(); if (!db) return;
+  try {
+    ensureJobsTable(db);
+    const upsert = db.prepare(`INSERT INTO lyra_job_profile (key,value,updated_at) VALUES (?,?,?)
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`);
+    upsert.run("resume", resume, new Date().toISOString());
+    upsert.run("target_role", targetRole, new Date().toISOString());
+    upsert.run("background", background, new Date().toISOString());
+  } catch { /* non-fatal */ }
+}
+
+export function getJobProfile(): { resume: string; targetRole: string; background: string } | null {
+  const db = getDb(); if (!db) return null;
+  try {
+    ensureJobsTable(db);
+    const rows = db.prepare("SELECT key, value FROM lyra_job_profile").all() as Array<{ key: string; value: string }>;
+    if (!rows.length) return null;
+    const map = Object.fromEntries(rows.map(r => [r.key, r.value]));
+    if (!map.resume) return null;
+    return { resume: map.resume, targetRole: map.target_role ?? "", background: map.background ?? "" };
+  } catch { return null; }
+}
+
+// ── Gumroad token storage ─────────────────────────────────────────────────────
+
+export function saveGumroadToken(token: string): void {
+  const db = getDb(); if (!db) return;
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS lyra_settings (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT)`);
+    db.prepare(`INSERT INTO lyra_settings (key,value,updated_at) VALUES ('gumroad_token',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`)
+      .run(token, new Date().toISOString());
+  } catch { /* non-fatal */ }
+}
+
+export function getGumroadToken(): string | null {
+  const db = getDb(); if (!db) return null;
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS lyra_settings (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT)`);
+    const row = db.prepare("SELECT value FROM lyra_settings WHERE key='gumroad_token'").get() as { value: string } | undefined;
+    return row?.value ?? process.env.GUMROAD_ACCESS_TOKEN ?? null;
+  } catch { return process.env.GUMROAD_ACCESS_TOKEN ?? null; }
+}
+
+// ── Commerce ──────────────────────────────────────────────────────────────────
+
+function ensureCommerceTable(db: import("better-sqlite3").Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS lyra_products (
+      id TEXT PRIMARY KEY,
+      gumroad_id TEXT,
+      name TEXT NOT NULL,
+      price INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'draft',
+      file_url TEXT,
+      cover_url TEXT,
+      short_url TEXT,
+      sales INTEGER DEFAULT 0,
+      revenue INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      last_checked TEXT
+    );
+  `);
+}
+
+export interface DbProduct {
+  id: string; gumroad_id?: string; name: string; price: number;
+  status: string; file_url?: string; cover_url?: string; short_url?: string;
+  sales: number; revenue: number; created_at: string;
+}
+
+export function saveCommerceProduct(fields: {
+  gumroad_id?: string; name: string; price: number;
+  file_url?: string; cover_url?: string; status?: string; short_url?: string;
+}): string {
+  const db = getDb(); if (!db) return "";
+  try {
+    ensureCommerceTable(db);
+    const id = Math.random().toString(36).slice(2);
+    db.prepare(`INSERT INTO lyra_products (id,gumroad_id,name,price,file_url,cover_url,status,short_url)
+      VALUES (?,?,?,?,?,?,?,?)`)
+      .run(id, fields.gumroad_id ?? null, fields.name, fields.price,
+        fields.file_url ?? null, fields.cover_url ?? null,
+        fields.status ?? "draft", fields.short_url ?? null);
+    return id;
+  } catch { return ""; }
+}
+
+export function listCommerceProducts(): DbProduct[] {
+  const db = getDb(); if (!db) return [];
+  try {
+    ensureCommerceTable(db);
+    return db.prepare("SELECT * FROM lyra_products ORDER BY created_at DESC").all() as DbProduct[];
+  } catch { return []; }
+}
+
+export function updateProductStats(gumroadId: string, sales: number, revenue: number): void {
+  const db = getDb(); if (!db) return;
+  try {
+    ensureCommerceTable(db);
+    db.prepare("UPDATE lyra_products SET sales=?, revenue=?, last_checked=? WHERE gumroad_id=?")
+      .run(sales, revenue, new Date().toISOString(), gumroadId);
+  } catch { /* non-fatal */ }
+}
+
+// ── Skills ─────────────────────────────────────────────────────────────────────
+
+export interface DbSkill {
+  id: string; name: string; description: string; type: string;
+  status: "pending" | "active" | "disabled"; content: string;
+  uses: number; successes: number; created_at: string; last_used: string | null;
+}
+
+export function saveSkill(fields: {
+  name: string; description: string; type?: string; content: string; status?: string;
+}): string {
+  const db = getDb(); if (!db) return "";
+  const existing = db.prepare("SELECT id FROM lyra_skills WHERE name = ?").get(fields.name) as { id: string } | undefined;
+  if (existing) {
+    db.prepare("UPDATE lyra_skills SET description=?, content=?, type=? WHERE name=?")
+      .run(fields.description, fields.content, fields.type ?? "skill", fields.name);
+    return existing.id;
+  }
+  const id = randomUUID();
+  db.prepare(`INSERT INTO lyra_skills (id,name,description,type,status,content,uses,successes,created_at)
+    VALUES (?,?,?,?,?,?,0,0,?)`)
+    .run(id, fields.name, fields.description, fields.type ?? "skill",
+      fields.status ?? "pending", fields.content, new Date().toISOString());
+  return id;
+}
+
+export function approveSkill(name: string): boolean {
+  const db = getDb(); if (!db) return false;
+  try { db.prepare("UPDATE lyra_skills SET status='active' WHERE name=?").run(name); return true; }
+  catch { return false; }
+}
+
+export function disableSkill(name: string): boolean {
+  const db = getDb(); if (!db) return false;
+  try { db.prepare("UPDATE lyra_skills SET status='disabled' WHERE name=?").run(name); return true; }
+  catch { return false; }
+}
+
+export function deleteSkill(name: string): boolean {
+  const db = getDb(); if (!db) return false;
+  try { db.prepare("DELETE FROM lyra_skills WHERE name=?").run(name); return true; }
+  catch { return false; }
+}
+
+export function listSkills(statusFilter?: string): DbSkill[] {
+  const db = getDb(); if (!db) return [];
+  try {
+    if (statusFilter) return db.prepare("SELECT * FROM lyra_skills WHERE status=? ORDER BY uses DESC").all(statusFilter) as DbSkill[];
+    return db.prepare("SELECT * FROM lyra_skills ORDER BY (status='active') DESC, uses DESC").all() as DbSkill[];
+  } catch { return []; }
+}
+
+export function getSkillByName(name: string): DbSkill | null {
+  const db = getDb(); if (!db) return null;
+  try { return (db.prepare("SELECT * FROM lyra_skills WHERE name=?").get(name) as DbSkill | undefined) ?? null; }
+  catch { return null; }
+}
+
+export function logSkillUse(name: string, success: boolean, note?: string): void {
+  const db = getDb(); if (!db) return;
+  try {
+    db.prepare("INSERT INTO lyra_skill_log (skill_name,success,note,used_at) VALUES (?,?,?,?)")
+      .run(name, success ? 1 : 0, note ?? null, new Date().toISOString());
+    db.prepare("UPDATE lyra_skills SET uses=uses+1, successes=successes+?, last_used=? WHERE name=?")
+      .run(success ? 1 : 0, new Date().toISOString(), name);
+  } catch { /* non-fatal */ }
+}
+
+export function getSkillLog(name?: string, limit = 50): Array<{ skill_name: string; success: number; note: string | null; used_at: string }> {
+  const db = getDb(); if (!db) return [];
+  try {
+    if (name) return db.prepare("SELECT * FROM lyra_skill_log WHERE skill_name=? ORDER BY used_at DESC LIMIT ?").all(name, limit) as never;
+    return db.prepare("SELECT * FROM lyra_skill_log ORDER BY used_at DESC LIMIT ?").all(limit) as never;
+  } catch { return []; }
+}
+

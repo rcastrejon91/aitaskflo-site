@@ -25,6 +25,8 @@ export interface Reflection {
   whatToImprove: string[];
   lessonsLearned: string[];
   score: number; // 1–10
+  topicTags?: string[];
+  callbackOpportunity?: string | null;
   createdAt: string;
 }
 

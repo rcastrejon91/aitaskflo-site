@@ -75,16 +75,23 @@ export async function writeStore<T>(filename: string, data: T): Promise<void> {
   }
 }
 
+export async function updateStore<T>(filename: string, data: T): Promise<T>;
 export async function updateStore<T>(
   filename: string,
   defaultValue: T,
   updater: (current: T) => T
+): Promise<T>;
+export async function updateStore<T>(
+  filename: string,
+  valueOrDefault: T,
+  updater?: (current: T) => T
 ): Promise<T> {
   ensureDataDir();
   await acquireLock(filename);
   try {
-    const current = readStore<T>(filename, defaultValue);
-    const updated = updater(current);
+    const updated = updater
+      ? updater(readStore<T>(filename, valueOrDefault))
+      : valueOrDefault;
     fs.writeFileSync(filePath(filename), JSON.stringify(updated, null, 2), "utf-8");
     return updated;
   } finally {

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Loader2, Sparkles, ArrowLeft, Paperclip, X, ImageIcon, Copy, Check as CheckIcon, Zap } from "lucide-react";
+import { Send, Loader2, Sparkles, ArrowLeft, Paperclip, X, ImageIcon, Copy, Check as CheckIcon, Zap, ThumbsUp, ThumbsDown } from "lucide-react";
 import Link from "next/link";
 import { MessageRenderer } from "./MessageRenderer";
 
@@ -86,15 +86,28 @@ function TypingDots() {
 }
 
 // ── Chat bubble ───────────────────────────────────────────────────────────────
-function ChatBubble({ msg, isStreaming }: { msg: Message; isStreaming: boolean }) {
+function ChatBubble({ msg, isStreaming, prevUserMessage }: { msg: Message; isStreaming: boolean; prevUserMessage?: string }) {
   const isUser = msg.role === "user";
   const [copied, setCopied] = useState(false);
+  const [feedback, setFeedback] = useState<1 | -1 | null>(null);
 
   function copyMessage() {
     navigator.clipboard.writeText(msg.content).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  }
+
+  async function sendFeedback(rating: 1 | -1) {
+    if (feedback !== null) return;
+    setFeedback(rating);
+    try {
+      await fetch("/api/lyra/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rating, userMessage: prevUserMessage ?? "", assistantMessage: msg.content }),
+      });
+    } catch { /* non-blocking */ }
   }
 
   return (
@@ -131,15 +144,32 @@ function ChatBubble({ msg, isStreaming }: { msg: Message; isStreaming: boolean }
           )}
         </div>
 
-        {/* Copy button — only for assistant messages with content */}
+        {/* Action row — copy + thumbs, assistant messages only */}
         {!isUser && msg.content && !isStreaming && (
-          <button
-            onClick={copyMessage}
-            className="self-start flex items-center gap-1 text-[11px] text-white/20 hover:text-white/50 transition-colors opacity-0 group-hover:opacity-100 px-1"
-          >
-            {copied ? <CheckIcon className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-            {copied ? "Copied" : "Copy"}
-          </button>
+          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity px-1">
+            <button
+              onClick={copyMessage}
+              className="flex items-center gap-1 text-[11px] text-white/20 hover:text-white/50 transition-colors"
+            >
+              {copied ? <CheckIcon className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+              {copied ? "Copied" : "Copy"}
+            </button>
+            <span className="text-white/10 text-[10px]">·</span>
+            <button
+              onClick={() => sendFeedback(1)}
+              className={`transition-colors ${feedback === 1 ? "text-emerald-400" : "text-white/20 hover:text-white/50"}`}
+              title="Good response"
+            >
+              <ThumbsUp className="w-3 h-3" />
+            </button>
+            <button
+              onClick={() => sendFeedback(-1)}
+              className={`transition-colors ${feedback === -1 ? "text-red-400" : "text-white/20 hover:text-white/50"}`}
+              title="Bad response"
+            >
+              <ThumbsDown className="w-3 h-3" />
+            </button>
+          </div>
         )}
       </div>
 
@@ -386,6 +416,7 @@ export default function LyraChat({ persona, referrer }: { persona?: string; refe
                 <ChatBubble
                   msg={msg}
                   isStreaming={loading && i === messages.length - 1}
+                  prevUserMessage={msg.role === "assistant" ? messages.slice(0, i).filter(m => m.role === "user").at(-1)?.content : undefined}
                 />
               </motion.div>
             ))}

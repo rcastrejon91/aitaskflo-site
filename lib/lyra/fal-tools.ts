@@ -9,9 +9,6 @@ function init() {
   fal.config({ credentials: process.env.FAL_KEY });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function cast<T>(v: unknown): T { return v as T; }
-
 // fal.run can return { data: T, requestId } or T directly depending on SDK version
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function unwrap<T>(raw: unknown): T {
@@ -169,3 +166,126 @@ export async function falFaceSwap(sourceUrl: string, targetUrl: string): Promise
   if (!url) throw new Error("No image returned");
   return url;
 }
+
+// ── PuLID — identity-consistent image generation ──────────────────────────────
+
+export async function falPuLID(params: {
+  prompt: string;
+  referenceImageUrl: string;
+  negativePrompt?: string;
+  seed?: number;
+  numInferenceSteps?: number;
+  guidanceScale?: number;
+}): Promise<{ url: string; seed: number }> {
+  init();
+  const raw = await fal.run("fal-ai/flux-pulid", {
+    input: {
+      prompt: params.prompt,
+      reference_image_url: params.referenceImageUrl,
+      negative_prompt: params.negativePrompt ?? "cartoon, anime, deformed, extra fingers, plastic skin, oversaturated, blurry",
+      num_inference_steps: params.numInferenceSteps ?? 28,
+      guidance_scale: params.guidanceScale ?? 3.5,
+      ...(params.seed !== undefined ? { seed: params.seed } : {}),
+    },
+  });
+  const result = unwrap<{ images: Array<{ url: string }>; seed?: number }>(raw);
+  const url = result.images?.[0]?.url;
+  if (!url) throw new Error("PuLID returned no image");
+  return { url, seed: result.seed ?? 0 };
+}
+
+// ── Flux batch generation (multiple seeds) ────────────────────────────────────
+
+export async function falImageGenBatch(params: {
+  prompt: string;
+  negativePrompt?: string;
+  count: number;
+  model?: "fast" | "quality" | "pro";
+}): Promise<Array<{ url: string; seed: number; index: number }>> {
+  init();
+  const modelId =
+    params.model === "pro"     ? "fal-ai/flux-pro"  :
+    params.model === "quality" ? "fal-ai/flux/dev"   :
+                                 "fal-ai/flux/schnell";
+
+  const results: Array<{ url: string; seed: number; index: number }> = [];
+
+  // Run in parallel batches of 5
+  const batchSize = 5;
+  for (let i = 0; i < params.count; i += batchSize) {
+    const batch = Array.from({ length: Math.min(batchSize, params.count - i) }, (_, j) => i + j);
+    const settled = await Promise.allSettled(
+      batch.map(async (index) => {
+        const seed = Math.floor(Math.random() * 999999999);
+        const raw = await fal.run(modelId, {
+          input: {
+            prompt: params.prompt,
+            negative_prompt: params.negativePrompt,
+            image_size: "portrait_4_3",
+            num_inference_steps: 28,
+            num_images: 1,
+            seed,
+            enable_safety_checker: false,
+          },
+        });
+        const result = unwrap<{ images: Array<{ url: string }> }>(raw);
+        const url = result.images?.[0]?.url;
+        if (!url) throw new Error("No image");
+        return { url, seed, index };
+      })
+    );
+    for (const s of settled) {
+      if (s.status === "fulfilled") results.push(s.value);
+    }
+  }
+
+  return results;
+}
+
+// ── Flux LoRA training ────────────────────────────────────────────────────────
+
+export async function falLoRATrain(params: {
+  trainingImages: Array<{ url: string; caption: string }>;
+  triggerWord: string;
+  steps?: number;
+}): Promise<{ loraUrl: string; trainingLog: string }> {
+  init();
+  const raw = await fal.run("fal-ai/flux-lora-fast-training", {
+    input: {
+      images_data_url: params.trainingImages.map(i => i.url).join(","),
+      trigger_word: params.triggerWord,
+      steps: params.steps ?? 1500,
+    },
+  });
+  const result = unwrap<{ diffusers_lora_file?: { url: string }; config_file?: { url: string } }>(raw);
+  const loraUrl = result.diffusers_lora_file?.url;
+  if (!loraUrl) throw new Error("LoRA training returned no weights URL");
+  return { loraUrl, trainingLog: JSON.stringify(result) };
+}
+
+// ── Flux with LoRA ────────────────────────────────────────────────────────────
+
+export async function falImageWithLoRA(params: {
+  prompt: string;
+  loraUrl: string;
+  loraScale?: number;
+  seed?: number;
+}): Promise<{ url: string; seed: number }> {
+  init();
+  const seed = params.seed ?? Math.floor(Math.random() * 999999999);
+  const raw = await fal.run("fal-ai/flux-lora", {
+    input: {
+      prompt: params.prompt,
+      loras: [{ path: params.loraUrl, scale: params.loraScale ?? 0.9 }],
+      image_size: "portrait_4_3",
+      num_inference_steps: 28,
+      seed,
+      enable_safety_checker: false,
+    },
+  });
+  const result = unwrap<{ images: Array<{ url: string }> }>(raw);
+  const url = result.images?.[0]?.url;
+  if (!url) throw new Error("No image from LoRA generation");
+  return { url, seed };
+}
+
