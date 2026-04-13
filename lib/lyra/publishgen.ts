@@ -81,6 +81,31 @@ function imageUrl(prompt: string, w = 800, h = 600): string {
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&nologo=true&seed=${Math.floor(Math.random() * 999999)}`;
 }
 
+async function aiImageUrl(prompt: string): Promise<string> {
+  // Try fal.ai FLUX first, fall back to Grok Aurora, then Pollinations
+  const falKey = process.env.FAL_KEY;
+  const xaiKey = process.env.XAI_API_KEY;
+
+  if (falKey) {
+    try {
+      const { falImageGen } = await import("./fal-tools");
+      const url = await falImageGen(prompt, "fast");
+      if (url) return url;
+    } catch { /* fall through */ }
+  }
+
+  if (xaiKey) {
+    try {
+      const { xaiImageGenSingle } = await import("./xai-tools");
+      const url = await xaiImageGenSingle(prompt);
+      if (url) return url;
+    } catch { /* fall through */ }
+  }
+
+  // Fallback: Pollinations
+  return imageUrl(prompt);
+}
+
 const TEMPLATE_PROMPTS: Record<DocTemplate, string> = {
   textbook: `academic textbook for students with clear explanations, examples, key terms in bold, and 3 exercises per section`,
   workbook: `interactive workbook with activities, fill-in exercises, reflection questions, and practice problems`,
@@ -136,9 +161,8 @@ Return ONLY valid JSON:
   const outline = JSON.parse(clean.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
 
   notify("Generating cover…");
-  const coverUrl = imageUrl(
-    outline.coverImagePrompt ?? `${topic} ${cfg.label} professional cover`,
-    Math.round(cfg.pageW), Math.round(cfg.pageH * 0.6)
+  const coverUrl = await aiImageUrl(
+    outline.coverImagePrompt ?? `${topic} ${cfg.label} professional cover art, dramatic lighting, high quality`
   );
 
   const sections: DocSection[] = [];
@@ -182,9 +206,8 @@ At least 400 words.`);
     }
 
     notify(`Illustrating: ${sec.title}…`);
-    const sectionImageUrl = imageUrl(
-      sec.imagePrompt ?? `${sec.title} ${topic} professional illustration diagram`,
-      600, 300
+    const sectionImageUrl = await aiImageUrl(
+      sec.imagePrompt ?? `${sec.title} ${topic} professional illustration, cinematic, detailed`
     );
 
     // Clean exercise and callout text from main content

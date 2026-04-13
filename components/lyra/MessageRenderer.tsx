@@ -1328,15 +1328,16 @@ function GeneratedImage({ url, isGameContext }: { url: string; isGameContext?: b
   const [retries, setRetries] = useState(0);
   const [gamePrompt, setGamePrompt] = useState<"idle" | "asked" | "added">("idle");
   const isFalUrl = url.includes("fal.media") || url.includes("fal.run") || url.includes("storage.googleapis") || url.startsWith("data:");
-  const MAX_RETRIES = isFalUrl ? 1 : 5;
+  const MAX_RETRIES = isFalUrl ? 4 : 5;
+  const RETRY_DELAY = isFalUrl ? 3000 : 6000;
 
-  // Pollinations can take 20-30s on cold start — retry up to 5 times
+  // fal.ai CDN can be slow to propagate — retry up to 4 times
   const handleError = () => {
     if (retries < MAX_RETRIES) {
       setTimeout(() => {
         setStatus("loading");
         setRetries(r => r + 1);
-      }, 6000);
+      }, RETRY_DELAY);
     } else {
       setStatus("error");
     }
