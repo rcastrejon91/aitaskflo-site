@@ -57,7 +57,8 @@ export async function updateProduct(shop: string, token: string, productId: stri
     method: "PUT",
     body: JSON.stringify({ product: { id: productId, ...fields } }),
   });
-  const data = await res.json() as { product: Record<string, unknown> };
+  const data = await res.json() as { product?: Record<string, unknown>; errors?: unknown };
+  if (!data.product) throw new Error(`Shopify error: ${JSON.stringify(data.errors ?? data)}`);
   return data.product;
 }
 
