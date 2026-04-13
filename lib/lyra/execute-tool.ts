@@ -1549,12 +1549,17 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
         return `✅ Product created: **${product.title}** (ID: ${product.id}) on ${shop} with image`;
       }
       case "update_product": {
-        if (!input.product_id) return "product_id is required for update";
-        const updated = await updateProduct(shop, access_token, input.product_id, {
-          title: input.product_title,
-          body_html: input.product_description,
-          tags: input.product_tags,
-        }) as { title: string };
+        if (!input.product_id) return "product_id is required for update — use list_products first to get the ID";
+        let updated: { title: string };
+        try {
+          updated = await updateProduct(shop, access_token, input.product_id, {
+            title: input.product_title,
+            body_html: input.product_description,
+            tags: input.product_tags,
+          }) as { title: string };
+        } catch (e) {
+          return `❌ Could not update Shopify product: ${e instanceof Error ? e.message : String(e)}`;
+        }
         return `✅ Product updated: **${updated.title}**`;
       }
       case "delete_product": {
