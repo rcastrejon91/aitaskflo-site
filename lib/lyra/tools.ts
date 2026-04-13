@@ -1713,6 +1713,33 @@ ACTIONS:
     },
   },
   {
+    name: "shopify_printful",
+    description: "Create a print-on-demand product (t-shirt, hoodie, mug, poster, tote bag, sticker, phone case) using Printful. Lyra generates the design with fal.ai, creates the Printful product, and syncs it to Shopify. Use when user wants to sell clothes, merch, or physical products without inventory.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        name: { type: "string", description: "Product name e.g. 'Dark Fantasy Wolf Hoodie'" },
+        description: { type: "string", description: "Product description" },
+        product_type: { type: "string", description: "unisex_tshirt | premium_tshirt | hoodie | zip_hoodie | tote_bag | mug | poster_small | poster_large | sticker" },
+        design_prompt: { type: "string", description: "fal.ai prompt for the design — be specific about style, colors, subject" },
+        price: { type: "string", description: "Retail price e.g. 34.99" },
+      },
+      required: ["name", "product_type"],
+    },
+  },
+  {
+    name: "shopify_hunt_trends",
+    description: "Research trending products to sell in a Shopify store. Analyzes current trends, scores demand vs competition, and returns winning product ideas with design prompts and ad angles. Use when user asks what to sell, wants product ideas, or asks Lyra to find trending items.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        niche: { type: "string", description: "Optional niche to focus on e.g. 'dark fantasy', 'fitness', 'pets'" },
+        count: { type: "string", description: "Number of product ideas to return (default: 5)" },
+        auto_create: { type: "string", description: "Set to 'true' to automatically create the top product in Shopify after research" },
+      },
+    },
+  },
+  {
     name: "shopify_create_store",
     description: "Create a complete Shopify store from a single description. Lyra picks the niche, creates products, writes descriptions, generates product images, sets prices, creates a launch discount, and gives the merchant an install link. Use when user says 'create me a store', 'start a shopify store', 'build me a [type] store', or 'set up a store selling [product]'.",
     input_schema: {
