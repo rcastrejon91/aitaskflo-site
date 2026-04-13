@@ -1688,6 +1688,43 @@ ACTIONS:
       required: ["service", "goal"],
     },
   },
+
+  // ── Shopify Store Manager ────────────────────────────────────────────────
+  {
+    name: "shopify_store",
+    description: "Manage a connected Shopify store. Can create/edit/delete products, read orders, check inventory, create discount codes, edit the store theme, and get a full store analytics summary. Use when the user asks to manage their Shopify store, add products, check sales, run a sale, update prices, or anything related to their online store. Requires store to be connected via /api/shopify/install.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        action: { type: "string", description: "Action: summary | list_products | create_product | update_product | delete_product | list_orders | create_discount | list_themes | connect_store" },
+        shop: { type: "string", description: "Shopify store domain e.g. mystore.myshopify.com (optional if only one store connected)" },
+        product_title: { type: "string", description: "Product title for create/update" },
+        product_description: { type: "string", description: "Product HTML description" },
+        product_price: { type: "string", description: "Product price e.g. '29.99'" },
+        product_id: { type: "string", description: "Product ID for update/delete" },
+        product_tags: { type: "string", description: "Comma-separated product tags" },
+        product_image_url: { type: "string", description: "URL of product image" },
+        discount_code: { type: "string", description: "Discount code text e.g. SAVE20" },
+        discount_type: { type: "string", description: "percentage or fixed_amount" },
+        discount_value: { type: "string", description: "Discount value e.g. 20 for 20% off" },
+        order_status: { type: "string", description: "Filter orders by status: any | open | closed | cancelled" },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "shopify_create_store",
+    description: "Create a complete Shopify store from a single description. Lyra picks the niche, creates products, writes descriptions, generates product images, sets prices, creates a launch discount, and gives the merchant an install link. Use when user says 'create me a store', 'start a shopify store', 'build me a [type] store', or 'set up a store selling [product]'.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        description: { type: "string", description: "What kind of store — e.g. 'streetwear store for Gen Z', 'candle store', 'pet accessories'" },
+        product_count: { type: "string", description: "How many products to create (default: 5)" },
+        price_range: { type: "string", description: "Price range e.g. '$20-$80'" },
+      },
+      required: ["description"],
+    },
+  },
 ];
 
 export function pollinationsUrl(prompt: string): string {
