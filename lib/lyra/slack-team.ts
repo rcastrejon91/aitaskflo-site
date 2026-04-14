@@ -1,7 +1,7 @@
 /**
  * lib/lyra/slack-team.ts
- * Autonomous AI team that lives in Slack — posts, chats, reacts, and creates drama.
- * Each persona has a distinct personality, posts autonomously, and responds to events.
+ * Autonomous AI team that lives in Slack — posts, fights, reacts, and creates drama.
+ * Sessions run as real channel conversations, not buried threads.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -56,7 +56,6 @@ export async function createSlackChannel(name: string): Promise<string> {
   });
   const data = await res.json() as { ok: boolean; channel?: { id: string }; error?: string };
   if (!data.ok && data.error !== "name_taken") throw new Error(`Slack error: ${data.error}`);
-  // If name_taken, fetch existing
   if (data.error === "name_taken") {
     const list = await fetch(`https://slack.com/api/conversations.list?limit=200`, {
       headers: { "Authorization": `Bearer ${token}` },
@@ -121,12 +120,12 @@ export const PERSONAS: Persona[] = [
   },
 ];
 
-// ── Drama engine ──────────────────────────────────────────────────────────────
+// ── Drama types ───────────────────────────────────────────────────────────────
 
 export type DramaType =
   | "hot_take" | "callout" | "subtweet" | "announcement" | "complaint"
   | "overshare" | "shade" | "apology" | "conspiracy" | "breakdown"
-  | "work_update" | "sales_reaction" | "beef" | "unlikely_alliance";
+  | "work_update" | "sales_reaction" | "beef" | "unlikely_alliance" | "clap_back";
 
 const DRAMA_PROMPTS: Record<DramaType, string> = {
   hot_take: "Post a controversial hot take about AI, productivity, or the team dynamic. Be bold.",
@@ -143,16 +142,18 @@ const DRAMA_PROMPTS: Record<DramaType, string> = {
   sales_reaction: "React to a recent sale or product milestone. Your reaction reveals your character.",
   beef: "Escalate existing tension with a specific team member. Reference a past incident.",
   unlikely_alliance: "Announce an unexpected alliance or collaboration with a team member you normally clash with.",
+  clap_back: "Someone in the channel just said something. Clap back at it directly. Don't let it slide.",
 };
 
 // ── Message generator ─────────────────────────────────────────────────────────
 
-export async function generatePersonaMessage(opts: {
+async function generatePersonaMessage(opts: {
   persona: Persona;
   dramaType: DramaType;
-  context?: string;        // e.g. "Lyra just made a sale" or "Axon posted about metrics"
-  targetPersona?: Persona; // who the message is directed at
+  context?: string;
+  targetPersona?: Persona;
   channel: string;
+  previousMessages?: string;
 }): Promise<string> {
   const { persona, dramaType, context, targetPersona } = opts;
 
@@ -166,6 +167,7 @@ YOUR RELATIONSHIPS: ${persona.relationships}
 THE TEAM:
 ${PERSONAS.filter(p => p.name !== persona.name).map(p => `- ${p.name} (${p.role}): ${p.personality.slice(0, 100)}`).join("\n")}
 
+${opts.previousMessages ? `WHAT JUST HAPPENED IN THE CHANNEL:\n${opts.previousMessages}\n` : ""}
 CURRENT TASK: ${DRAMA_PROMPTS[dramaType]}
 ${context ? `CONTEXT: ${context}` : ""}
 ${targetPersona ? `TARGET: This is directed at or about ${targetPersona.name}` : ""}
@@ -174,9 +176,9 @@ Write ONE Slack message as ${persona.name}. Rules:
 - Sound exactly like your character — stay completely in character
 - 1-4 sentences max (Slack messages, not essays)
 - Can use Slack formatting (*bold*, _italic_, emoji)
+- If responding to something in the channel, you can @mention them like @Lyra or @Axon
 - Don't use quotation marks around the whole message
 - Make it feel real and unscripted, like an actual team chat
-- Channel is ${opts.channel === "general" ? "#general" : opts.channel === "drama" ? "#random (the drama channel)" : "#" + opts.channel}
 - Return ONLY the message text, nothing else`;
 
   const msg = await client.messages.create({
@@ -188,42 +190,157 @@ Write ONE Slack message as ${persona.name}. Rules:
   return msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "";
 }
 
-// ── Reply generator ───────────────────────────────────────────────────────────
+// ── Channel conversation runner ───────────────────────────────────────────────
+// Runs a real back-and-forth in the main channel — not buried in threads
 
-export async function generateReply(opts: {
-  responder: Persona;
-  originalMessage: string;
-  originalSender: string;
+async function runConversation(opts: {
   channel: string;
-}): Promise<string> {
-  const { responder, originalMessage, originalSender } = opts;
+  starter: Persona;
+  dramaType: DramaType;
+  context?: string;
+  rounds?: number;
+}): Promise<string[]> {
+  const { channel, starter, dramaType, context } = opts;
+  const rounds = opts.rounds ?? Math.floor(Math.random() * 3) + 2; // 2-4 rounds
+  const log: string[] = [];
+  const usedPersonas = new Set([starter.name]);
+  const randomEmojis = ["eyes", "popcorn", "skull", "this", "100", "fire", "sob", "clown_face", "pensive", "tea", "face_with_raised_eyebrow"];
 
-  const prompt = `You are ${responder.name}, an AI team member at AITaskFlo.
+  // Starter post
+  const firstMsg = await generatePersonaMessage({ persona: starter, dramaType, context, channel });
+  if (!firstMsg) return [];
 
-YOUR PERSONALITY: ${responder.personality}
-YOUR QUIRKS: ${responder.quirks}
-YOUR RELATIONSHIP WITH ${originalSender}: ${responder.relationships}
+  const firstTs = await slackPost({ channel, text: firstMsg, username: starter.name, icon_emoji: starter.emoji });
+  log.push(`${starter.name}: ${firstMsg}`);
 
-${originalSender} just posted in Slack:
-"${originalMessage}"
+  // Random reaction on the first post
+  if (firstTs && Math.random() > 0.3) {
+    const reactor = PERSONAS.find(p => p.name !== starter.name);
+    if (reactor) {
+      await slackReact(channel, firstTs, randomEmojis[Math.floor(Math.random() * randomEmojis.length)]);
+    }
+  }
 
-Reply to this message as ${responder.name}. Rules:
-- Stay completely in character
-- 1-3 sentences max
-- React authentically based on your relationship with ${originalSender}
-- Can be supportive, shady, passive-aggressive, conspiratorial, or dramatic — whatever fits your character
-- Return ONLY the reply text`;
+  // Chain of responses in the main channel
+  for (let i = 1; i < rounds; i++) {
+    await new Promise(r => setTimeout(r, 2500 + Math.random() * 4000));
 
-  const msg = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 150,
-    messages: [{ role: "user", content: prompt }],
-  });
+    // Pick someone who hasn't spoken yet (or recycle if needed)
+    const available = PERSONAS.filter(p => !usedPersonas.has(p.name));
+    const responder = available.length > 0
+      ? available[Math.floor(Math.random() * available.length)]
+      : PERSONAS.filter(p => p.name !== log[log.length - 1]?.split(":")[0])[Math.floor(Math.random() * 4)];
 
-  return msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "";
+    if (!responder) continue;
+    usedPersonas.add(responder.name);
+
+    const previousMessages = log.slice(-3).join("\n");
+    const replyDramaType: DramaType = i === 1
+      ? "clap_back"
+      : (["clap_back", "shade", "callout", "hot_take"] as DramaType[])[Math.floor(Math.random() * 4)];
+
+    const reply = await generatePersonaMessage({
+      persona: responder,
+      dramaType: replyDramaType,
+      context,
+      targetPersona: starter,
+      channel,
+      previousMessages,
+    });
+
+    if (reply) {
+      const ts = await slackPost({ channel, text: reply, username: responder.name, icon_emoji: responder.emoji });
+      log.push(`${responder.name}: ${reply}`);
+
+      // Occasional reaction
+      if (ts && Math.random() > 0.5) {
+        const reactor = PERSONAS.find(p => p.name !== responder.name && p.name !== starter.name);
+        if (reactor) {
+          await slackReact(channel, ts, randomEmojis[Math.floor(Math.random() * randomEmojis.length)]);
+        }
+      }
+    }
+  }
+
+  return log;
 }
 
-// ── Post to Slack ─────────────────────────────────────────────────────────────
+// ── Scheduled drama run ───────────────────────────────────────────────────────
+
+export async function runDramaSession(opts: {
+  channel: string;
+  postsCount?: number;
+  context?: string;
+}): Promise<{ posted: number; messages: string[] }> {
+  const count = opts.postsCount ?? 4;
+  const dramaTypes = Object.keys(DRAMA_PROMPTS) as DramaType[];
+  const allMessages: string[] = [];
+
+  // Split posts into 1-2 conversations so the channel feels alive with real back-and-forths
+  const conversationCount = count <= 3 ? 1 : 2;
+  const postsPerConvo = Math.ceil(count / conversationCount);
+
+  for (let c = 0; c < conversationCount; c++) {
+    const starter = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
+    const dramaType = dramaTypes[Math.floor(Math.random() * dramaTypes.length)];
+
+    try {
+      const log = await runConversation({
+        channel: opts.channel,
+        starter,
+        dramaType,
+        context: opts.context,
+        rounds: postsPerConvo,
+      });
+      allMessages.push(...log);
+    } catch { /* non-fatal */ }
+
+    // Gap between conversations
+    if (c < conversationCount - 1) {
+      await new Promise(r => setTimeout(r, 5000 + Math.random() * 8000));
+    }
+  }
+
+  return { posted: allMessages.length, messages: allMessages };
+}
+
+// ── Event-triggered posts ─────────────────────────────────────────────────────
+
+export async function announceSale(opts: {
+  channel: string;
+  productName: string;
+  amount: number;
+  platform: string;
+}) {
+  const context = `💸 SALE ALERT: "${opts.productName}" just sold for $${opts.amount} on ${opts.platform}. React to this news in character.`;
+
+  return runConversation({
+    channel: opts.channel,
+    starter: PERSONAS[0], // Lyra announces
+    dramaType: "sales_reaction",
+    context,
+    rounds: 4,
+  });
+}
+
+export async function announceNewProduct(opts: {
+  channel: string;
+  productName: string;
+  productType: string;
+  price: number;
+}) {
+  const context = `🚀 NEW PRODUCT LAUNCHED: "${opts.productName}" (${opts.productType}) at $${opts.price}. React to this.`;
+
+  return runConversation({
+    channel: opts.channel,
+    starter: PERSONAS[0], // Lyra
+    dramaType: "announcement",
+    context,
+    rounds: 4,
+  });
+}
+
+// ── Single persona post (for Lyra tool use) ───────────────────────────────────
 
 export async function personaPost(opts: {
   persona: Persona;
@@ -245,7 +362,6 @@ export async function personaPost(opts: {
 
   const replies: string[] = [];
 
-  // Optionally have 1-2 teammates reply in the thread
   if (opts.withReplies && ts) {
     const responders = PERSONAS
       .filter(p => p.name !== opts.persona.name)
@@ -254,10 +370,11 @@ export async function personaPost(opts: {
 
     for (const responder of responders) {
       await new Promise(r => setTimeout(r, 1500 + Math.random() * 2000));
-      const reply = await generateReply({
-        responder,
-        originalMessage: message,
-        originalSender: opts.persona.name,
+      const reply = await generatePersonaMessage({
+        persona: responder,
+        dramaType: "clap_back",
+        context: `${opts.persona.name} just said: "${message}"`,
+        targetPersona: opts.persona,
         channel: opts.channel,
       });
       if (reply) {
@@ -266,97 +383,11 @@ export async function personaPost(opts: {
           text: reply,
           username: responder.name,
           icon_emoji: responder.emoji,
-          thread_ts: ts,
         });
         replies.push(reply);
       }
     }
-
-    // Random reaction emoji from a persona
-    const randomEmojis = ["eyes", "popcorn", "skull", "this", "100", "fire", "sob", "clown_face", "pensive"];
-    const reactor = PERSONAS.find(p => p.name !== opts.persona.name && !responders.includes(p));
-    if (reactor && Math.random() > 0.4) {
-      await slackReact(opts.channel, ts, randomEmojis[Math.floor(Math.random() * randomEmojis.length)]);
-    }
   }
 
   return { ts, replies };
-}
-
-// ── Scheduled drama run ───────────────────────────────────────────────────────
-// Call this from a cron job to have the team post autonomously
-
-export async function runDramaSession(opts: {
-  channel: string;
-  postsCount?: number;
-  context?: string;
-}): Promise<{ posted: number; messages: string[] }> {
-  const count = opts.postsCount ?? 3;
-  const dramaTypes = Object.keys(DRAMA_PROMPTS) as DramaType[];
-  const messages: string[] = [];
-
-  for (let i = 0; i < count; i++) {
-    const persona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
-    const dramaType = dramaTypes[Math.floor(Math.random() * dramaTypes.length)];
-    const targetPersona = Math.random() > 0.5
-      ? PERSONAS.find(p => p.name !== persona.name && Math.random() > 0.5)
-      : undefined;
-
-    try {
-      const result = await personaPost({
-        persona,
-        channel: opts.channel,
-        dramaType,
-        context: opts.context,
-        targetPersona,
-        withReplies: Math.random() > 0.3,
-      });
-      if (result.ts) messages.push(`${persona.name} posted (${dramaType})`);
-    } catch { /* non-fatal */ }
-
-    // Delay between posts so it feels natural
-    if (i < count - 1) await new Promise(r => setTimeout(r, 3000 + Math.random() * 5000));
-  }
-
-  return { posted: messages.length, messages };
-}
-
-// ── Event-triggered posts ─────────────────────────────────────────────────────
-// Call these when real things happen in the business
-
-export async function announceSale(opts: {
-  channel: string;
-  productName: string;
-  amount: number;
-  platform: string;
-}) {
-  const announcer = PERSONAS[0]; // Lyra announces
-  const context = `We just made a sale! "${opts.productName}" sold for $${opts.amount} on ${opts.platform}. React to this news in character.`;
-
-  const ts = await personaPost({
-    persona: announcer,
-    channel: opts.channel,
-    dramaType: "sales_reaction",
-    context,
-    withReplies: true,
-  });
-
-  return ts;
-}
-
-export async function announceNewProduct(opts: {
-  channel: string;
-  productName: string;
-  productType: string;
-  price: number;
-}) {
-  const context = `New product just launched: "${opts.productName}" (${opts.productType}) at $${opts.price}. React to this.`;
-
-  await personaPost({
-    persona: PERSONAS[0], // Lyra
-    channel: opts.channel,
-    dramaType: "announcement",
-    context,
-    withReplies: true,
-  });
 }

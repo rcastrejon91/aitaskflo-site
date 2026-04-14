@@ -1,11 +1,27 @@
 /**
- * POST /api/slack/drama
- * Trigger a drama session manually or via cron
- * Body: { channel?, count?, context?, secret? }
+ * GET  /api/slack/drama?key=... — Vercel cron trigger
+ * POST /api/slack/drama         — Manual trigger or event-driven
+ * Body: { channel?, count?, context?, secret?, event?, productName?, amount?, platform?, productType?, price? }
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { runDramaSession, announceSale, announceNewProduct } from "@/lib/lyra/slack-team";
+
+// Vercel cron hits GET — run a drama session automatically
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const key = searchParams.get("key");
+  if (key !== process.env.CRON_SECRET && req.headers.get("x-cron-secret") !== process.env.CRON_SECRET) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const channel = process.env.SLACK_DRAMA_CHANNEL ?? "general";
+  try {
+    const result = await runDramaSession({ channel, postsCount: 4 });
+    return NextResponse.json({ ok: true, ...result });
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+  }
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({})) as {
@@ -21,7 +37,6 @@ export async function POST(req: NextRequest) {
     price?: number;
   };
 
-  // Auth check
   if (body.secret !== process.env.CRON_SECRET && req.headers.get("x-cron-secret") !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -29,7 +44,6 @@ export async function POST(req: NextRequest) {
   const channel = body.channel ?? process.env.SLACK_DRAMA_CHANNEL ?? "general";
 
   try {
-    // Event-driven posts
     if (body.event === "sale" && body.productName) {
       await announceSale({
         channel,
@@ -50,10 +64,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, event: "product_announced" });
     }
 
-    // Regular drama session
     const result = await runDramaSession({
       channel,
-      postsCount: body.count ?? 3,
+      postsCount: body.count ?? 4,
       context: body.context,
     });
 
