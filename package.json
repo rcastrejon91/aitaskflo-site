@@ -12,7 +12,7 @@
     "@anthropic-ai/sdk": "^0.88.0",
     "@fal-ai/client": "^1.9.5",
     "@react-pdf/renderer": "^4.4.1",
-    "@stripe/stripe-js": "^8.11.0",
+    "@stripe/stripe-js": "^9.1.0",
     "@types/bcryptjs": "^3.0.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/nodemailer": "^8.0.0",
@@ -24,7 +24,7 @@
     "framer-motion": "^12.38.0",
     "gif-encoder-2": "^1.0.5",
     "groq-sdk": "^1.1.2",
-    "lucide-react": "^0.427.0",
+    "lucide-react": "^1.8.0",
     "next": "^16.2.3",
     "next-auth": "^5.0.0-beta.30",
     "next-themes": "^0.4.6",
@@ -32,13 +32,13 @@
     "openai": "^6.34.0",
     "playwright": "^1.59.1",
     "pngjs": "^7.0.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
     "react-markdown": "^10.1.0",
     "react-syntax-highlighter": "^16.1.1",
     "remark-gfm": "^4.0.1",
-    "stripe": "^20.4.1",
-    "tailwind-merge": "^2.5.2"
+    "stripe": "^22.0.1",
+    "tailwind-merge": "^3.5.0"
   },
   "overrides": {
     "picomatch": "^4.0.4"
@@ -47,12 +47,12 @@
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^20.19.27",
     "@types/pngjs": "^6.0.5",
-    "@types/react": "^18.3.27",
-    "@types/react-dom": "^18.3.7",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.58.1",
     "@typescript-eslint/parser": "^8.58.1",
     "autoprefixer": "^10.4.27",
-    "eslint": "^9.39.4",
+    "eslint": "^10.2.0",
     "eslint-config-next": "^16.2.3",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
@@ -64,6 +64,6 @@
     "postcss": "^8.5.9",
     "prettier": "^3.8.2",
     "tailwindcss": "^4.2.2",
-    "typescript": "^5.5.4"
+    "typescript": "^6.0.2"
   }
 }

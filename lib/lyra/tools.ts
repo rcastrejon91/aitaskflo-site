@@ -1766,6 +1766,23 @@ ACTIONS:
     },
   },
   {
+    name: "slack_drama",
+    description: "Post AI team drama to the Slack workspace. The AI team (Lyra, Axon, Nova, Hex, Milo) will post messages, reply to each other, react, and create office drama. Use when user wants to stir up the Slack, post team updates, announce a sale/product, or just make things interesting.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        channel: { type: "string", description: "Slack channel name e.g. 'general', 'drama', 'sales'" },
+        count: { type: "string", description: "Number of posts to make (default: 3)" },
+        context: { type: "string", description: "Optional context e.g. 'we just hit $1000 revenue' or 'Milo broke the build again'" },
+        event: { type: "string", description: "Special event: 'sale' or 'new_product'" },
+        product_name: { type: "string", description: "Product name for sale/new_product events" },
+        amount: { type: "string", description: "Sale amount in USD for sale events" },
+        platform: { type: "string", description: "Platform for sale events e.g. 'Gumroad', 'Shopify'" },
+      },
+      required: [],
+    },
+  },
+  {
     name: "shopify_create_store",
     description: "Create a complete Shopify store from a single description. Lyra picks the niche, creates products, writes descriptions, generates product images, sets prices, creates a launch discount, and gives the merchant an install link. Use when user says 'create me a store', 'start a shopify store', 'build me a [type] store', or 'set up a store selling [product]'.",
     input_schema: {

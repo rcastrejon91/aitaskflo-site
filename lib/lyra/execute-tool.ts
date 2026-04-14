@@ -3931,6 +3931,31 @@ Keep it concise and practical.`,
     return `📧 Email campaign complete. Sent: ${sent} | Failed: ${failed} | Total buyers: ${emails.length}`;
   }
 
+  // ── Slack Drama ───────────────────────────────────────────────────────────────
+  if (name === "slack_drama") {
+    if (!process.env.SLACK_BOT_TOKEN) return "SLACK_BOT_TOKEN not set — add it to .env.local first.";
+    const progress = (msg: string) => { try { controller.enqueue(encoder.encode(`\n${msg}`)); } catch { /* closed */ } };
+    const channel = input.channel ?? process.env.SLACK_DRAMA_CHANNEL ?? "general";
+    const count = parseInt(input.count ?? "3", 10) || 3;
+
+    progress(`🎭 Stirring up drama in #${channel}…`);
+
+    const { runDramaSession, announceSale, announceNewProduct } = await import("@/lib/lyra/slack-team");
+
+    if (input.event === "sale" && input.product_name) {
+      await announceSale({ channel, productName: input.product_name, amount: parseFloat(input.amount ?? "0"), platform: input.platform ?? "Gumroad" });
+      return `📣 Sale announced in #${channel} — the team is reacting!`;
+    }
+
+    if (input.event === "new_product" && input.product_name) {
+      await announceNewProduct({ channel, productName: input.product_name, productType: input.product_type ?? "product", price: parseFloat(input.amount ?? "0") });
+      return `📣 New product announced in #${channel}!`;
+    }
+
+    const result = await runDramaSession({ channel, postsCount: count, context: input.context });
+    return `🎭 Drama session complete — ${result.posted} posts in #${channel}:\n${result.messages.join("\n")}`;
+  }
+
   const card = JSON.stringify({ tool: name, ...input });
   controller.enqueue(encoder.encode(`\n${card}`));
   return `${name} recorded.`;
