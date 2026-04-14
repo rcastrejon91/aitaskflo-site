@@ -40,7 +40,7 @@ export default function ScreenPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const stateTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const stateTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const recognitionRef = useRef<{ stop(): void } | null>(null);
   const esRef = useRef<EventSource | null>(null);
 
