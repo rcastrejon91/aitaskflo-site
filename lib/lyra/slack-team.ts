@@ -292,8 +292,9 @@ export async function runDramaSession(opts: {
         context: opts.context,
         rounds: postsPerConvo,
       });
+      console.log(`[drama] conversation ${c + 1} log:`, log);
       allMessages.push(...log);
-    } catch { /* non-fatal */ }
+    } catch (e) { console.error(`[drama] conversation ${c + 1} failed:`, e); }
 
     // Gap between conversations
     if (c < conversationCount - 1) {
