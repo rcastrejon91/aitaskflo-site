@@ -1,39 +1,19 @@
-name: Deploy to DigitalOcean
+name: Notify Slack on Push
 
 on:
   push:
     branches: [main]
 
 jobs:
-  deploy:
+  notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DO_HOST }}
-          username: ${{ secrets.DO_USER }}
-          key: ${{ secrets.DO_SSH_KEY }}
-          port: ${{ secrets.DO_PORT || 22 }}
-          script: |
-            set -e
-            cd /home/aitaskflo
-
-            echo "→ Pulling latest code..."
-            git pull origin main
-
-            echo "→ Installing dependencies..."
-            npm install --legacy-peer-deps
-
-            echo "→ Building..."
-            npm run build
-
-            echo "→ Restarting app..."
-            if pm2 list | grep -q aitaskflo; then
-              pm2 reload aitaskflo --update-env
-            else
-              pm2 start npm --name aitaskflo -- start
-              pm2 save
-            fi
-
-            echo "✓ Deployed successfully"
+      - name: Notify Slack
+        run: |
+          curl -X POST https://slack.com/api/chat.postMessage \
+            -H "Authorization: Bearer ${{ secrets.SLACK_BOT_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "channel": "a-project",
+              "text": ":rocket: *New commit pushed to main*\nAuthor: ${{ github.actor }}\nMessage: ${{ github.event.head_commit.message }}"
+            }'
