@@ -15,5 +15,5 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "channel": "a-project",
-              "text": ":rocket: *New commit pushed to main*\nAuthor: ${{ github.actor }}\nMessage: ${{ github.event.head_commit.message }}"
+              "text": ":rocket: *New commit pushed to main*\nAuthor: AITaskFlo\nMessage: ${{ github.event.head_commit.message }}"
             }'
