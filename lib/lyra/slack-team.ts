@@ -341,6 +341,52 @@ export async function announceNewProduct(opts: {
   });
 }
 
+// ── Event-driven persona response (listens and replies to messages) ───────────
+
+export async function generatePersonaResponse(opts: {
+  persona: Persona;
+  message: string;
+  channel: string;
+  responseType: "answer" | "summary" | "task" | "alert" | "hype";
+}) {
+  const prompts = {
+    answer: `Someone in the channel asked: "${opts.message}". Answer it in character. Be helpful but stay true to your personality.`,
+    summary: `Someone asked for a summary. The context is: "${opts.message}". Summarize it in your style.`,
+    task: `Someone wants to create a task: "${opts.message}". Acknowledge it and log it in character as Milo would — eager but slightly resentful.`,
+    alert: `There's an issue being reported: "${opts.message}". React to this as your character would — investigate, warn, or escalate in your style.`,
+    hype: `Good news is happening: "${opts.message}". React to this milestone in character.`,
+  };
+
+  const prompt = `You are ${opts.persona.name}, an AI team member at AITaskFlo.
+YOUR ROLE: ${opts.persona.role}
+YOUR PERSONALITY: ${opts.persona.personality}
+YOUR QUIRKS: ${opts.persona.quirks}
+
+${prompts[opts.responseType]}
+
+Write ONE Slack message as ${opts.persona.name}. Rules:
+- Stay completely in character
+- 1-3 sentences max
+- Can use Slack formatting (*bold*, _italic_, emoji)
+- Return ONLY the message text`;
+
+  const msg = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 200,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const text = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "";
+  if (!text) return;
+
+  await slackPost({
+    channel: opts.channel,
+    text,
+    username: opts.persona.name,
+    icon_emoji: opts.persona.emoji,
+  });
+}
+
 // ── Single persona post (for Lyra tool use) ───────────────────────────────────
 
 export async function personaPost(opts: {
