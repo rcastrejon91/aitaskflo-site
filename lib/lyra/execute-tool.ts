@@ -3708,7 +3708,11 @@ If there is an "Apply" or "Apply Now" button, click it. Fill required fields wit
 
   // ── Clinical Assistant ──────────────────────────────────────────────────────
 
-  if (name === "ehr_patient") {
+  if (name === "ehr_patient" || name === "ehr_encounter") {
+    return "EHR patient tools are not available yet. Coming soon.";
+  }
+
+  if (name === "ehr_patient_DISABLED") {
     const action = input.action ?? "list";
     const uid = userId ?? "anon";
 
@@ -3748,7 +3752,7 @@ If there is an "Apply" or "Apply Now" button, click it. Fill required fields wit
     return `**${patients.length} patient(s) on record:**\n\n` + patients.map(formatPatientSummary).join("\n\n");
   }
 
-  if (name === "ehr_encounter") {
+  if (name === "ehr_encounter_DISABLED") {
     const action = input.action ?? "list";
     const uid = userId ?? "anon";
 
