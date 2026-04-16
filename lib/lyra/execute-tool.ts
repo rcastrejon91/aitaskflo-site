@@ -74,6 +74,37 @@ import {
   formatPubMedResults,
   formatBookResults,
 } from "@/lib/lyra/clinical";
+import {
+  getAccessories,
+  getAllLights,
+  turnOn,
+  turnOff,
+  setBrightness,
+  setColor,
+  setSceneAllLights,
+  storyLightReaction,
+} from "@/lib/lyra/homebridge";
+import {
+  getArmStatus,
+  moveToPosition,
+  runProgram,
+  stopArm,
+  openGripper,
+  closeGripper,
+  getVideoFeed as getArmVideoFeed,
+} from "@/lib/lyra/robot-arm";
+import {
+  getDroneStatus,
+  takeoff,
+  land,
+  moveTo,
+  hover,
+  returnHome,
+} from "@/lib/lyra/drone";
+import {
+  checkIn,
+  alertContacts,
+} from "@/lib/lyra/rugged";
 
 // ── Tool dispatcher ───────────────────────────────────────────────────────────
 
@@ -1159,12 +1190,49 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
 
   if (name === "maps_geocode") {
     const { toolGeocode } = await import("@/lib/lyra/google-tools");
-    return await toolGeocode(input.address ?? "");
+    const result = await toolGeocode(input.address ?? "");
+    // Emit map event so the client MapPanel can drop a pin
+    const latMatch = result.match(/Lat:\s*([-\d.]+)/);
+    const lngMatch = result.match(/Lng:\s*([-\d.]+)/);
+    if (latMatch && lngMatch) {
+      const lat = parseFloat(latMatch[1]);
+      const lng = parseFloat(lngMatch[1]);
+      const mapPayload = JSON.stringify({
+        type: "pin",
+        pin: { position: { lat, lng }, label: input.address, title: input.address },
+        center: { lat, lng },
+        zoom: 14,
+      });
+      controller.enqueue(encoder.encode(`\n__MAP__${mapPayload}__MAP__`));
+    }
+    return result;
   }
 
   if (name === "maps_distance") {
     const { toolDistanceMatrix } = await import("@/lib/lyra/google-tools");
-    return await toolDistanceMatrix(input.origin ?? "", input.destination ?? "", input.mode ?? "driving");
+    const result = await toolDistanceMatrix(input.origin ?? "", input.destination ?? "", input.mode ?? "driving");
+    // Emit a route event so the MapPanel can show the route
+    const { toolGeocode: geocodeForRoute } = await import("@/lib/lyra/google-tools");
+    const [originResult, destResult] = await Promise.all([
+      geocodeForRoute(input.origin ?? ""),
+      geocodeForRoute(input.destination ?? ""),
+    ]);
+    const oLat = originResult.match(/Lat:\s*([-\d.]+)/);
+    const oLng = originResult.match(/Lng:\s*([-\d.]+)/);
+    const dLat = destResult.match(/Lat:\s*([-\d.]+)/);
+    const dLng = destResult.match(/Lng:\s*([-\d.]+)/);
+    if (oLat && oLng && dLat && dLng) {
+      const waypoints = [
+        { lat: parseFloat(oLat[1]), lng: parseFloat(oLng[1]) },
+        { lat: parseFloat(dLat[1]), lng: parseFloat(dLng[1]) },
+      ];
+      const mapPayload = JSON.stringify({
+        type: "route",
+        route: { waypoints, label: `${input.origin} → ${input.destination}` },
+      });
+      controller.enqueue(encoder.encode(`\n__MAP__${mapPayload}__MAP__`));
+    }
+    return result;
   }
 
   if (name === "maps_timezone") {
@@ -1208,21 +1276,75 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
       if (type === "directions") {
         // Directions API
         const parts = query.split(/\bto\b/i);
-        const origin = encodeURIComponent((parts[0] ?? query).trim());
-        const destination = encodeURIComponent((parts[1] ?? query).trim());
+        const originRaw = (parts[0] ?? query).trim();
+        const destRaw = (parts[1] ?? query).trim();
+        const origin = encodeURIComponent(originRaw);
+        const destination = encodeURIComponent(destRaw);
         const res = await fetch(`https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&key=${key}`);
-        const data = await res.json() as { routes?: Array<{ legs?: Array<{ duration: { text: string }; distance: { text: string }; steps?: Array<{ html_instructions: string }> }> }> };
+        const data = await res.json() as {
+          routes?: Array<{
+            legs?: Array<{
+              duration: { text: string };
+              distance: { text: string };
+              steps?: Array<{ html_instructions: string }>;
+              start_location?: { lat: number; lng: number };
+              end_location?: { lat: number; lng: number };
+            }>;
+          }>;
+        };
         const leg = data.routes?.[0]?.legs?.[0];
         if (!leg) return "No route found.";
         const steps = leg.steps?.slice(0, 8).map(s => s.html_instructions.replace(/<[^>]+>/g, "")).join("\n") ?? "";
+        // Emit MAP event so the MapPanel shows the route
+        if (leg.start_location && leg.end_location) {
+          const mapPayload = JSON.stringify({
+            type: "route",
+            route: {
+              waypoints: [
+                { lat: leg.start_location.lat, lng: leg.start_location.lng },
+                { lat: leg.end_location.lat, lng: leg.end_location.lng },
+              ],
+              label: `${originRaw} → ${destRaw}`,
+            },
+          });
+          controller.enqueue(encoder.encode(`\n__MAP__${mapPayload}__MAP__`));
+        }
         return `**Directions:** ${leg.duration.text} (${leg.distance.text})\n\n${steps}`;
       } else {
         // Places Text Search
-        const location = input.location ? `&location=${encodeURIComponent(input.location)}` : "";
-        const res = await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}${location}&key=${key}`);
-        const data = await res.json() as { results?: Array<{ name: string; formatted_address: string; rating?: number; opening_hours?: { open_now?: boolean } }> };
+        const locationParam = input.location ? `&location=${encodeURIComponent(input.location)}` : "";
+        const res = await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}${locationParam}&key=${key}`);
+        const data = await res.json() as {
+          results?: Array<{
+            name: string;
+            formatted_address: string;
+            rating?: number;
+            opening_hours?: { open_now?: boolean };
+            geometry?: { location: { lat: number; lng: number } };
+          }>;
+        };
         const results = data.results?.slice(0, 5) ?? [];
         if (!results.length) return "No places found.";
+        // Emit MAP pins for place results that have coordinates
+        const pinsWithCoords = results.filter(p => p.geometry?.location);
+        if (pinsWithCoords.length > 0) {
+          const firstLoc = pinsWithCoords[0].geometry!.location;
+          // Center on first result
+          const centerPayload = JSON.stringify({
+            type: "center",
+            center: firstLoc,
+            zoom: 13,
+          });
+          controller.enqueue(encoder.encode(`\n__MAP__${centerPayload}__MAP__`));
+          // Drop a pin for each result
+          for (const place of pinsWithCoords) {
+            const pinPayload = JSON.stringify({
+              type: "pin",
+              pin: { position: place.geometry!.location, label: place.name, title: place.formatted_address },
+            });
+            controller.enqueue(encoder.encode(`\n__MAP__${pinPayload}__MAP__`));
+          }
+        }
         const lines = results.map((p, i) =>
           `${i + 1}. **${p.name}** — ${p.formatted_address}${p.rating ? ` ⭐ ${p.rating}` : ""}${p.opening_hours?.open_now !== undefined ? (p.opening_hours.open_now ? " · Open now" : " · Closed") : ""}`
         );
@@ -4092,6 +4214,302 @@ Keep it concise and practical.`,
 
     const result = await runDramaSession({ channel, postsCount: count, context: input.context });
     return `🎭 Drama session complete — ${result.posted} posts in #${channel}:\n${result.messages.join("\n")}`;
+  }
+
+  // ── Smart Home (Homebridge) ───────────────────────────────────────────────────
+  if (name === "smart_home_list") {
+    try {
+      const accessories = await getAccessories();
+      if (accessories.length === 0) return "No devices found. Is Homebridge running?";
+      const lines = accessories.map((a) => `• ${a.displayName} (${a.serviceName ?? a.type ?? "unknown"})`);
+      return `Found ${accessories.length} device(s):\n${lines.join("\n")}`;
+    } catch (e) {
+      return `Smart home error: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+
+  if (name === "smart_home_control") {
+    try {
+      const deviceName = input.device_name ?? "";
+      const action = input.action ?? "on";
+
+      // Find the device by display name (case-insensitive)
+      const accessories = await getAccessories();
+      const device = accessories.find(
+        (a) => a.displayName.toLowerCase() === deviceName.toLowerCase()
+      );
+      if (!device) {
+        const names = accessories.map((a) => a.displayName).join(", ");
+        return `Device "${deviceName}" not found. Available: ${names || "none"}`;
+      }
+
+      switch (action) {
+        case "on":
+          return await turnOn(device.uniqueId);
+        case "off":
+          return await turnOff(device.uniqueId);
+        case "brightness": {
+          const pct = parseInt(input.brightness ?? "50", 10);
+          return await setBrightness(device.uniqueId, pct);
+        }
+        case "color": {
+          const hue = parseFloat(input.hue ?? "0");
+          const sat = parseFloat(input.saturation ?? "100");
+          return await setColor(device.uniqueId, hue, sat);
+        }
+        default:
+          return `Unknown action "${action}". Use: on | off | brightness | color`;
+      }
+    } catch (e) {
+      return `Smart home control error: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+
+  if (name === "smart_home_scene") {
+    try {
+      const scene = (input.scene ?? "bright").toLowerCase();
+      // Map "movie" to a dim-warm preset handled inline
+      if (scene === "movie") {
+        const lights = await getAllLights();
+        if (lights.length === 0) return "No lights found.";
+        const results: string[] = [];
+        for (const light of lights) {
+          try {
+            const { setCharacteristic } = await import("@/lib/lyra/homebridge");
+            await setCharacteristic(light.uniqueId, "On", true);
+            await setCharacteristic(light.uniqueId, "Brightness", 20);
+            await setCharacteristic(light.uniqueId, "Hue", 30);
+            await setCharacteristic(light.uniqueId, "Saturation", 60);
+            results.push(`${light.displayName}: OK`);
+          } catch (e) {
+            results.push(`${light.displayName}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+        return `Scene "movie" applied to ${lights.length} light(s):\n${results.join("\n")}`;
+      }
+
+      const validScenes = ["scary", "romantic", "bright", "off"] as const;
+      type ValidScene = typeof validScenes[number];
+      if (!validScenes.includes(scene as ValidScene)) {
+        return `Unknown scene "${scene}". Valid scenes: scary | romantic | bright | movie | off`;
+      }
+      return await setSceneAllLights(scene as ValidScene);
+    } catch (e) {
+      return `Smart home scene error: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+
+  if (name === "smart_home_story_react") {
+    try {
+      const event = (input.event ?? "dramatic").toLowerCase();
+      const validEvents = ["scary", "dramatic", "peaceful", "celebration"] as const;
+      type ValidEvent = typeof validEvents[number];
+      if (!validEvents.includes(event as ValidEvent)) {
+        return `Unknown event "${event}". Valid events: scary | dramatic | peaceful | celebration`;
+      }
+      return await storyLightReaction(event as ValidEvent);
+    } catch (e) {
+      return `Story reaction error: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+
+  // ── Story Mode ────────────────────────────────────────────────────────────────
+  if (name === "story_mode") {
+    const action = (input.action ?? "start").toLowerCase();
+    const progress = (msg: string) => { try { controller.enqueue(encoder.encode(`\n${msg}`)); } catch { /* closed */ } };
+
+    if (action === "stop") {
+      // Restore normal lighting
+      try { await storyLightReaction("peaceful"); } catch { /* non-fatal */ }
+      const stopCard = JSON.stringify({ tool: "story_mode", action: "stop" });
+      controller.enqueue(encoder.encode(`\n${stopCard}`));
+      return "Story mode ended. Lights restored.";
+    }
+
+    // action === "start"
+    progress("📖 Activating story mode…");
+
+    // 1. Dim lights for atmosphere
+    try {
+      await storyLightReaction("dramatic");
+      progress("💡 Lights dimmed.");
+    } catch { /* smart home not available — non-fatal */ }
+
+    // 2. Signal the client to open the hologram overlay
+    const startCard = JSON.stringify({
+      tool: "story_mode",
+      action: "start",
+      genre: input.genre ?? "mystery",
+      text: input.text ?? null,
+    });
+    controller.enqueue(encoder.encode(`\n${startCard}`));
+
+    // 3. Stream the story via the /api/lyra/story endpoint
+    const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+    try {
+      const res = await fetch(`${baseUrl}/api/lyra/story`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          genre: input.genre,
+          text: input.text,
+          userId,
+        }),
+        signal: AbortSignal.timeout(120_000),
+      });
+
+      if (!res.ok || !res.body) {
+        return `Story endpoint returned ${res.status}. Story mode partially activated.`;
+      }
+
+      // Pipe the story stream straight through to the chat controller
+      const storyReader = res.body.getReader();
+      while (true) {
+        const { done, value } = await storyReader.read();
+        if (done) break;
+        try { controller.enqueue(value); } catch { break; }
+      }
+    } catch (fetchErr) {
+      const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+      progress(`⚠️ Story streaming error: ${msg.slice(0, 120)}`);
+    }
+
+    return "Story mode complete.";
+  }
+
+  // ── Robot Arm ─────────────────────────────────────────────────────────────────
+  if (name === "robot_arm") {
+    const action = input.action ?? "status";
+    try {
+      switch (action) {
+        case "status": {
+          const s = await getArmStatus();
+          return [
+            `**Robot Arm Status**`,
+            `Mode: ${s.mode}  |  Safety: ${s.safetyState}  |  Powered: ${s.powered}`,
+            `TCP Position: x=${s.tcpPosition.x} y=${s.tcpPosition.y} z=${s.tcpPosition.z}`,
+            `Joints: ${s.joints.map((j, i) => `J${i + 1}=${j.toFixed(1)}\u00b0`).join("  ")}`,
+            `Program running: ${s.programRunning}`,
+            `Camera feed: ${getArmVideoFeed()}`,
+          ].join("\n");
+        }
+        case "move": {
+          const x  = parseFloat(input.x  ?? "0");
+          const y  = parseFloat(input.y  ?? "0");
+          const z  = parseFloat(input.z  ?? "0");
+          const rx = parseFloat(input.rx ?? "0");
+          const ry = parseFloat(input.ry ?? "0");
+          const rz = parseFloat(input.rz ?? "0");
+          const res = await moveToPosition(x, y, z, rx, ry, rz);
+          return res.success
+            ? `Arm moving to (${x}, ${y}, ${z}) rx=${rx} ry=${ry} rz=${rz}.`
+            : `Move failed: ${res.message ?? "unknown error"}`;
+        }
+        case "gripper": {
+          const cmd = (input.gripper ?? "open").toLowerCase();
+          const res = cmd === "close" ? await closeGripper() : await openGripper();
+          return res.success
+            ? `Gripper ${cmd === "close" ? "closed" : "opened"}.`
+            : `Gripper command failed: ${res.message ?? "unknown error"}`;
+        }
+        case "stop": {
+          const res = await stopArm();
+          return res.success ? "Arm stopped." : `Stop failed: ${res.message ?? "unknown error"}`;
+        }
+        case "run_program": {
+          const prog = input.program_name ?? "";
+          if (!prog) return "Provide program_name to run a saved program.";
+          const res = await runProgram(prog);
+          return res.success
+            ? `Program "${prog}" started.`
+            : `Program start failed: ${res.message ?? "unknown error"}`;
+        }
+        default:
+          return `Unknown robot_arm action "${action}". Use: status | move | gripper | stop | run_program`;
+      }
+    } catch (e) {
+      return `Robot arm error: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+
+  // ── Drone Control ─────────────────────────────────────────────────────────────
+  if (name === "drone_control") {
+    const action = input.action ?? "status";
+    try {
+      switch (action) {
+        case "status": {
+          const s = await getDroneStatus();
+          return [
+            `**Drone Status**`,
+            `Mode: ${s.mode}  |  Armed: ${s.armed}  |  Airborne: ${s.airborne}`,
+            `Battery: ${s.battery}%  |  Altitude: ${s.altitude}m  |  Speed: ${s.speedMs}m/s`,
+            `GPS: ${s.gps.lat.toFixed(6)}, ${s.gps.lng.toFixed(6)}  (${s.gps.satellites} sats, fix: ${s.gps.fix})`,
+            `Heading: ${s.heading}\u00b0`,
+          ].join("\n");
+        }
+        case "takeoff": {
+          const alt = input.altitude ? parseFloat(input.altitude) : 10;
+          const res = await takeoff(alt);
+          return res.success
+            ? `Drone taking off to ${alt}m.`
+            : `Takeoff failed: ${res.message ?? "unknown error"}`;
+        }
+        case "land": {
+          const res = await land();
+          return res.success ? "Drone landing." : `Land failed: ${res.message ?? "unknown error"}`;
+        }
+        case "hover": {
+          const res = await hover();
+          return res.success ? "Drone hovering." : `Hover failed: ${res.message ?? "unknown error"}`;
+        }
+        case "goto": {
+          const lat = parseFloat(input.lat ?? "0");
+          const lng = parseFloat(input.lng ?? "0");
+          const alt = parseFloat(input.altitude ?? "30");
+          const res = await moveTo(lat, lng, alt);
+          return res.success
+            ? `Drone flying to ${lat}, ${lng} at ${alt}m.`
+            : `Goto failed: ${res.message ?? "unknown error"}`;
+        }
+        case "rth": {
+          const res = await returnHome();
+          return res.success ? "Drone returning to home." : `RTH failed: ${res.message ?? "unknown error"}`;
+        }
+        default:
+          return `Unknown drone_control action "${action}". Use: status | takeoff | land | hover | goto | rth`;
+      }
+    } catch (e) {
+      return `Drone error: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+
+  // ── Rugged Check-In ───────────────────────────────────────────────────────────
+  if (name === "rugged_checkin") {
+    const uid = input.user_id ?? userId ?? "";
+    if (!uid) return "Cannot check in — no user ID available.";
+    try {
+      await checkIn(uid);
+      return `Check-in recorded for ${uid}. Dead man's switch timer reset.`;
+    } catch (e) {
+      return `Check-in error: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+
+  // ── Alert Contacts ────────────────────────────────────────────────────────────
+  if (name === "alert_contacts") {
+    const uid = input.user_id ?? userId ?? "";
+    if (!uid) return "Cannot send alert — no user ID available.";
+    const message = input.message ?? "Emergency alert from Lyra.";
+    const location =
+      input.lat && input.lng
+        ? { lat: parseFloat(input.lat), lng: parseFloat(input.lng) }
+        : null;
+    try {
+      const result = await alertContacts(uid, message, location);
+      return `Emergency alert sent. Delivered: ${result.sent} | Failed: ${result.failed}${result.errors.length ? `\nErrors: ${result.errors.join(", ")}` : ""}`;
+    } catch (e) {
+      return `Alert error: ${e instanceof Error ? e.message : String(e)}`;
+    }
   }
 
   const card = JSON.stringify({ tool: name, ...input });
