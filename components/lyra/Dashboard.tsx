@@ -14,6 +14,7 @@ import Link from "next/link";
 import { LineageGraph } from "./LineageGraph";
 import { ReflectionLog } from "./ReflectionLog";
 import { MessageRenderer } from "./MessageRenderer";
+import { MagicBook } from "./MagicBook";
 import type {
   Agent, Memory, Reflection, LineageGraph as LineageGraphType, LyraState,
 } from "@/lib/types/lyra";
@@ -604,8 +605,15 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
         {/* Center — Chat */}
         <main className="flex-1 flex flex-col overflow-hidden min-w-0">
 
+          {/* Magic Book — floats above chat, auto-opens on magic keywords */}
+          <div className="px-4 sm:px-6 pt-3">
+            <MagicBook
+              triggerText={messages.length > 0 ? messages[messages.length - 1].content : undefined}
+            />
+          </div>
+
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-8 space-y-5">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-5">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-4 gap-8">
                 {/* Hero icon + greeting */}
