@@ -24,18 +24,20 @@ export function initClinicalTables(): void {
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS ehr_patients (
-      id          TEXT PRIMARY KEY,
-      user_id     TEXT NOT NULL,
-      name        TEXT NOT NULL,
-      dob         TEXT,
-      sex         TEXT,
-      mrn         TEXT,
-      allergies   TEXT DEFAULT '',
-      notes       TEXT DEFAULT '',
-      created_at  TEXT DEFAULT (datetime('now')),
-      updated_at  TEXT DEFAULT (datetime('now'))
+      id            TEXT PRIMARY KEY,
+      user_id       TEXT NOT NULL,
+      name          TEXT NOT NULL,
+      dob           TEXT,
+      sex           TEXT,
+      mrn           TEXT,
+      allergies     TEXT DEFAULT '',
+      notes         TEXT DEFAULT '',
+      is_test_data  INTEGER DEFAULT 0,
+      created_at    TEXT DEFAULT (datetime('now')),
+      updated_at    TEXT DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_ehr_patients_user ON ehr_patients(user_id);
+    CREATE INDEX IF NOT EXISTS idx_ehr_patients_test ON ehr_patients(user_id, is_test_data);
 
     CREATE TABLE IF NOT EXISTS ehr_encounters (
       id               TEXT PRIMARY KEY,
@@ -50,6 +52,7 @@ export function initClinicalTables(): void {
       vitals           TEXT DEFAULT '',
       medications      TEXT DEFAULT '',
       icd_codes        TEXT DEFAULT '',
+      is_test_data     INTEGER DEFAULT 0,
       created_at       TEXT DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_ehr_encounters_patient ON ehr_encounters(patient_id);
@@ -83,12 +86,13 @@ function requireAuth(userId: string): void {
 interface RawPatient {
   id: string;
   user_id: string;
-  name: string;      // encrypted
+  name: string;            // encrypted
   dob: string | null;      // encrypted
   sex: string | null;      // encrypted
   mrn: string | null;      // encrypted
-  allergies: string; // encrypted JSON
-  notes: string;     // encrypted
+  allergies: string;       // encrypted JSON
+  notes: string;           // encrypted
+  is_test_data: number;
   created_at: string;
   updated_at: string;
 }
@@ -105,7 +109,8 @@ interface RawEncounter {
   soap_plan: string | null;        // encrypted
   vitals: string;       // encrypted JSON
   medications: string;  // encrypted JSON
-  icd_codes: string;    // plaintext (not PHI — diagnostic codes are not patient-identifying)
+  icd_codes: string;    // plaintext (not PHI)
+  is_test_data: number;
   created_at: string;
 }
 
@@ -120,6 +125,7 @@ export interface EhrPatient {
   mrn?: string;
   allergies: string[];
   notes: string;
+  is_test_data: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -137,6 +143,7 @@ export interface EhrEncounter {
   vitals: Record<string, unknown>;
   medications: string[];
   icd_codes: string[];
+  is_test_data: boolean;
   created_at: string;
 }
 
@@ -152,6 +159,7 @@ function decryptPatient(raw: RawPatient): EhrPatient {
     mrn: raw.mrn ? decryptPHI(raw.mrn) : undefined,
     allergies: decryptPHIJson<string[]>(raw.allergies, []),
     notes: decryptPHI(raw.notes),
+    is_test_data: raw.is_test_data === 1,
     created_at: raw.created_at,
     updated_at: raw.updated_at,
   };
@@ -171,6 +179,7 @@ function decryptEncounter(raw: RawEncounter): EhrEncounter {
     vitals: decryptPHIJson<Record<string, unknown>>(raw.vitals, {}),
     medications: decryptPHIJson<string[]>(raw.medications, []),
     icd_codes: raw.icd_codes ? JSON.parse(raw.icd_codes) : [],
+    is_test_data: raw.is_test_data === 1,
     created_at: raw.created_at,
   };
 }
@@ -185,6 +194,7 @@ export function upsertPatient(fields: {
   mrn?: string;
   allergies?: string[];
   notes?: string;
+  isTestData?: boolean;
   ip?: string;
 }): EhrPatient {
   requireAuth(fields.userId);
@@ -239,8 +249,8 @@ export function upsertPatient(fields: {
 
   const id = randomUUID();
   db.prepare(`
-    INSERT INTO ehr_patients (id, user_id, name, dob, sex, mrn, allergies, notes, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO ehr_patients (id, user_id, name, dob, sex, mrn, allergies, notes, is_test_data, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     fields.userId,
@@ -250,6 +260,7 @@ export function upsertPatient(fields: {
     fields.mrn ? encryptPHI(fields.mrn) : null,
     encryptPHIJson(fields.allergies ?? []),
     encryptPHI(fields.notes ?? ""),
+    fields.isTestData ? 1 : 0,
     now,
     now,
   );
@@ -322,6 +333,7 @@ export function saveEncounter(fields: {
   vitals?: Record<string, unknown>;
   medications?: string[];
   icdCodes?: string[];
+  isTestData?: boolean;
   ip?: string;
 }): EhrEncounter {
   requireAuth(fields.userId);
@@ -336,8 +348,8 @@ export function saveEncounter(fields: {
     INSERT INTO ehr_encounters
       (id, patient_id, user_id, date, chief_complaint,
        soap_subjective, soap_objective, soap_assessment, soap_plan,
-       vitals, medications, icd_codes, created_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
+       vitals, medications, icd_codes, is_test_data, created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
   `).run(
     id,
     fields.patientId,
@@ -350,7 +362,8 @@ export function saveEncounter(fields: {
     fields.soap?.plan       ? encryptPHI(fields.soap.plan)       : null,
     encryptPHIJson(fields.vitals ?? {}),
     encryptPHIJson(fields.medications ?? []),
-    JSON.stringify(fields.icdCodes ?? []),  // ICD codes are not PHI
+    JSON.stringify(fields.icdCodes ?? []),
+    fields.isTestData ? 1 : 0,
   );
 
   logAudit({ userId: fields.userId, action: "create", recordType: "encounter", recordId: id, detail: `patient: ${fields.patientId}`, ip: fields.ip });
@@ -370,6 +383,28 @@ export function getEncounters(userId: string, patientId: string, limit = 20, ip?
 
   logAudit({ userId, action: "read", recordType: "encounter", recordId: patientId, detail: `list encounters`, ip });
   return rows.map(decryptEncounter);
+}
+
+// ── Test data management ──────────────────────────────────────────────────────
+
+export function deleteTestData(userId: string): { patients: number; encounters: number } {
+  const db = getDb();
+  if (!db) return { patients: 0, encounters: 0 };
+  initClinicalTables();
+  const enc = db.prepare("DELETE FROM ehr_encounters WHERE user_id = ? AND is_test_data = 1").run(userId);
+  const pat = db.prepare("DELETE FROM ehr_patients WHERE user_id = ? AND is_test_data = 1").run(userId);
+  logAudit({ userId, action: "delete", recordType: "patient", detail: "bulk delete test data" });
+  return { patients: pat.changes, encounters: enc.changes };
+}
+
+export function listTestPatients(userId: string): EhrPatient[] {
+  const db = getDb();
+  if (!db) return [];
+  initClinicalTables();
+  const rows = db.prepare(
+    "SELECT * FROM ehr_patients WHERE user_id = ? AND is_test_data = 1 ORDER BY updated_at DESC"
+  ).all(userId) as RawPatient[];
+  return rows.map(decryptPatient);
 }
 
 // ── PubMed clinical research search ──────────────────────────────────────────
