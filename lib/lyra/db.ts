@@ -318,6 +318,9 @@ function initSchema(db: BetterSqlite3Db) {
   try {
     db.exec(`ALTER TABLE users ADD COLUMN avoid_topics TEXT`);
   } catch { /* column already exists */ }
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN slack_bot_token TEXT`);
+  } catch { /* column already exists */ }
 
   // Semantic embeddings table
   try {
@@ -1946,6 +1949,33 @@ export function getGumroadToken(): string | null {
     const row = db.prepare("SELECT value FROM lyra_settings WHERE key='gumroad_token'").get() as { value: string } | undefined;
     return row?.value ?? process.env.GUMROAD_ACCESS_TOKEN ?? null;
   } catch { return process.env.GUMROAD_ACCESS_TOKEN ?? null; }
+}
+
+// ── Per-user Slack token ──────────────────────────────────────────────────────
+
+export function getSlackToken(userId: string): string | null {
+  const db = getDb(); if (!db) return null;
+  try {
+    const row = db.prepare("SELECT slack_bot_token FROM users WHERE id = ?").get(userId) as { slack_bot_token: string | null } | undefined;
+    return row?.slack_bot_token ?? null;
+  } catch { return null; }
+}
+
+export function setSlackToken(userId: string, token: string): void {
+  const db = getDb(); if (!db) return;
+  db.prepare("UPDATE users SET slack_bot_token = ? WHERE id = ?").run(token, userId);
+}
+
+export function getAllProUsersWithSlack(): Array<{ id: string; slack_bot_token: string }> {
+  const db = getDb(); if (!db) return [];
+  try {
+    return db.prepare(`
+      SELECT u.id, u.slack_bot_token
+      FROM users u
+      JOIN subscriptions s ON s.user_id = u.id
+      WHERE s.plan != 'free' AND s.status = 'active' AND u.slack_bot_token IS NOT NULL
+    `).all() as Array<{ id: string; slack_bot_token: string }>;
+  } catch { return []; }
 }
 
 // ── Commerce ──────────────────────────────────────────────────────────────────
