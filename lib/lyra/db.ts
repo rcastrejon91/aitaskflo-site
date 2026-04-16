@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
+import { initRLSchema } from "./rl/schema";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -597,6 +598,9 @@ function initSchema(db: BetterSqlite3Db) {
       CREATE INDEX IF NOT EXISTS idx_audit_record ON ehr_audit_log(record_type, record_id, ts DESC);
     `);
   } catch { /* ignore */ }
+
+  // ── Reinforcement Learning tables (additive) ──────────────────────────────
+  try { initRLSchema(db); } catch { /* ignore */ }
 }
 
 // ── HIPAA Audit Log ───────────────────────────────────────────────────────────
