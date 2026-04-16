@@ -318,6 +318,7 @@ export async function POST(req: NextRequest) {
     const wantsSaveProfile = msgLower.includes("my resume") || msgLower.includes("i'm a ") || msgLower.includes("i am a ") || (msgLower.includes("looking for") && msgLower.includes("role"));
     const wantsAts = ["ats score", "score my resume", "resume score", "check my resume", "resume match"].some(t => msgLower.includes(t));
     const wantsTailor = ["tailor my resume", "tailor resume", "rewrite my resume", "optimize my resume"].some(t => msgLower.includes(t));
+    const wantsSearch = /\b(search|look up|look it up|find out|google|check|can u check|can you check|idk can u|what is|who is|what are|who are|find me info|get info|research|find info|look for info|what does|how does|when did|where is|tell me about)\b/i.test(message) && !/\b(my resume|my contacts|gumroad|hubspot|game|book|story|image|music|video|gif)\b/i.test(message);
 
     // Media generation — never ask for clarification, always act immediately
     // History-based context: look at last 3 assistant+user turns to resolve vague intents
@@ -402,6 +403,8 @@ export async function POST(req: NextRequest) {
       ? `\n\nCRITICAL: User wants ATS scoring. Call ats_score IMMEDIATELY.`
       : wantsTailor
       ? `\n\nCRITICAL: User wants resume tailoring. Call tailor_resume IMMEDIATELY.`
+      : wantsSearch
+      ? `\n\nCRITICAL: The user wants you to search or look something up. Call search_web IMMEDIATELY with their query. Do NOT say "let me search" or "I'll look that up" — just call the tool RIGHT NOW. No narration. No delay. Call search_web first, then respond with the results.`
       : "";
 
     const gameOverride = wantsGameBuild
