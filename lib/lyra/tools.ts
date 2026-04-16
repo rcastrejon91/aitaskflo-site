@@ -1861,6 +1861,125 @@ ACTIONS:
       required: ["query"],
     },
   },
+  {
+    name: "smart_home_list",
+    description: "List all smart home devices connected through Homebridge. Shows each device's name, type, and current state. Use when the user asks what devices are available, wants to see their smart home setup, or needs a device name to control.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "smart_home_control",
+    description: "Control a specific smart home device by name — turn it on or off, dim it, or change its color. Requires a device name (get it from smart_home_list if unknown). Use whenever the user says 'turn on the lights', 'dim the bedroom', 'set the lamp to blue', etc.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        device_name: { type: "string", description: "The display name of the device, e.g. 'Living Room Light', 'Bedroom Lamp'" },
+        action:      { type: "string", description: "Action to perform: 'on' | 'off' | 'brightness' | 'color'" },
+        brightness:  { type: "number", description: "Brightness 0-100 (required for action='brightness')" },
+        hue:         { type: "number", description: "Hue 0-360 (required for action='color')" },
+        saturation:  { type: "number", description: "Saturation 0-100 (required for action='color')" },
+      },
+      required: ["device_name", "action"],
+    },
+  },
+  {
+    name: "smart_home_scene",
+    description: "Set all lights to a named scene at once. Scenes: 'scary' (dim red), 'romantic' (warm pink), 'bright' (full white), 'movie' (dim warm), 'off' (all off). Use when the user says 'set the mood', 'scary mode', 'movie time', 'turn everything off', etc.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        scene: { type: "string", description: "Scene name: 'scary' | 'romantic' | 'bright' | 'movie' | 'off'" },
+      },
+      required: ["scene"],
+    },
+  },
+  {
+    name: "smart_home_story_react",
+    description: "Trigger a cinematic light reaction that matches the current story moment. Automatically flashes, pulses, or shifts all lights to enhance immersion. Use during story mode when something scary, dramatic, peaceful, or celebratory happens.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        event: { type: "string", description: "Story event type: 'scary' (red flash) | 'dramatic' (deep purple) | 'peaceful' (soft blue) | 'celebration' (color cycle)" },
+      },
+      required: ["event"],
+    },
+  },
+  {
+    name: "robot_arm",
+    description: "Control the lab robot arm. Get status, move to a position, open/close the gripper, run a saved program, or stop all motion. Use when the user asks to grab something, move the arm, run a lab routine, or check arm state.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        action:      { type: "string", description: "Action: 'status' | 'move' | 'gripper' | 'stop' | 'run_program'" },
+        x:           { type: "number", description: "X position in mm (required for action='move')" },
+        y:           { type: "number", description: "Y position in mm (required for action='move')" },
+        z:           { type: "number", description: "Z position in mm (required for action='move')" },
+        rx:          { type: "number", description: "RX rotation in radians (required for action='move')" },
+        ry:          { type: "number", description: "RY rotation in radians (required for action='move')" },
+        rz:          { type: "number", description: "RZ rotation in radians (required for action='move')" },
+        gripper:     { type: "string", description: "Gripper command: 'open' | 'close' (required for action='gripper')" },
+        program_name:{ type: "string", description: "Name of the saved program to run (required for action='run_program')" },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "drone_control",
+    description: "Control the drone. Get status, takeoff, land, hover, fly to GPS coordinates, or return to home. Use when the user wants to fly the drone, check its battery or position, or issue a flight command.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        action:   { type: "string", description: "Action: 'status' | 'takeoff' | 'land' | 'hover' | 'goto' | 'rth'" },
+        altitude: { type: "number", description: "Target altitude in meters (optional for 'takeoff', required for 'goto')" },
+        lat:      { type: "number", description: "Latitude decimal degrees (required for action='goto')" },
+        lng:      { type: "number", description: "Longitude decimal degrees (required for action='goto')" },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "rugged_checkin",
+    description: "Check in to reset the dead man's switch timer. Use when the user says 'I'm safe', 'check in', 'I'm OK', or explicitly wants to reset their survival check-in timer.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        user_id: { type: "string", description: "User ID (defaults to authenticated user if omitted)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "alert_contacts",
+    description: "Send an emergency SMS alert with an optional GPS location to all saved emergency contacts via Twilio. Use when the user triggers an SOS, says they are in danger, or explicitly asks to alert their contacts.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        message: { type: "string", description: "Emergency message to send to all contacts" },
+        lat:     { type: "number", description: "Current latitude (optional — adds a Google Maps link)" },
+        lng:     { type: "number", description: "Current longitude (optional — adds a Google Maps link)" },
+        user_id: { type: "string", description: "User ID (defaults to authenticated user if omitted)" },
+      },
+      required: ["message"],
+    },
+  },
+
+  // ── Story Mode ───────────────────────────────────────────────────────────
+  {
+    name: "story_mode",
+    description: "Activate story mode — Lyra becomes a dramatic whisper-style narrator, triggers the hologram TV overlay on the client, and dims the smart-home lights. Use when the user asks Lyra to tell a story, read something aloud in narrator mode, or activate hologram / story mode.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        action: { type: "string", description: "'start' to begin story mode, 'stop' to end it" },
+        genre:  { type: "string", description: "Story genre to generate when action is 'start': horror | thriller | fantasy | mystery | romance | sci_fi | adventure" },
+        text:   { type: "string", description: "Existing story text for Lyra to narrate. If omitted, Lyra generates one based on genre." },
+      },
+      required: ["action"],
+    },
+  },
 ];
 
 export function pollinationsUrl(prompt: string): string {

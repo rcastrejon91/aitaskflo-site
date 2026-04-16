@@ -9,6 +9,14 @@ import {
   ShieldAlert, Loader2, CheckCircle2, XCircle,
 } from "lucide-react";
 
+// ── MapPanel event bridge — window.lyraMapEvent is set by MapPanel ────────────
+declare global {
+  interface Window {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    lyraMapEvent?: (event: any) => void;
+  }
+}
+
 // react-markdown and remark-gfm are part of the unified CJS ecosystem with
 // circular require() graphs. Top-level imports put them in the SSR bundle
 // where Turbopack's module registry overflows the call stack. Defer them
@@ -1547,7 +1555,8 @@ type Segment =
   | { kind: "image";   url: string }
   | { kind: "gif";     url: string }
   | { kind: "tool";    json: string }
-  | { kind: "confirm"; json: string };
+  | { kind: "confirm"; json: string }
+  | { kind: "map";     json: string };
 
 function GifEmbed({ url }: { url: string }) {
   return (
@@ -1557,12 +1566,13 @@ function GifEmbed({ url }: { url: string }) {
   );
 }
 
-/** Character-level scanner — handles multi-field tool JSON, __IMG__, __GIF__ and __CONFIRM__ tags. */
+/** Character-level scanner — handles multi-field tool JSON, __IMG__, __GIF__, __CONFIRM__ and __MAP__ tags. */
 function parseSegments(raw: string): Segment[] {
   const segments: Segment[] = [];
   const IMG_DELIM = "__IMG__";
   const GIF_DELIM = "__GIF__";
   const CONFIRM_DELIM = "__CONFIRM__";
+  const MAP_DELIM = "__MAP__";
   let i = 0;
   let textStart = 0;
 
@@ -1575,6 +1585,18 @@ function parseSegments(raw: string): Segment[] {
       if (closeIdx === -1) { textStart = i; break; }
       segments.push({ kind: "confirm", json: raw.slice(contentStart, closeIdx) });
       i = closeIdx + CONFIRM_DELIM.length;
+      textStart = i;
+      continue;
+    }
+
+    // ── Map event tag — consumed silently (no visible UI segment) ──────────
+    if (raw.startsWith(MAP_DELIM, i)) {
+      if (i > textStart) segments.push({ kind: "text", value: raw.slice(textStart, i) });
+      const contentStart = i + MAP_DELIM.length;
+      const closeIdx = raw.indexOf(MAP_DELIM, contentStart);
+      if (closeIdx === -1) { textStart = i; break; }
+      segments.push({ kind: "map", json: raw.slice(contentStart, closeIdx) });
+      i = closeIdx + MAP_DELIM.length;
       textStart = i;
       continue;
     }
@@ -1756,6 +1778,16 @@ export function MessageRenderer({ content, isGameContext }: { content: string; i
         if (seg.kind === "gif")     return <GifEmbed key={i} url={seg.url} />;
         if (seg.kind === "tool")    return <ToolCard key={i} raw={seg.json} />;
         if (seg.kind === "confirm") return <ConfirmCard key={i} json={seg.json} />;
+        if (seg.kind === "map") {
+          // Dispatch map event to any mounted MapPanel — no visible output
+          if (typeof window !== "undefined" && window.lyraMapEvent) {
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              window.lyraMapEvent(JSON.parse(seg.json) as any);
+            } catch { /* malformed json — ignore */ }
+          }
+          return null;
+        }
         if (!seg.value.trim()) return null;
 
         if (!md) {
