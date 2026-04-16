@@ -1960,10 +1960,21 @@ Return ONLY valid JSON:
   }
 
   if (name === "fal_tts") {
-    if (!process.env.FAL_KEY) return "fal.ai is not configured — add FAL_KEY to environment.";
+    const text = input.text ?? "";
+    const voice = input.voice ?? "aria";
+    // Prefer ElevenLabs (higher quality) — fall back to fal Kokoro
+    if (process.env.ELEVENLABS_API_KEY) {
+      controller.enqueue(encoder.encode("\n🔊 Generating speech with ElevenLabs…\n"));
+      const { elevenLabsTTS } = await import("@/lib/lyra/fal-tools");
+      const url = await elevenLabsTTS(text, voice);
+      const card = JSON.stringify({ tool: "fal_audio", url, type: "speech", voice, preview: text.slice(0, 60) });
+      controller.enqueue(encoder.encode(`\n${card}`));
+      return `Audio ready (ElevenLabs).`;
+    }
+    if (!process.env.FAL_KEY) return "TTS is not configured — add ELEVENLABS_API_KEY or FAL_KEY to environment.";
     controller.enqueue(encoder.encode("\n🔊 Generating speech with fal.ai Kokoro…\n"));
-    const url = await falTTS(input.text ?? "", input.voice ?? "aria");
-    const card = JSON.stringify({ tool: "fal_audio", url, type: "speech", voice: input.voice ?? "aria", preview: (input.text ?? "").slice(0, 60) });
+    const url = await falTTS(text, voice);
+    const card = JSON.stringify({ tool: "fal_audio", url, type: "speech", voice, preview: text.slice(0, 60) });
     controller.enqueue(encoder.encode(`\n${card}`));
     return `Audio ready: ${url}`;
   }
