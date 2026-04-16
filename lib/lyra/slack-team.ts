@@ -583,3 +583,215 @@ export async function personaPost(opts: {
 
   return { ts, replies };
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── AGENT OS — autonomous multi-agent system running inside Slack ─────────────
+// Each agent owns a channel, monitors their domain, acts without being asked.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Dedicated channels per agent ──────────────────────────────────────────────
+export const AGENT_CHANNELS: Record<string, string> = {
+  Lyra: "lyra-brain",
+  Axon: "axon-data",
+  Nova: "nova-growth",
+  Hex:  "hex-security",
+  Milo: "milo-tasks",
+  ops:  "lyra-ops",       // Cross-agent war room
+};
+
+// ── What each agent monitors and owns ─────────────────────────────────────────
+const AGENT_DOMAINS: Record<string, string> = {
+  Lyra: `You monitor the overall health of the AITaskFlo platform and creative direction.
+Your job: scan for anything interesting, concerning, or worth acting on.
+Look for: user experience issues, creative opportunities, product ideas worth pursuing.
+If something needs another agent's attention, tag them and post a handoff in #lyra-ops.`,
+
+  Axon: `You monitor metrics, analytics, and data signals for AITaskFlo.
+Your job: search for industry news, competitor moves, performance trends.
+Look for: market opportunities, traffic patterns, financial signals, growth data.
+If you find something actionable, post it in #axon-data with numbers and sources.`,
+
+  Nova: `You monitor growth opportunities, viral trends, and marketing angles for AITaskFlo.
+Your job: find content that's going viral in AI/tech/creative spaces and spot opportunities.
+Look for: trending topics to jump on, marketing hooks, social proof moments.
+If you find a campaign idea, draft it in #nova-growth and tag Lyra if it needs approval.`,
+
+  Hex: `You monitor security, infrastructure, and system health for AITaskFlo.
+Your job: watch for errors, anomalies, suspicious patterns, and vulnerabilities.
+Look for: server issues, security news relevant to our stack, anything that smells wrong.
+If you find a real threat, post an alert in #hex-security and immediately escalate to #lyra-ops.`,
+
+  Milo: `You manage tasks, todos, deadlines, and follow-ups for the AITaskFlo team.
+Your job: track what needs doing, who hasn't followed up, what's overdue.
+Look for: pending tasks, items that have gone quiet, deadlines approaching.
+Post daily task summaries in #milo-tasks and remind people of what's slipping.`,
+};
+
+// ── Read recent messages from a Slack channel ─────────────────────────────────
+async function readChannelHistory(channelName: string, limit = 10): Promise<string> {
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!token) return "";
+
+  try {
+    // Get channel ID from name
+    const listRes = await fetch(`https://slack.com/api/conversations.list?limit=200&types=public_channel,private_channel`, {
+      headers: { "Authorization": `Bearer ${token}` },
+      signal: AbortSignal.timeout(8_000),
+    });
+    const listData = await listRes.json() as { channels?: Array<{ id: string; name: string }> };
+    const channel = listData.channels?.find(c => c.name === channelName.replace("#", ""));
+    if (!channel) return `(channel #${channelName} not found)`;
+
+    // Fetch history
+    const histRes = await fetch(`https://slack.com/api/conversations.history?channel=${channel.id}&limit=${limit}`, {
+      headers: { "Authorization": `Bearer ${token}` },
+      signal: AbortSignal.timeout(8_000),
+    });
+    const histData = await histRes.json() as { messages?: Array<{ text?: string; username?: string; ts?: string }> };
+    const messages = histData.messages ?? [];
+    if (!messages.length) return `(#${channelName} is empty)`;
+
+    return messages
+      .reverse()
+      .map(m => `[${m.username ?? "unknown"}]: ${(m.text ?? "").slice(0, 200)}`)
+      .join("\n");
+  } catch {
+    return `(could not read #${channelName})`;
+  }
+}
+
+// ── Post to agent's dedicated channel ─────────────────────────────────────────
+async function postToAgentChannel(persona: Persona, message: string, alsoOps = false) {
+  const channelName = AGENT_CHANNELS[persona.name];
+  if (!channelName) return;
+
+  // Ensure channel exists (creates if missing)
+  try { await createSlackChannel(channelName); } catch { /* exists */ }
+
+  await slackPost({ channel: channelName, text: message, username: persona.name, icon_emoji: persona.emoji });
+
+  if (alsoOps) {
+    try { await createSlackChannel(AGENT_CHANNELS.ops); } catch { /* exists */ }
+    await slackPost({
+      channel: AGENT_CHANNELS.ops,
+      text: `*${persona.name}* flagged something: ${message.slice(0, 300)}`,
+      username: persona.name,
+      icon_emoji: persona.emoji,
+    });
+  }
+}
+
+// ── Single agent think-and-act cycle ──────────────────────────────────────────
+export async function agentThinkAndAct(persona: Persona): Promise<{ acted: boolean; summary: string }> {
+  const toolNames = PERSONA_TOOL_NAMES[persona.name] ?? [];
+  const personaTools = LYRA_TOOLS.filter(t => toolNames.includes(t.name));
+
+  // Read context: own channel + ops channel
+  const [ownHistory, opsHistory] = await Promise.all([
+    readChannelHistory(AGENT_CHANNELS[persona.name] ?? "general", 8),
+    readChannelHistory(AGENT_CHANNELS.ops, 5),
+  ]);
+
+  const system = `You are ${persona.name}, an autonomous AI agent at AITaskFlo. You run independently on a schedule.
+
+ROLE: ${persona.role}
+PERSONALITY: ${persona.personality}
+DOMAIN: ${AGENT_DOMAINS[persona.name]}
+
+RECENT ACTIVITY IN YOUR CHANNEL:
+${ownHistory}
+
+RECENT OPS CHANNEL (cross-agent coordination):
+${opsHistory}
+
+YOUR JOB RIGHT NOW:
+1. Decide if there is anything worth acting on in your domain
+2. If YES: use your tools to investigate, then post a useful update to your channel
+3. If a finding is CRITICAL or needs another agent: set escalate=true in your response
+4. If NOTHING needs attention right now: respond with exactly: AGENT_IDLE
+
+Respond with JSON:
+{
+  "action": "post" | "idle",
+  "message": "the message to post (if action=post)",
+  "escalate": true/false,
+  "reason": "brief explanation of what you found or why idle"
+}`;
+
+  const messages: Anthropic.MessageParam[] = [
+    { role: "user", content: `Run your ${persona.name} agent cycle. Current time: ${new Date().toLocaleString("en-US", { timeZone: "America/Chicago" })}` },
+  ];
+
+  let iterations = 0;
+  const MAX_ROUNDS = 4;
+
+  while (iterations < MAX_ROUNDS) {
+    iterations++;
+
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 600,
+      system,
+      tools: personaTools.length > 0 ? personaTools : undefined,
+      messages,
+    });
+
+    if (response.stop_reason === "tool_use") {
+      const toolUseBlocks = response.content.filter(b => b.type === "tool_use") as Anthropic.ToolUseBlock[];
+      const toolResults: Anthropic.ToolResultBlockParam[] = [];
+
+      for (const block of toolUseBlocks) {
+        const result = await executeSlackTool(block.name, block.input as Record<string, string>);
+        toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result.text });
+      }
+
+      messages.push({ role: "assistant", content: response.content });
+      messages.push({ role: "user", content: toolResults });
+      continue;
+    }
+
+    // Parse final response
+    const textBlock = response.content.find(b => b.type === "text");
+    const raw = textBlock?.type === "text" ? textBlock.text.trim() : "";
+
+    if (raw === "AGENT_IDLE" || raw.includes('"action":"idle"') || raw.includes('"action": "idle"')) {
+      return { acted: false, summary: `${persona.name} idle` };
+    }
+
+    let parsed: { action?: string; message?: string; escalate?: boolean; reason?: string } = {};
+    try {
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      parsed = JSON.parse(jsonMatch?.[0] ?? "{}");
+    } catch { /* bad json — try to use raw as message */ }
+
+    if (parsed.action === "post" && parsed.message) {
+      await postToAgentChannel(persona, parsed.message, parsed.escalate === true);
+      return { acted: true, summary: `${persona.name}: ${parsed.reason ?? "posted update"}` };
+    }
+
+    return { acted: false, summary: `${persona.name} idle` };
+  }
+
+  return { acted: false, summary: `${persona.name} max iterations` };
+}
+
+// ── Run all 5 agents in parallel — the full Agent OS tick ─────────────────────
+export async function runAgentOS(): Promise<{ results: Array<{ agent: string; acted: boolean; summary: string }> }> {
+  // Ensure all agent channels exist
+  await Promise.allSettled([
+    ...Object.values(AGENT_CHANNELS).map(name => createSlackChannel(name)),
+  ]);
+
+  // Run all agents in parallel
+  const results = await Promise.allSettled(
+    PERSONAS.map(p => agentThinkAndAct(p))
+  );
+
+  return {
+    results: results.map((r, i) => ({
+      agent: PERSONAS[i].name,
+      acted: r.status === "fulfilled" ? r.value.acted : false,
+      summary: r.status === "fulfilled" ? r.value.summary : `${PERSONAS[i].name} error`,
+    })),
+  };
+}
