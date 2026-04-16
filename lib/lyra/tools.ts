@@ -1795,6 +1795,72 @@ ACTIONS:
       required: ["description"],
     },
   },
+
+  // ── Clinical Assistant tools ────────────────────────────────────────────────
+  {
+    name: "ehr_patient",
+    description: "Create, update, or look up patient records in the EHR (Electronic Health Record). Use when the user mentions a patient, wants to save patient info, look up a patient, or list patients. Actions: 'save' (create or update), 'get' (lookup by ID), 'search' (by name/MRN), 'list' (all patients).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        action:   { type: "string", description: "'save' | 'get' | 'search' | 'list'" },
+        name:     { type: "string", description: "Patient full name (required for save)" },
+        dob:      { type: "string", description: "Date of birth YYYY-MM-DD" },
+        sex:      { type: "string", description: "Patient sex/gender" },
+        mrn:      { type: "string", description: "Medical Record Number" },
+        allergies:{ type: "array",  items: { type: "string" }, description: "List of known allergies" },
+        notes:    { type: "string", description: "Free-text clinical notes" },
+        patient_id: { type: "string", description: "Patient UUID (required for 'get')" },
+        query:    { type: "string", description: "Search query for name, MRN, or notes (for 'search')" },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "ehr_encounter",
+    description: "Save a clinical encounter / SOAP note for a patient, or retrieve encounter history. Use when writing visit notes, SOAP notes, recording vitals, medications, or ICD codes for a patient.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        action:     { type: "string", description: "'save' | 'list'" },
+        patient_id: { type: "string", description: "Patient UUID (required)" },
+        date:       { type: "string", description: "Encounter date YYYY-MM-DD (defaults to today)" },
+        chief_complaint: { type: "string", description: "Patient's chief complaint" },
+        subjective: { type: "string", description: "SOAP — Subjective: patient-reported symptoms, history" },
+        objective:  { type: "string", description: "SOAP — Objective: exam findings, vitals observed" },
+        assessment: { type: "string", description: "SOAP — Assessment: diagnosis / differential" },
+        plan:       { type: "string", description: "SOAP — Plan: treatment, orders, follow-up" },
+        vitals:     { type: "object", description: "Key-value vitals e.g. {bp:'120/80', hr:72, temp:'98.6F'}" },
+        medications:{ type: "array",  items: { type: "string" }, description: "Medications prescribed or continued" },
+        icd_codes:  { type: "array",  items: { type: "string" }, description: "ICD-10 diagnosis codes e.g. ['J06.9','Z00.00']" },
+      },
+      required: ["action", "patient_id"],
+    },
+  },
+  {
+    name: "clinical_research",
+    description: "Search PubMed for peer-reviewed clinical research, medical studies, drug trials, treatment guidelines, or any medical literature. Use when the user asks about evidence, studies, research, or 'what does the literature say about X'.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query:      { type: "string", description: "Medical search query, e.g. 'metformin type 2 diabetes HbA1c', 'SSRI adolescent depression RCT'" },
+        max_results:{ type: "number", description: "Number of results to return (1-10, default 5)" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "medical_book_search",
+    description: "Search medical textbooks and clinical references (Open Library + NIH Bookshelf) for fact-finding. Use when the user asks 'what does Harrison's say about X', wants a textbook reference, or needs to fact-check a clinical claim.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query:      { type: "string", description: "Medical topic or textbook query, e.g. 'Harrison principles internal medicine sepsis', 'Robbins pathology carcinoma'" },
+        max_results:{ type: "number", description: "Number of books to return (1-10, default 5)" },
+      },
+      required: ["query"],
+    },
+  },
 ];
 
 export function pollinationsUrl(prompt: string): string {
