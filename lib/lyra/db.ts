@@ -552,6 +552,30 @@ function initSchema(db: BetterSqlite3Db) {
     `);
   } catch { /* ignore */ }
 
+  // ── Role Bots ─────────────────────────────────────────────────────────────
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS role_bots (
+        id              TEXT PRIMARY KEY,
+        user_id         TEXT NOT NULL,
+        name            TEXT NOT NULL,
+        company         TEXT,
+        role_title      TEXT,
+        jd_raw          TEXT,
+        system_prompt   TEXT NOT NULL,
+        tools           TEXT DEFAULT '[]',
+        knowledge       TEXT DEFAULT '',
+        tone            TEXT DEFAULT 'professional',
+        domain          TEXT DEFAULT '',
+        responsibilities TEXT DEFAULT '[]',
+        status          TEXT DEFAULT 'active',
+        created_at      TEXT DEFAULT (datetime('now')),
+        updated_at      TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_role_bots_user ON role_bots(user_id, status);
+    `);
+  } catch { /* ignore */ }
+
   // ── HIPAA Audit Log — § 164.312(b) ───────────────────────────────────────
   try {
     db.exec(`
@@ -2061,3 +2085,102 @@ export function getSkillLog(name?: string, limit = 50): Array<{ skill_name: stri
   } catch { return []; }
 }
 
+
+// ── Role Bots ──────────────────────────────────────────────────────────────────
+
+export interface RoleBot {
+  id: string;
+  user_id: string;
+  name: string;
+  company: string | null;
+  role_title: string | null;
+  jd_raw: string | null;
+  system_prompt: string;
+  tools: string;           // JSON string[]
+  knowledge: string;
+  tone: string;
+  domain: string;
+  responsibilities: string; // JSON string[]
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export function saveRoleBot(fields: {
+  userId: string;
+  name: string;
+  company?: string;
+  roleTitle?: string;
+  jdRaw?: string;
+  systemPrompt: string;
+  tools?: string[];
+  knowledge?: string;
+  tone?: string;
+  domain?: string;
+  responsibilities?: string[];
+}): RoleBot {
+  const db = getDb();
+  if (!db) throw new Error("DB unavailable");
+  const { randomUUID } = require("crypto") as typeof import("crypto");
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO role_bots (id, user_id, name, company, role_title, jd_raw, system_prompt, tools, knowledge, tone, domain, responsibilities, status, created_at, updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(
+    id, fields.userId, fields.name,
+    fields.company ?? null, fields.roleTitle ?? null, fields.jdRaw ?? null,
+    fields.systemPrompt,
+    JSON.stringify(fields.tools ?? []),
+    fields.knowledge ?? "",
+    fields.tone ?? "professional",
+    fields.domain ?? "",
+    JSON.stringify(fields.responsibilities ?? []),
+    "active", now, now,
+  );
+  return db.prepare("SELECT * FROM role_bots WHERE id = ?").get(id) as RoleBot;
+}
+
+export function updateRoleBot(id: string, userId: string, fields: Partial<{
+  name: string; company: string; systemPrompt: string; tools: string[];
+  knowledge: string; tone: string; domain: string; status: string;
+}>): boolean {
+  const db = getDb();
+  if (!db) return false;
+  const sets: string[] = ["updated_at = ?"];
+  const vals: unknown[] = [new Date().toISOString()];
+  if (fields.name !== undefined) { sets.push("name = ?"); vals.push(fields.name); }
+  if (fields.company !== undefined) { sets.push("company = ?"); vals.push(fields.company); }
+  if (fields.systemPrompt !== undefined) { sets.push("system_prompt = ?"); vals.push(fields.systemPrompt); }
+  if (fields.tools !== undefined) { sets.push("tools = ?"); vals.push(JSON.stringify(fields.tools)); }
+  if (fields.knowledge !== undefined) { sets.push("knowledge = ?"); vals.push(fields.knowledge); }
+  if (fields.tone !== undefined) { sets.push("tone = ?"); vals.push(fields.tone); }
+  if (fields.domain !== undefined) { sets.push("domain = ?"); vals.push(fields.domain); }
+  if (fields.status !== undefined) { sets.push("status = ?"); vals.push(fields.status); }
+  vals.push(id, userId);
+  try {
+    db.prepare(`UPDATE role_bots SET ${sets.join(", ")} WHERE id = ? AND user_id = ?`).run(...vals as Parameters<typeof db.prepare>[0][]);
+    return true;
+  } catch { return false; }
+}
+
+export function getRoleBot(id: string): RoleBot | null {
+  const db = getDb();
+  if (!db) return null;
+  try { return (db.prepare("SELECT * FROM role_bots WHERE id = ?").get(id) as RoleBot | undefined) ?? null; }
+  catch { return null; }
+}
+
+export function listRoleBots(userId: string): RoleBot[] {
+  const db = getDb();
+  if (!db) return [];
+  try { return db.prepare("SELECT * FROM role_bots WHERE user_id = ? AND status != 'deleted' ORDER BY created_at DESC").all(userId) as RoleBot[]; }
+  catch { return []; }
+}
+
+export function deleteRoleBot(id: string, userId: string): boolean {
+  const db = getDb();
+  if (!db) return false;
+  try { db.prepare("UPDATE role_bots SET status = 'deleted' WHERE id = ? AND user_id = ?").run(id, userId); return true; }
+  catch { return false; }
+}

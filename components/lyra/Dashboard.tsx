@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Send, Loader2, Lightbulb, GitBranch,
   Zap, ArrowLeft, CheckCircle, AlertCircle, X, LogOut, SlidersHorizontal, Settings,
-  MessageSquare, Truck, Gamepad2, BookOpen, Library, Play, Building2, Briefcase, Users, TrendingUp, GraduationCap, Rss, FlaskConical, Brain, ChevronLeft, ChevronRight, Search, PenLine, Store,
+  MessageSquare, Truck, Gamepad2, BookOpen, Library, Play, Building2, Briefcase, Users, TrendingUp, GraduationCap, Rss, FlaskConical, Brain, ChevronLeft, ChevronRight, Search, PenLine, Store, Bot,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
@@ -435,8 +435,9 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
     { href: "/investors", icon: TrendingUp,    label: "Investors" },
     { href: "/feed",      icon: Rss,           label: "Feed"      },
     { href: "/demo",      icon: FlaskConical,  label: "Demo"      },
-    { href: "/memory",    icon: Brain,         label: "Memory"    },
-    { href: "/searches",  icon: Search,        label: "Searches"  },
+    { href: "/memory",      icon: Brain,         label: "Memory"    },
+    { href: "/searches",    icon: Search,        label: "Searches"  },
+    { href: "/lyra/roles",  icon: Bot,           label: "Roles"     },
   ];
 
   const activeAgent = data.activeAgent;
