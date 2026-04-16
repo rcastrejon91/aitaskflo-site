@@ -38,30 +38,25 @@ export async function POST(req: NextRequest) {
   // Don't await — respond to Slack immediately, process in background
   (async () => {
     try {
-      // Question → Lyra answers
-      if (text.includes("?") || text.startsWith("hey") || text.startsWith("what") || text.startsWith("how") || text.startsWith("can")) {
-        await generatePersonaResponse({
-          persona: PERSONAS[0], // Lyra
-          message: event.text!,
-          channel,
-          responseType: "answer",
-        });
-        return;
+      const PERSONA_MAP: Record<string, number> = { lyra: 0, axon: 1, nova: 2, hex: 3, milo: 4 };
+
+      // @mention routing — @lyra, @axon, @nova, @hex, @milo take priority
+      const mentionMatch = text.match(/@(lyra|axon|nova|hex|milo)\b/i);
+      if (mentionMatch) {
+        const idx = PERSONA_MAP[mentionMatch[1].toLowerCase()];
+        if (idx !== undefined) {
+          await generatePersonaResponse({
+            persona: PERSONAS[idx],
+            message: event.text!,
+            channel,
+            responseType: "answer",
+          });
+          return;
+        }
       }
 
-      // Summarize request → Axon summarizes
-      if (text.includes("summarize") || text.includes("summary") || text.includes("recap")) {
-        await generatePersonaResponse({
-          persona: PERSONAS[1], // Axon
-          message: event.text!,
-          channel,
-          responseType: "summary",
-        });
-        return;
-      }
-
-      // Task creation → Milo logs it
-      if (text.includes("create task") || text.includes("add task") || text.includes("todo") || text.includes("to-do")) {
+      // Task creation → Milo logs it (with real create_task tool)
+      if (text.includes("create task") || text.includes("add task") || text.includes("todo") || text.includes("to-do") || text.includes("remind me") || text.includes("reminder")) {
         await generatePersonaResponse({
           persona: PERSONAS[4], // Milo
           message: event.text!,
@@ -71,8 +66,8 @@ export async function POST(req: NextRequest) {
         return;
       }
 
-      // Error / issue → Hex flags it
-      if (text.includes("error") || text.includes("broken") || text.includes("down") || text.includes("issue") || text.includes("bug")) {
+      // Error / issue → Hex investigates (with search_web, read_url)
+      if (text.includes("error") || text.includes("broken") || text.includes("down") || text.includes("issue") || text.includes("bug") || text.includes("outage")) {
         await generatePersonaResponse({
           persona: PERSONAS[3], // Hex
           message: event.text!,
@@ -82,13 +77,35 @@ export async function POST(req: NextRequest) {
         return;
       }
 
+      // Summarize request → Axon summarizes (with real data tools)
+      if (text.includes("summarize") || text.includes("summary") || text.includes("recap") || text.includes("stats") || text.includes("numbers")) {
+        await generatePersonaResponse({
+          persona: PERSONAS[1], // Axon
+          message: event.text!,
+          channel,
+          responseType: "summary",
+        });
+        return;
+      }
+
       // Milestone / good news → Nova hypes it
-      if (text.includes("sale") || text.includes("revenue") || text.includes("user") || text.includes("launch") || text.includes("shipped")) {
+      if (text.includes("sale") || text.includes("revenue") || text.includes("launch") || text.includes("shipped") || text.includes("hit") || text.includes("milestone")) {
         await generatePersonaResponse({
           persona: PERSONAS[2], // Nova
           message: event.text!,
           channel,
           responseType: "hype",
+        });
+        return;
+      }
+
+      // Question or direct request → Lyra answers (with real tools)
+      if (text.includes("?") || text.startsWith("hey") || text.startsWith("what") || text.startsWith("how") || text.startsWith("can") || text.startsWith("search") || text.startsWith("find") || text.startsWith("get") || text.startsWith("show")) {
+        await generatePersonaResponse({
+          persona: PERSONAS[0], // Lyra
+          message: event.text!,
+          channel,
+          responseType: "answer",
         });
         return;
       }

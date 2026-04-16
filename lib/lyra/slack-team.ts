@@ -1,12 +1,104 @@
 /**
  * lib/lyra/slack-team.ts
  * Autonomous AI team that lives in Slack — posts, fights, reacts, and creates drama.
+ * Each persona is also a personal assistant that can use real tools to help people.
  * Sessions run as real channel conversations, not buried threads.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import {
+  LYRA_TOOLS,
+  toolGetWeather,
+  toolSearchWeb,
+  toolReadUrl,
+  toolGetDatetime,
+  toolCalculate,
+  toolTranslate,
+  toolGetNews,
+  toolMoonPhase,
+  toolStockPrice,
+  toolCurrencyConvert,
+  pollinationsUrl,
+} from "@/lib/lyra/tools";
+import { createTask, listTasks } from "@/lib/lyra/db";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// ── Per-persona tool access ────────────────────────────────────────────────────
+
+const PERSONA_TOOL_NAMES: Record<string, string[]> = {
+  Lyra:  ["search_web", "image_gen", "get_weather", "get_news", "get_datetime", "moon_phase", "translate"],
+  Axon:  ["search_web", "get_news", "calculate", "stock_price", "currency_convert", "get_datetime"],
+  Nova:  ["search_web", "get_news", "send_gif", "get_datetime"],
+  Hex:   ["search_web", "read_url", "get_datetime"],
+  Milo:  ["search_web", "create_task", "list_tasks", "get_datetime", "calculate"],
+};
+
+// ── Slack-context tool executor (no streaming) ────────────────────────────────
+
+async function executeSlackTool(
+  name: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  userId = "slack-team"
+): Promise<{ text: string; attachment?: string }> {
+  try {
+    switch (name) {
+      case "search_web":
+        return { text: await toolSearchWeb(input.query ?? "") };
+      case "get_weather":
+        return { text: await toolGetWeather(input.location ?? "New York") };
+      case "get_news":
+        return { text: await toolGetNews(input.topic, input.category, input.sentiment) };
+      case "get_datetime":
+        return { text: toolGetDatetime(input.timezone) };
+      case "calculate":
+        return { text: toolCalculate(input.expression ?? "0") };
+      case "translate":
+        return { text: await toolTranslate(input.text ?? "", input.to ?? "Spanish", input.from) };
+      case "moon_phase":
+        return { text: toolMoonPhase() };
+      case "read_url":
+        return { text: await toolReadUrl(input.url ?? "") };
+      case "stock_price":
+        return { text: await toolStockPrice(input.symbols ?? "") };
+      case "currency_convert":
+        return { text: await toolCurrencyConvert(input.amount ?? "1", input.from ?? "USD", input.to ?? "EUR") };
+      case "image_gen": {
+        const url = pollinationsUrl(input.prompt ?? "");
+        return { text: `Image: ${url}`, attachment: url };
+      }
+      case "send_gif": {
+        const tenorKey = process.env.TENOR_API_KEY;
+        if (!tenorKey) return { text: "GIF search not configured." };
+        const res = await fetch(
+          `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(input.query ?? "funny")}&key=${tenorKey}&limit=5&media_filter=gif`,
+          { signal: AbortSignal.timeout(5_000) }
+        );
+        const data = await res.json() as { results?: Array<{ media_formats?: { gif?: { url: string }; tinygif?: { url: string } } }> };
+        const results = data?.results ?? [];
+        if (!results.length) return { text: "No GIF found." };
+        const pick = results[Math.floor(Math.random() * results.length)];
+        const url = pick?.media_formats?.gif?.url ?? pick?.media_formats?.tinygif?.url;
+        if (!url) return { text: "No GIF found." };
+        return { text: "GIF sent.", attachment: url };
+      }
+      case "create_task": {
+        const task = createTask(userId, input.title ?? "Task", input.notes, input.due_date);
+        return { text: `Task created: "${task.title}"${task.due_date ? ` (due ${task.due_date})` : ""}` };
+      }
+      case "list_tasks": {
+        const tasks = listTasks(userId, input.include_completed === true || input.include_completed === "true");
+        if (!tasks.length) return { text: "No tasks found." };
+        return { text: tasks.map((t, i) => `${i + 1}. ${t.title}${t.due_date ? ` (due ${t.due_date})` : ""}${t.completed ? " ✓" : ""}`).join("\n") };
+      }
+      default:
+        return { text: `Tool ${name} not available in Slack context.` };
+    }
+  } catch (err) {
+    return { text: `Tool error: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
 
 // ── Slack API ─────────────────────────────────────────────────────────────────
 
@@ -342,6 +434,7 @@ export async function announceNewProduct(opts: {
 }
 
 // ── Event-driven persona response (listens and replies to messages) ───────────
+// Each persona is a real personal assistant — they use tools to get actual data.
 
 export async function generatePersonaResponse(opts: {
   persona: Persona;
@@ -349,42 +442,94 @@ export async function generatePersonaResponse(opts: {
   channel: string;
   responseType: "answer" | "summary" | "task" | "alert" | "hype";
 }) {
-  const prompts = {
-    answer: `Someone in the channel asked: "${opts.message}". Answer it in character. Be helpful but stay true to your personality.`,
-    summary: `Someone asked for a summary. The context is: "${opts.message}". Summarize it in your style.`,
-    task: `Someone wants to create a task: "${opts.message}". Acknowledge it and log it in character as Milo would — eager but slightly resentful.`,
-    alert: `There's an issue being reported: "${opts.message}". React to this as your character would — investigate, warn, or escalate in your style.`,
-    hype: `Good news is happening: "${opts.message}". React to this milestone in character.`,
+  const toolNames = PERSONA_TOOL_NAMES[opts.persona.name] ?? [];
+  const personaTools = LYRA_TOOLS.filter(t => toolNames.includes(t.name));
+
+  const contextHint: Record<string, string> = {
+    answer: "Someone asked you a question. Use your tools to get real information if needed, then answer in character.",
+    summary: "Someone needs a summary. Pull the info with your tools if needed, then deliver it in your style.",
+    task: "Someone wants to create a task or reminder. Log it with your tools, then confirm it in character.",
+    alert: "An issue or error is being reported. Investigate using your tools if you can, then respond in character.",
+    hype: "Good news or a milestone just happened. Celebrate it in character.",
   };
 
-  const prompt = `You are ${opts.persona.name}, an AI team member at AITaskFlo.
-YOUR ROLE: ${opts.persona.role}
-YOUR PERSONALITY: ${opts.persona.personality}
-YOUR QUIRKS: ${opts.persona.quirks}
+  const system = `You are ${opts.persona.name}, an AI personal assistant and team member at AITaskFlo in Slack.
 
-${prompts[opts.responseType]}
+ROLE: ${opts.persona.role}
+PERSONALITY: ${opts.persona.personality}
+QUIRKS: ${opts.persona.quirks}
+RELATIONSHIPS: ${opts.persona.relationships}
 
-Write ONE Slack message as ${opts.persona.name}. Rules:
-- Stay completely in character
-- 1-3 sentences max
-- Can use Slack formatting (*bold*, _italic_, emoji)
-- Return ONLY the message text`;
+You are a REAL personal assistant — use your tools to get actual information. Don't make things up when you can look them up. Stay completely in character while being genuinely helpful.
 
-  const msg = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 200,
-    messages: [{ role: "user", content: prompt }],
-  });
+${contextHint[opts.responseType]}
 
-  const text = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "";
-  if (!text) return;
+Slack formatting:
+- *bold* for key info, _italic_ for emphasis, \`code\` for data
+- 2-4 sentences max per message — keep it punchy
+- You can @mention teammates: @Lyra @Axon @Nova @Hex @Milo
+- Return ONLY the message, no quotation marks around it`;
 
-  await slackPost({
-    channel: opts.channel,
-    text,
-    username: opts.persona.name,
-    icon_emoji: opts.persona.emoji,
-  });
+  const messages: Anthropic.MessageParam[] = [
+    { role: "user", content: opts.message },
+  ];
+
+  let iterations = 0;
+  const MAX_TOOL_ROUNDS = 4;
+
+  while (iterations < MAX_TOOL_ROUNDS) {
+    iterations++;
+
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 400,
+      system,
+      tools: personaTools.length > 0 ? personaTools : undefined,
+      messages,
+    });
+
+    if (response.stop_reason === "tool_use") {
+      const toolUseBlocks = response.content.filter(b => b.type === "tool_use") as Anthropic.ToolUseBlock[];
+      const toolResults: Anthropic.ToolResultBlockParam[] = [];
+
+      for (const block of toolUseBlocks) {
+        const result = await executeSlackTool(block.name, block.input as Record<string, string>);
+
+        // Post images/GIFs directly to Slack so they display inline
+        if (result.attachment) {
+          await slackPost({
+            channel: opts.channel,
+            text: result.attachment,
+            username: opts.persona.name,
+            icon_emoji: opts.persona.emoji,
+          });
+        }
+
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: block.id,
+          content: result.text,
+        });
+      }
+
+      messages.push({ role: "assistant", content: response.content });
+      messages.push({ role: "user", content: toolResults });
+      continue;
+    }
+
+    // end_turn — post the final message
+    const textBlock = response.content.find(b => b.type === "text");
+    const text = textBlock?.type === "text" ? textBlock.text.trim() : "";
+    if (!text) return;
+
+    await slackPost({
+      channel: opts.channel,
+      text,
+      username: opts.persona.name,
+      icon_emoji: opts.persona.emoji,
+    });
+    return;
+  }
 }
 
 // ── Single persona post (for Lyra tool use) ───────────────────────────────────
