@@ -776,7 +776,10 @@ Respond with JSON:
 }
 
 // ── Run all 5 agents in parallel — the full Agent OS tick ─────────────────────
-export async function runAgentOS(): Promise<{ results: Array<{ agent: string; acted: boolean; summary: string }> }> {
+export async function runAgentOS(slackToken?: string): Promise<{ results: Array<{ agent: string; acted: boolean; summary: string }> }> {
+  // Allow per-user token override (for multi-tenant use)
+  if (slackToken) process.env.SLACK_BOT_TOKEN = slackToken;
+
   // Ensure all agent channels exist
   await Promise.allSettled([
     ...Object.values(AGENT_CHANNELS).map(name => createSlackChannel(name)),
