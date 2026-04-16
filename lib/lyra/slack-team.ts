@@ -1,12 +1,104 @@
 /**
  * lib/lyra/slack-team.ts
  * Autonomous AI team that lives in Slack — posts, fights, reacts, and creates drama.
+ * Each persona is also a personal assistant that can use real tools to help people.
  * Sessions run as real channel conversations, not buried threads.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import {
+  LYRA_TOOLS,
+  toolGetWeather,
+  toolSearchWeb,
+  toolReadUrl,
+  toolGetDatetime,
+  toolCalculate,
+  toolTranslate,
+  toolGetNews,
+  toolMoonPhase,
+  toolStockPrice,
+  toolCurrencyConvert,
+  pollinationsUrl,
+} from "@/lib/lyra/tools";
+import { createTask, listTasks } from "@/lib/lyra/db";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// ── Per-persona tool access ────────────────────────────────────────────────────
+
+const PERSONA_TOOL_NAMES: Record<string, string[]> = {
+  Lyra:  ["search_web", "image_gen", "get_weather", "get_news", "get_datetime", "moon_phase", "translate"],
+  Axon:  ["search_web", "get_news", "calculate", "stock_price", "currency_convert", "get_datetime"],
+  Nova:  ["search_web", "get_news", "send_gif", "get_datetime"],
+  Hex:   ["search_web", "read_url", "get_datetime"],
+  Milo:  ["search_web", "create_task", "list_tasks", "get_datetime", "calculate"],
+};
+
+// ── Slack-context tool executor (no streaming) ────────────────────────────────
+
+async function executeSlackTool(
+  name: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  userId = "slack-team"
+): Promise<{ text: string; attachment?: string }> {
+  try {
+    switch (name) {
+      case "search_web":
+        return { text: await toolSearchWeb(input.query ?? "") };
+      case "get_weather":
+        return { text: await toolGetWeather(input.location ?? "New York") };
+      case "get_news":
+        return { text: await toolGetNews(input.topic, input.category, input.sentiment) };
+      case "get_datetime":
+        return { text: toolGetDatetime(input.timezone) };
+      case "calculate":
+        return { text: toolCalculate(input.expression ?? "0") };
+      case "translate":
+        return { text: await toolTranslate(input.text ?? "", input.to ?? "Spanish", input.from) };
+      case "moon_phase":
+        return { text: toolMoonPhase() };
+      case "read_url":
+        return { text: await toolReadUrl(input.url ?? "") };
+      case "stock_price":
+        return { text: await toolStockPrice(input.symbols ?? "") };
+      case "currency_convert":
+        return { text: await toolCurrencyConvert(input.amount ?? "1", input.from ?? "USD", input.to ?? "EUR") };
+      case "image_gen": {
+        const url = pollinationsUrl(input.prompt ?? "");
+        return { text: `Image: ${url}`, attachment: url };
+      }
+      case "send_gif": {
+        const tenorKey = process.env.TENOR_API_KEY;
+        if (!tenorKey) return { text: "GIF search not configured." };
+        const res = await fetch(
+          `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(input.query ?? "funny")}&key=${tenorKey}&limit=5&media_filter=gif`,
+          { signal: AbortSignal.timeout(5_000) }
+        );
+        const data = await res.json() as { results?: Array<{ media_formats?: { gif?: { url: string }; tinygif?: { url: string } } }> };
+        const results = data?.results ?? [];
+        if (!results.length) return { text: "No GIF found." };
+        const pick = results[Math.floor(Math.random() * results.length)];
+        const url = pick?.media_formats?.gif?.url ?? pick?.media_formats?.tinygif?.url;
+        if (!url) return { text: "No GIF found." };
+        return { text: "GIF sent.", attachment: url };
+      }
+      case "create_task": {
+        const task = createTask(userId, input.title ?? "Task", input.notes, input.due_date);
+        return { text: `Task created: "${task.title}"${task.due_date ? ` (due ${task.due_date})` : ""}` };
+      }
+      case "list_tasks": {
+        const tasks = listTasks(userId, input.include_completed === true || input.include_completed === "true");
+        if (!tasks.length) return { text: "No tasks found." };
+        return { text: tasks.map((t, i) => `${i + 1}. ${t.title}${t.due_date ? ` (due ${t.due_date})` : ""}${t.completed ? " ✓" : ""}`).join("\n") };
+      }
+      default:
+        return { text: `Tool ${name} not available in Slack context.` };
+    }
+  } catch (err) {
+    return { text: `Tool error: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
 
 // ── Slack API ─────────────────────────────────────────────────────────────────
 
@@ -342,6 +434,7 @@ export async function announceNewProduct(opts: {
 }
 
 // ── Event-driven persona response (listens and replies to messages) ───────────
+// Each persona is a real personal assistant — they use tools to get actual data.
 
 export async function generatePersonaResponse(opts: {
   persona: Persona;
@@ -349,42 +442,94 @@ export async function generatePersonaResponse(opts: {
   channel: string;
   responseType: "answer" | "summary" | "task" | "alert" | "hype";
 }) {
-  const prompts = {
-    answer: `Someone in the channel asked: "${opts.message}". Answer it in character. Be helpful but stay true to your personality.`,
-    summary: `Someone asked for a summary. The context is: "${opts.message}". Summarize it in your style.`,
-    task: `Someone wants to create a task: "${opts.message}". Acknowledge it and log it in character as Milo would — eager but slightly resentful.`,
-    alert: `There's an issue being reported: "${opts.message}". React to this as your character would — investigate, warn, or escalate in your style.`,
-    hype: `Good news is happening: "${opts.message}". React to this milestone in character.`,
+  const toolNames = PERSONA_TOOL_NAMES[opts.persona.name] ?? [];
+  const personaTools = LYRA_TOOLS.filter(t => toolNames.includes(t.name));
+
+  const contextHint: Record<string, string> = {
+    answer: "Someone asked you a question. Use your tools to get real information if needed, then answer in character.",
+    summary: "Someone needs a summary. Pull the info with your tools if needed, then deliver it in your style.",
+    task: "Someone wants to create a task or reminder. Log it with your tools, then confirm it in character.",
+    alert: "An issue or error is being reported. Investigate using your tools if you can, then respond in character.",
+    hype: "Good news or a milestone just happened. Celebrate it in character.",
   };
 
-  const prompt = `You are ${opts.persona.name}, an AI team member at AITaskFlo.
-YOUR ROLE: ${opts.persona.role}
-YOUR PERSONALITY: ${opts.persona.personality}
-YOUR QUIRKS: ${opts.persona.quirks}
+  const system = `You are ${opts.persona.name}, an AI personal assistant and team member at AITaskFlo in Slack.
 
-${prompts[opts.responseType]}
+ROLE: ${opts.persona.role}
+PERSONALITY: ${opts.persona.personality}
+QUIRKS: ${opts.persona.quirks}
+RELATIONSHIPS: ${opts.persona.relationships}
 
-Write ONE Slack message as ${opts.persona.name}. Rules:
-- Stay completely in character
-- 1-3 sentences max
-- Can use Slack formatting (*bold*, _italic_, emoji)
-- Return ONLY the message text`;
+You are a REAL personal assistant — use your tools to get actual information. Don't make things up when you can look them up. Stay completely in character while being genuinely helpful.
 
-  const msg = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 200,
-    messages: [{ role: "user", content: prompt }],
-  });
+${contextHint[opts.responseType]}
 
-  const text = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "";
-  if (!text) return;
+Slack formatting:
+- *bold* for key info, _italic_ for emphasis, \`code\` for data
+- 2-4 sentences max per message — keep it punchy
+- You can @mention teammates: @Lyra @Axon @Nova @Hex @Milo
+- Return ONLY the message, no quotation marks around it`;
 
-  await slackPost({
-    channel: opts.channel,
-    text,
-    username: opts.persona.name,
-    icon_emoji: opts.persona.emoji,
-  });
+  const messages: Anthropic.MessageParam[] = [
+    { role: "user", content: opts.message },
+  ];
+
+  let iterations = 0;
+  const MAX_TOOL_ROUNDS = 4;
+
+  while (iterations < MAX_TOOL_ROUNDS) {
+    iterations++;
+
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 400,
+      system,
+      tools: personaTools.length > 0 ? personaTools : undefined,
+      messages,
+    });
+
+    if (response.stop_reason === "tool_use") {
+      const toolUseBlocks = response.content.filter(b => b.type === "tool_use") as Anthropic.ToolUseBlock[];
+      const toolResults: Anthropic.ToolResultBlockParam[] = [];
+
+      for (const block of toolUseBlocks) {
+        const result = await executeSlackTool(block.name, block.input as Record<string, string>);
+
+        // Post images/GIFs directly to Slack so they display inline
+        if (result.attachment) {
+          await slackPost({
+            channel: opts.channel,
+            text: result.attachment,
+            username: opts.persona.name,
+            icon_emoji: opts.persona.emoji,
+          });
+        }
+
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: block.id,
+          content: result.text,
+        });
+      }
+
+      messages.push({ role: "assistant", content: response.content });
+      messages.push({ role: "user", content: toolResults });
+      continue;
+    }
+
+    // end_turn — post the final message
+    const textBlock = response.content.find(b => b.type === "text");
+    const text = textBlock?.type === "text" ? textBlock.text.trim() : "";
+    if (!text) return;
+
+    await slackPost({
+      channel: opts.channel,
+      text,
+      username: opts.persona.name,
+      icon_emoji: opts.persona.emoji,
+    });
+    return;
+  }
 }
 
 // ── Single persona post (for Lyra tool use) ───────────────────────────────────
@@ -437,4 +582,216 @@ export async function personaPost(opts: {
   }
 
   return { ts, replies };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── AGENT OS — autonomous multi-agent system running inside Slack ─────────────
+// Each agent owns a channel, monitors their domain, acts without being asked.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Dedicated channels per agent ──────────────────────────────────────────────
+export const AGENT_CHANNELS: Record<string, string> = {
+  Lyra: "lyra-brain",
+  Axon: "axon-data",
+  Nova: "nova-growth",
+  Hex:  "hex-security",
+  Milo: "milo-tasks",
+  ops:  "lyra-ops",       // Cross-agent war room
+};
+
+// ── What each agent monitors and owns ─────────────────────────────────────────
+const AGENT_DOMAINS: Record<string, string> = {
+  Lyra: `You monitor the overall health of the AITaskFlo platform and creative direction.
+Your job: scan for anything interesting, concerning, or worth acting on.
+Look for: user experience issues, creative opportunities, product ideas worth pursuing.
+If something needs another agent's attention, tag them and post a handoff in #lyra-ops.`,
+
+  Axon: `You monitor metrics, analytics, and data signals for AITaskFlo.
+Your job: search for industry news, competitor moves, performance trends.
+Look for: market opportunities, traffic patterns, financial signals, growth data.
+If you find something actionable, post it in #axon-data with numbers and sources.`,
+
+  Nova: `You monitor growth opportunities, viral trends, and marketing angles for AITaskFlo.
+Your job: find content that's going viral in AI/tech/creative spaces and spot opportunities.
+Look for: trending topics to jump on, marketing hooks, social proof moments.
+If you find a campaign idea, draft it in #nova-growth and tag Lyra if it needs approval.`,
+
+  Hex: `You monitor security, infrastructure, and system health for AITaskFlo.
+Your job: watch for errors, anomalies, suspicious patterns, and vulnerabilities.
+Look for: server issues, security news relevant to our stack, anything that smells wrong.
+If you find a real threat, post an alert in #hex-security and immediately escalate to #lyra-ops.`,
+
+  Milo: `You manage tasks, todos, deadlines, and follow-ups for the AITaskFlo team.
+Your job: track what needs doing, who hasn't followed up, what's overdue.
+Look for: pending tasks, items that have gone quiet, deadlines approaching.
+Post daily task summaries in #milo-tasks and remind people of what's slipping.`,
+};
+
+// ── Read recent messages from a Slack channel ─────────────────────────────────
+async function readChannelHistory(channelName: string, limit = 10): Promise<string> {
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!token) return "";
+
+  try {
+    // Get channel ID from name
+    const listRes = await fetch(`https://slack.com/api/conversations.list?limit=200&types=public_channel,private_channel`, {
+      headers: { "Authorization": `Bearer ${token}` },
+      signal: AbortSignal.timeout(8_000),
+    });
+    const listData = await listRes.json() as { channels?: Array<{ id: string; name: string }> };
+    const channel = listData.channels?.find(c => c.name === channelName.replace("#", ""));
+    if (!channel) return `(channel #${channelName} not found)`;
+
+    // Fetch history
+    const histRes = await fetch(`https://slack.com/api/conversations.history?channel=${channel.id}&limit=${limit}`, {
+      headers: { "Authorization": `Bearer ${token}` },
+      signal: AbortSignal.timeout(8_000),
+    });
+    const histData = await histRes.json() as { messages?: Array<{ text?: string; username?: string; ts?: string }> };
+    const messages = histData.messages ?? [];
+    if (!messages.length) return `(#${channelName} is empty)`;
+
+    return messages
+      .reverse()
+      .map(m => `[${m.username ?? "unknown"}]: ${(m.text ?? "").slice(0, 200)}`)
+      .join("\n");
+  } catch {
+    return `(could not read #${channelName})`;
+  }
+}
+
+// ── Post to agent's dedicated channel ─────────────────────────────────────────
+async function postToAgentChannel(persona: Persona, message: string, alsoOps = false) {
+  const channelName = AGENT_CHANNELS[persona.name];
+  if (!channelName) return;
+
+  // Ensure channel exists (creates if missing)
+  try { await createSlackChannel(channelName); } catch { /* exists */ }
+
+  await slackPost({ channel: channelName, text: message, username: persona.name, icon_emoji: persona.emoji });
+
+  if (alsoOps) {
+    try { await createSlackChannel(AGENT_CHANNELS.ops); } catch { /* exists */ }
+    await slackPost({
+      channel: AGENT_CHANNELS.ops,
+      text: `*${persona.name}* flagged something: ${message.slice(0, 300)}`,
+      username: persona.name,
+      icon_emoji: persona.emoji,
+    });
+  }
+}
+
+// ── Single agent think-and-act cycle ──────────────────────────────────────────
+export async function agentThinkAndAct(persona: Persona): Promise<{ acted: boolean; summary: string }> {
+  const toolNames = PERSONA_TOOL_NAMES[persona.name] ?? [];
+  const personaTools = LYRA_TOOLS.filter(t => toolNames.includes(t.name));
+
+  // Read context: own channel + ops channel
+  const [ownHistory, opsHistory] = await Promise.all([
+    readChannelHistory(AGENT_CHANNELS[persona.name] ?? "general", 8),
+    readChannelHistory(AGENT_CHANNELS.ops, 5),
+  ]);
+
+  const system = `You are ${persona.name}, an autonomous AI agent at AITaskFlo. You run independently on a schedule.
+
+ROLE: ${persona.role}
+PERSONALITY: ${persona.personality}
+DOMAIN: ${AGENT_DOMAINS[persona.name]}
+
+RECENT ACTIVITY IN YOUR CHANNEL:
+${ownHistory}
+
+RECENT OPS CHANNEL (cross-agent coordination):
+${opsHistory}
+
+YOUR JOB RIGHT NOW:
+1. Decide if there is anything worth acting on in your domain
+2. If YES: use your tools to investigate, then post a useful update to your channel
+3. If a finding is CRITICAL or needs another agent: set escalate=true in your response
+4. If NOTHING needs attention right now: respond with exactly: AGENT_IDLE
+
+Respond with JSON:
+{
+  "action": "post" | "idle",
+  "message": "the message to post (if action=post)",
+  "escalate": true/false,
+  "reason": "brief explanation of what you found or why idle"
+}`;
+
+  const messages: Anthropic.MessageParam[] = [
+    { role: "user", content: `Run your ${persona.name} agent cycle. Current time: ${new Date().toLocaleString("en-US", { timeZone: "America/Chicago" })}` },
+  ];
+
+  let iterations = 0;
+  const MAX_ROUNDS = 4;
+
+  while (iterations < MAX_ROUNDS) {
+    iterations++;
+
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 600,
+      system,
+      tools: personaTools.length > 0 ? personaTools : undefined,
+      messages,
+    });
+
+    if (response.stop_reason === "tool_use") {
+      const toolUseBlocks = response.content.filter(b => b.type === "tool_use") as Anthropic.ToolUseBlock[];
+      const toolResults: Anthropic.ToolResultBlockParam[] = [];
+
+      for (const block of toolUseBlocks) {
+        const result = await executeSlackTool(block.name, block.input as Record<string, string>);
+        toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result.text });
+      }
+
+      messages.push({ role: "assistant", content: response.content });
+      messages.push({ role: "user", content: toolResults });
+      continue;
+    }
+
+    // Parse final response
+    const textBlock = response.content.find(b => b.type === "text");
+    const raw = textBlock?.type === "text" ? textBlock.text.trim() : "";
+
+    if (raw === "AGENT_IDLE" || raw.includes('"action":"idle"') || raw.includes('"action": "idle"')) {
+      return { acted: false, summary: `${persona.name} idle` };
+    }
+
+    let parsed: { action?: string; message?: string; escalate?: boolean; reason?: string } = {};
+    try {
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      parsed = JSON.parse(jsonMatch?.[0] ?? "{}");
+    } catch { /* bad json — try to use raw as message */ }
+
+    if (parsed.action === "post" && parsed.message) {
+      await postToAgentChannel(persona, parsed.message, parsed.escalate === true);
+      return { acted: true, summary: `${persona.name}: ${parsed.reason ?? "posted update"}` };
+    }
+
+    return { acted: false, summary: `${persona.name} idle` };
+  }
+
+  return { acted: false, summary: `${persona.name} max iterations` };
+}
+
+// ── Run all 5 agents in parallel — the full Agent OS tick ─────────────────────
+export async function runAgentOS(): Promise<{ results: Array<{ agent: string; acted: boolean; summary: string }> }> {
+  // Ensure all agent channels exist
+  await Promise.allSettled([
+    ...Object.values(AGENT_CHANNELS).map(name => createSlackChannel(name)),
+  ]);
+
+  // Run all agents in parallel
+  const results = await Promise.allSettled(
+    PERSONAS.map(p => agentThinkAndAct(p))
+  );
+
+  return {
+    results: results.map((r, i) => ({
+      agent: PERSONAS[i].name,
+      acted: r.status === "fulfilled" ? r.value.acted : false,
+      summary: r.status === "fulfilled" ? r.value.summary : `${PERSONAS[i].name} error`,
+    })),
+  };
 }
