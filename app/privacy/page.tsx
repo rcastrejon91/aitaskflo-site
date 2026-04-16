@@ -58,19 +58,27 @@ export default function PrivacyPage() {
             },
             {
               title: "7. Security",
-              body: `We use industry-standard security practices including HTTPS, hashed passwords, and server-side validation. No system is 100% secure; we encourage strong unique passwords.`,
+              body: `We use industry-standard security practices including HTTPS (TLS 1.2+), bcrypt-hashed passwords, server-side validation, and Cloudflare-enforced DDoS protection. Clinical/PHI data is encrypted at rest using AES-256-GCM. No system is 100% secure; we encourage strong unique passwords and enabling any available MFA.`,
             },
             {
-              title: "8. Your Rights",
-              body: `You have the right to access, correct, or delete your personal data. To exercise these rights, contact us at aitaskflo@gmail.com. EU/EEA residents have additional rights under GDPR.`,
+              title: "8. Protected Health Information (PHI) and HIPAA",
+              body: `If you use the clinical features of AITaskFlo, any Protected Health Information (PHI) you enter is encrypted at rest using AES-256-GCM before storage. Every access, modification, and deletion of PHI is logged with timestamp, user identity, and IP address per HIPAA § 164.312(b). PHI is never used to train shared AI models. Covered Entities must execute a Business Associate Agreement (BAA) with AITaskFlo before entering PHI. Our full HIPAA Notice of Privacy Practices is at aitaskflo.com/hipaa. BAA available at aitaskflo.com/baa.`,
             },
             {
-              title: "9. Changes to This Policy",
+              title: "9. Your Rights",
+              body: `You have the right to access, correct, or delete your personal data. HIPAA-covered individuals have additional rights described in our Notice of Privacy Practices (aitaskflo.com/hipaa), including the right to access PHI, request amendments, and receive an accounting of disclosures. EU/EEA residents have additional rights under GDPR. To exercise any rights, contact us at aitaskflo@gmail.com.`,
+            },
+            {
+              title: "10. Data Breach Notification",
+              body: `In the event of a breach involving your data, we will notify you in accordance with applicable law. For PHI breaches, notification will occur within 60 calendar days of discovery as required by HIPAA (45 CFR § 164.410). For other personal data breaches, we will notify you as promptly as feasible.`,
+            },
+            {
+              title: "11. Changes to This Policy",
               body: `We may update this policy. We will notify you of significant changes via email or a notice in the app. Continued use after changes constitutes acceptance.`,
             },
             {
-              title: "10. Contact",
-              body: `Questions? Email us at aitaskflo@gmail.com.`,
+              title: "12. Contact — Privacy and Security Officer",
+              body: `Questions or privacy requests? Contact our Privacy and Security Officer at aitaskflo@gmail.com. For HIPAA-specific requests, include "HIPAA Request" in the subject line.`,
             },
           ].map(({ title, body }) => (
             <section key={title}>

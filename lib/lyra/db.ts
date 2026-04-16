@@ -551,6 +551,69 @@ function initSchema(db: BetterSqlite3Db) {
       CREATE INDEX IF NOT EXISTS idx_jobs_status ON agent_jobs(status, created_at DESC);
     `);
   } catch { /* ignore */ }
+
+  // ── HIPAA Audit Log — § 164.312(b) ───────────────────────────────────────
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS ehr_audit_log (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL,
+        action      TEXT NOT NULL,
+        record_type TEXT NOT NULL,
+        record_id   TEXT,
+        detail      TEXT,
+        ip          TEXT,
+        user_agent  TEXT,
+        ts          TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_audit_user ON ehr_audit_log(user_id, ts DESC);
+      CREATE INDEX IF NOT EXISTS idx_audit_record ON ehr_audit_log(record_type, record_id, ts DESC);
+    `);
+  } catch { /* ignore */ }
+}
+
+// ── HIPAA Audit Log ───────────────────────────────────────────────────────────
+
+export function logAudit(fields: {
+  userId: string;
+  action: "create" | "read" | "update" | "delete" | "search" | "list" | "export";
+  recordType: "patient" | "encounter" | "lab" | "session";
+  recordId?: string;
+  detail?: string;
+  ip?: string;
+  userAgent?: string;
+}): void {
+  const db = getDb();
+  if (!db) return;
+  try {
+    const { randomUUID } = require("crypto") as typeof import("crypto");
+    db.prepare(`
+      INSERT INTO ehr_audit_log (id, user_id, action, record_type, record_id, detail, ip, user_agent, ts)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).run(
+      randomUUID(),
+      fields.userId,
+      fields.action,
+      fields.recordType,
+      fields.recordId ?? null,
+      fields.detail ?? null,
+      fields.ip ?? null,
+      fields.userAgent ?? null,
+    );
+  } catch { /* never throw from audit log */ }
+}
+
+export function getAuditLog(userId: string, limit = 100): Array<{
+  id: string; user_id: string; action: string; record_type: string;
+  record_id: string | null; detail: string | null; ip: string | null; ts: string;
+}> {
+  const db = getDb();
+  if (!db) return [];
+  try {
+    return db.prepare(
+      "SELECT * FROM ehr_audit_log WHERE user_id = ? ORDER BY ts DESC LIMIT ?"
+    ).all(userId, limit) as never;
+  } catch { return []; }
 }
 
 // ── Message persistence (training data) ──────────────────────────────────────

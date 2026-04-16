@@ -60,6 +60,20 @@ import {
   falMusicGen,
 } from "@/lib/lyra/fal-tools";
 import { hosLogStatus, hosGetStatus, loadSearch, formatLoads } from "@/lib/lyra/trucker";
+import {
+  upsertPatient,
+  searchPatients,
+  getPatient,
+  listPatients,
+  saveEncounter,
+  getEncounters,
+  searchPubMed,
+  searchMedicalBooks,
+  formatPatientSummary,
+  formatEncounterSummary,
+  formatPubMedResults,
+  formatBookResults,
+} from "@/lib/lyra/clinical";
 
 // ── Tool dispatcher ───────────────────────────────────────────────────────────
 
@@ -3690,6 +3704,115 @@ If there is an "Apply" or "Apply Now" button, click it. Fill required fields wit
     controller.enqueue(encoder.encode(`\n${card}`));
     shoutout("showoff", `I just learned a new skill!`, `"${skillName}" is now part of me`);
     return `Skill "${skillName}" learned and saved. I'll remember this for all future conversations.`;
+  }
+
+  // ── Clinical Assistant ──────────────────────────────────────────────────────
+
+  if (name === "ehr_patient") {
+    const action = input.action ?? "list";
+    const uid = userId ?? "anon";
+
+    if (action === "save") {
+      if (!input.name) return "Patient name is required to save a record.";
+      const allergies = Array.isArray((input as Record<string, unknown>).allergies)
+        ? (input as Record<string, unknown>).allergies as string[]
+        : input.allergies ? [input.allergies] : [];
+      const patient = upsertPatient({
+        userId: uid,
+        name: input.name,
+        dob: input.dob,
+        sex: input.sex,
+        mrn: input.mrn,
+        allergies,
+        notes: input.notes,
+      });
+      return `Patient saved.\n${formatPatientSummary(patient)}`;
+    }
+
+    if (action === "get") {
+      if (!input.patient_id) return "patient_id is required.";
+      const patient = getPatient(uid, input.patient_id);
+      if (!patient) return "Patient not found.";
+      return formatPatientSummary(patient);
+    }
+
+    if (action === "search") {
+      const patients = searchPatients(uid, input.query ?? "");
+      if (!patients.length) return "No patients found matching that query.";
+      return patients.map(formatPatientSummary).join("\n\n");
+    }
+
+    // list
+    const patients = listPatients(uid);
+    if (!patients.length) return "No patients on record yet.";
+    return `**${patients.length} patient(s) on record:**\n\n` + patients.map(formatPatientSummary).join("\n\n");
+  }
+
+  if (name === "ehr_encounter") {
+    const action = input.action ?? "list";
+    const uid = userId ?? "anon";
+
+    if (!input.patient_id) return "patient_id is required for encounter actions.";
+
+    if (action === "save") {
+      const vitals = typeof (input as Record<string, unknown>).vitals === "object"
+        ? (input as Record<string, unknown>).vitals as Record<string, unknown>
+        : {};
+      const medications = Array.isArray((input as Record<string, unknown>).medications)
+        ? (input as Record<string, unknown>).medications as string[]
+        : input.medications ? [input.medications] : [];
+      const icd_codes = Array.isArray((input as Record<string, unknown>).icd_codes)
+        ? (input as Record<string, unknown>).icd_codes as string[]
+        : input.icd_codes ? [input.icd_codes] : [];
+
+      const enc = saveEncounter({
+        userId: uid,
+        patientId: input.patient_id,
+        date: input.date,
+        chiefComplaint: input.chief_complaint,
+        soap: {
+          subjective: input.subjective,
+          objective: input.objective,
+          assessment: input.assessment,
+          plan: input.plan,
+        },
+        vitals,
+        medications,
+        icdCodes: icd_codes,
+      });
+      return `Encounter saved.\n${formatEncounterSummary(enc)}`;
+    }
+
+    // list
+    const encounters = getEncounters(uid, input.patient_id);
+    if (!encounters.length) return "No encounters found for this patient.";
+    return `**${encounters.length} encounter(s):**\n\n` + encounters.map(formatEncounterSummary).join("\n\n---\n\n");
+  }
+
+  if (name === "clinical_research") {
+    const query = input.query ?? "";
+    if (!query) return "A search query is required.";
+    const max = Math.min(parseInt(input.max_results ?? "5") || 5, 10);
+    controller.enqueue(encoder.encode(`\n🔬 Searching PubMed for **${query}**…\n`));
+    try {
+      const articles = await searchPubMed(query, max);
+      return formatPubMedResults(articles);
+    } catch (e) {
+      return `PubMed search failed: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+
+  if (name === "medical_book_search") {
+    const query = input.query ?? "";
+    if (!query) return "A search query is required.";
+    const max = Math.min(parseInt(input.max_results ?? "5") || 5, 10);
+    controller.enqueue(encoder.encode(`\n📚 Searching medical references for **${query}**…\n`));
+    try {
+      const books = await searchMedicalBooks(query, max);
+      return formatBookResults(books);
+    } catch (e) {
+      return `Medical book search failed: ${e instanceof Error ? e.message : String(e)}`;
+    }
   }
 
   if (name === "discover_tool") {
