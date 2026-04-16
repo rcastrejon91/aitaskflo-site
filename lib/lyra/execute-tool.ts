@@ -2086,12 +2086,18 @@ Return ONLY valid JSON:
     const voice = input.voice ?? "aria";
     // Prefer ElevenLabs (higher quality) — fall back to fal Kokoro
     if (process.env.ELEVENLABS_API_KEY) {
-      controller.enqueue(encoder.encode("\n🔊 Generating speech with ElevenLabs…\n"));
-      const { elevenLabsTTS } = await import("@/lib/lyra/fal-tools");
-      const url = await elevenLabsTTS(text, voice);
-      const card = JSON.stringify({ tool: "fal_audio", url, type: "speech", voice, preview: text.slice(0, 60) });
-      controller.enqueue(encoder.encode(`\n${card}`));
-      return `Audio ready (ElevenLabs).`;
+      try {
+        controller.enqueue(encoder.encode("\n🔊 Generating speech with ElevenLabs…\n"));
+        const { elevenLabsTTS } = await import("@/lib/lyra/fal-tools");
+        const url = await elevenLabsTTS(text, voice);
+        const card = JSON.stringify({ tool: "fal_audio", url, type: "speech", voice, preview: text.slice(0, 60) });
+        controller.enqueue(encoder.encode(`\n${card}`));
+        return `Audio ready (ElevenLabs).`;
+      } catch (e) {
+        // Fall through to Kokoro if ElevenLabs fails (e.g. free plan limitation)
+        controller.enqueue(encoder.encode("\n⚠️ ElevenLabs unavailable, switching to Kokoro…\n"));
+        if (!process.env.FAL_KEY) return `TTS error: ${e instanceof Error ? e.message : String(e)}`;
+      }
     }
     if (!process.env.FAL_KEY) return "TTS is not configured — add ELEVENLABS_API_KEY or FAL_KEY to environment.";
     controller.enqueue(encoder.encode("\n🔊 Generating speech with fal.ai Kokoro…\n"));
