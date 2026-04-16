@@ -141,6 +141,51 @@ export async function falTTS(text: string, voiceHint = "aria"): Promise<string> 
   return url;
 }
 
+// ── ElevenLabs TTS (high quality — used when ELEVENLABS_API_KEY is set) ───────
+
+// Popular ElevenLabs voice IDs
+const ELEVEN_VOICES: Record<string, string> = {
+  aria:    "9BWtsMINqrJLrRacOk9x", // Aria — expressive female
+  jessica: "cgSgspJ2msm6clMCkdW9", // Jessica — warm female
+  sarah:   "EXAVITQu4vr4xnSDxMaL", // Sarah — clear female
+  michael: "flq6f7UD5kfhECb8f8RZ", // Michael — natural male
+  liam:    "TX3LPaxmHKxFdv7VOQHJ", // Liam — young male
+  adam:    "pNInz6obpgDQGcFmaJgB", // Adam — deep male
+  echo:    "AZnzlk1XvdvUeBnXmlld", // Echo — storytelling male
+  nova:    "FGY2WhTYpPnrIDTdsKH5", // Nova — bright female
+};
+
+export async function elevenLabsTTS(text: string, voiceHint = "aria"): Promise<string> {
+  const key = process.env.ELEVENLABS_API_KEY;
+  if (!key) throw new Error("ELEVENLABS_API_KEY not set");
+
+  const voiceId = ELEVEN_VOICES[voiceHint.toLowerCase()] ?? ELEVEN_VOICES.aria;
+
+  const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    method: "POST",
+    headers: {
+      "xi-api-key": key,
+      "Content-Type": "application/json",
+      "Accept": "audio/mpeg",
+    },
+    body: JSON.stringify({
+      text: text.slice(0, 5000),
+      model_id: "eleven_turbo_v2_5",
+      voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true },
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text().catch(() => `status ${res.status}`);
+    throw new Error(`ElevenLabs error: ${err.slice(0, 200)}`);
+  }
+
+  // Return as base64 data URL so the browser can play it directly
+  const buffer = await res.arrayBuffer();
+  const base64 = Buffer.from(buffer).toString("base64");
+  return `data:audio/mpeg;base64,${base64}`;
+}
+
 // ── Music generation ──────────────────────────────────────────────────────────
 
 export async function falMusicGen(prompt: string, duration = 15): Promise<string> {
