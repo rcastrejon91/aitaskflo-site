@@ -21,7 +21,7 @@ import { shouldOrchestrate, orchestrate, resumeInterruptedJobs } from "@/lib/lyr
 import { startTextScheduler } from "@/lib/lyra/text-scheduler";
 import { scanChatMessage } from "@/lib/lyra/content-scanner";
 import { logSecurityEvent } from "@/lib/lyra/db";
-import { logExecution } from "@/lib/lyra/observeLearnLoop";
+import { logExecution, observeAndLearn } from "@/lib/lyra/observeLearnLoop";
 
 // Seed built-in skills once on cold start (no-op if already seeded)
 try { seedBuiltinSkills(); } catch { /* ignore */ }
@@ -563,6 +563,7 @@ export async function POST(req: NextRequest) {
         }, 20_000);
 
         let textSoFar = "";
+        const allToolsUsed: string[] = [];
 
         try {
           const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -735,6 +736,7 @@ export async function POST(req: NextRequest) {
                 input = {};
               }
               const result = await executeTool(toolUse.name, input, encoder, controller, userId, clientIp);
+              allToolsUsed.push(toolUse.name);
               toolResults.push({
                 type: "tool_result",
                 tool_use_id: toolUse.id,
@@ -792,6 +794,12 @@ export async function POST(req: NextRequest) {
           }
         } finally {
           clearInterval(globalKeepAlive);
+          // ── Observe & Learn — auto-create skills from multi-tool tasks ───
+          if (userId && allToolsUsed.length >= 2) {
+            observeAndLearn({ userId, task: message, toolSequence: allToolsUsed, outcome: textSoFar.slice(0, 200), success: true })
+              .then(notification => { if (notification) try { controller.enqueue(encoder.encode(`\n\n${notification}`)); } catch { /* closed */ } })
+              .catch(() => { /* non-blocking */ });
+          }
           // ── "And also" hook — 30% chance on creative responses ───────────
           // Runs after the main response, appends a bonus offer if warranted.
           // Fire-and-forget: any error here must not block stream close.

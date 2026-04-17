@@ -1727,12 +1727,44 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
         const themes = await listThemes(shop, access_token) as Array<{ id: string; name: string; role: string }>;
         return `**Themes on ${shop}:**\n\n${themes.map(t => `- ${t.name} (${t.role}) — ID: ${t.id}`).join("\n")}`;
       }
+      case "get_theme_asset": {
+        const { getThemeAsset } = await import("@/lib/lyra/shopify");
+        if (!input.theme_id || !input.asset_key) return "theme_id and asset_key are required.";
+        const asset = await getThemeAsset(shop, access_token, input.theme_id, input.asset_key);
+        return `**Asset: ${input.asset_key}**\n\n\`\`\`liquid\n${asset.value ?? asset.attachment ?? "(binary)"}\n\`\`\``;
+      }
+      case "update_theme_asset": {
+        const { updateThemeAsset } = await import("@/lib/lyra/shopify");
+        if (!input.theme_id || !input.asset_key || !input.value) return "theme_id, asset_key, and value are required.";
+        await updateThemeAsset(shop, access_token, input.theme_id, input.asset_key, input.value);
+        return `✅ Updated **${input.asset_key}** on theme ${input.theme_id}`;
+      }
+      case "design_homepage": {
+        const { getThemeAsset, updateThemeAsset, listThemes } = await import("@/lib/lyra/shopify");
+        // Get active theme
+        const themes = await listThemes(shop, access_token) as Array<{ id: string; name: string; role: string }>;
+        const activeTheme = themes.find(t => t.role === "main") ?? themes[0];
+        if (!activeTheme) return "No active theme found.";
+        // Read current homepage
+        const asset = await getThemeAsset(shop, access_token, activeTheme.id, "templates/index.json");
+        const current = asset.value ?? "{}";
+        // Apply design instructions via AI rewrite
+        const { complete, getChatProvider } = await import("@/lib/lyra/providers");
+        const newContent = await complete({
+          config: getChatProvider(),
+          system: "You are a Shopify theme expert. Rewrite the homepage template JSON (templates/index.json) based on the user's design request. Return ONLY valid JSON, no explanation.",
+          messages: [{ role: "user", content: `Current homepage JSON:\n${current}\n\nDesign request: ${input.design_prompt ?? "Make it modern and clean"}` }],
+          maxTokens: 4096,
+        });
+        await updateThemeAsset(shop, access_token, activeTheme.id, "templates/index.json", newContent);
+        return `✅ Homepage updated on **${shop}** (theme: ${activeTheme.name})\n\nChanges applied based on: "${input.design_prompt ?? "Make it modern and clean"}"`;
+      }
       case "connect_store": {
         const installUrl = `${process.env.NEXTAUTH_URL}/api/shopify/install?shop=${input.shop ?? "YOUR_STORE.myshopify.com"}`;
         return `To connect your Shopify store, visit:\n\n${installUrl}\n\nThis will authorize Lyra to manage your store.`;
       }
       default:
-        return `Unknown action: ${input.action}. Available: summary, list_products, create_product, update_product, delete_product, list_orders, create_discount, list_themes, connect_store`;
+        return `Unknown action: ${input.action}. Available: summary, list_products, create_product, update_product, delete_product, list_orders, create_discount, list_themes, get_theme_asset, update_theme_asset, design_homepage, connect_store`;
     }
   }
 
