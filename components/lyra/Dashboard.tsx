@@ -457,14 +457,31 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
     ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
   };
 
-  const QUICK_PROMPTS = [
+  const ALL_QUICK_PROMPTS = [
     { icon: "🎮", text: "Build me a browser game", label: "Game Engine" },
     { icon: "🖼️", text: "Generate a cinematic image of a cyberpunk city at night", label: "Image Gen" },
     { icon: "🔍", text: "Search the web for the latest AI news today", label: "Web Search" },
     { icon: "✍️", text: "Write a cold email to get my first SaaS customer", label: "Writing" },
     { icon: "📊", text: "Help me build a simple business plan", label: "Strategy" },
     { icon: "⚡", text: "How can I automate my email workflow?", label: "Automation" },
+    { icon: "🛒", text: "Show me my Shopify store summary", label: "Shopify" },
+    { icon: "🎨", text: "Design my Shopify homepage with a dark fantasy theme", label: "Store Design" },
+    { icon: "👕", text: "Create a print-on-demand t-shirt for my store", label: "Merch" },
+    { icon: "📦", text: "Create a new product for my Shopify store", label: "Products" },
+    { icon: "💸", text: "Create a 20% off discount code for my store", label: "Discounts" },
+    { icon: "📚", text: "Write and publish a dark fantasy eBook on Gumroad", label: "Publish" },
+    { icon: "🔥", text: "Find trending products to sell in my store", label: "Trends" },
+    { icon: "🤖", text: "I wish I could auto-post products to social media", label: "Automate" },
+    { icon: "📈", text: "Analyze my store performance and suggest improvements", label: "Analytics" },
+    { icon: "🎵", text: "Generate a background music track for my game", label: "Audio" },
+    { icon: "💼", text: "Run my daily business plan for today", label: "Daily Plan" },
+    { icon: "🌐", text: "Search Reddit for dark fantasy community feedback", label: "Research" },
   ];
+
+  const [QUICK_PROMPTS] = useState(() => {
+    const shuffled = [...ALL_QUICK_PROMPTS].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 6);
+  });
 
   // ── Activity toast ──────────────────────────────────────────────────────────
   const ACTIVITY_EVENTS = [
