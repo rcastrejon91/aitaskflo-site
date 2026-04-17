@@ -220,6 +220,42 @@ function initSchema(db: BetterSqlite3Db) {
     );
   `);
 
+  // ── Games (html_code inline browser games) ────────────────────────────────
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS games (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        slug          TEXT UNIQUE NOT NULL,
+        title         TEXT NOT NULL,
+        genre         TEXT NOT NULL DEFAULT 'other',
+        engine        TEXT NOT NULL DEFAULT 'phaser',
+        concept       TEXT,
+        thumbnail_url TEXT,
+        html_code     TEXT NOT NULL,
+        play_count    INTEGER DEFAULT 0,
+        avg_rating    REAL DEFAULT 0,
+        rating_count  INTEGER DEFAULT 0,
+        hidden        INTEGER DEFAULT 0,
+        featured      INTEGER DEFAULT 0,
+        created_at    TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS games_ratings (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        game_slug  TEXT NOT NULL,
+        user_id    TEXT NOT NULL,
+        stars      INTEGER NOT NULL,
+        rated_at   TEXT NOT NULL,
+        UNIQUE(game_slug, user_id),
+        FOREIGN KEY (game_slug) REFERENCES games(slug)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_games_slug ON games(slug);
+      CREATE INDEX IF NOT EXISTS idx_games_created ON games(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_games_ratings_slug ON games_ratings(game_slug);
+    `);
+  } catch { /* ignore */ }
+
   // Add HOS (Hours of Service) trucking tables
   try {
     db.exec(`

@@ -6,6 +6,7 @@ Check these on every tick. If nothing needs attention, reply HEARTBEAT_OK.
 - Are there any pending reminders or tasks due today?
 - Any stock alerts (check ALPACA positions if market is open)
 - Any new emails that need urgent attention
+- Before any product task: read LYRA_SALES_BIBLE.md and apply the relevant section
 
 ## tasks:
 - name: morning-brief

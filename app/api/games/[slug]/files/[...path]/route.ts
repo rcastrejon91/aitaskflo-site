@@ -47,7 +47,7 @@ export async function GET(
 
   // ── Filesystem candidates ──────────────────────────────────────────────────
   // Use data/games as the default (writable on any OS, matches the DB dir)
-  const cwd = process.cwd();
+  const cwd = process.cwd(/*turbopackIgnore: true*/);
   const dataGamesDir = path.join(
     process.env.APP_DIR ?? cwd,
     "data", "games"
@@ -76,6 +76,24 @@ export async function GET(
 
   // ── DB fallback for index.html (browser games stored inline) ──────────────
   if (relPath === "index.html" || relPath === "") {
+    // Check new games table (html_code) first
+    try {
+      const { getGame } = await import("@/lib/lyra/games");
+      const game = getGame(slug);
+      if (game?.html_code) {
+        return new NextResponse(game.html_code, {
+          status: 200,
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "X-Frame-Options": "SAMEORIGIN",
+            "Content-Security-Policy": "default-src * 'unsafe-inline' 'unsafe-eval' blob: data:",
+            ...CORS_HEADERS,
+          },
+        });
+      }
+    } catch { /* fall through */ }
+
+    // Fall back to legacy marketplace_games game_content
     try {
       const { getGameContent } = await import("@/lib/lyra/db");
       const html = getGameContent(slug);

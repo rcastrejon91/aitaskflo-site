@@ -3,8 +3,10 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Loader2, Sparkles, ArrowLeft, Paperclip, X, ImageIcon, Copy, Check as CheckIcon, Zap, ThumbsUp, ThumbsDown } from "lucide-react";
+// Sparkles still used in LimitReachedCard
 import Link from "next/link";
 import { MessageRenderer } from "./MessageRenderer";
+import { LyraSpirit, SpiritState } from "./LyraSpirit";
 
 // ── Limit reached card ────────────────────────────────────────────────────────
 function LimitReachedCard() {
@@ -122,7 +124,7 @@ function ChatBubble({ msg, isStreaming, prevUserMessage }: { msg: Message; isStr
         <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
           isUser
             ? "bg-gradient-to-br from-violet-600 to-violet-700 text-white rounded-br-sm shadow-lg shadow-violet-500/20"
-            : "bg-white/[0.05] text-white/90 border border-white/[0.07] rounded-bl-sm backdrop-blur-sm"
+            : "bg-white/[0.05] text-white/90 border border-white/[0.07] rounded-bl-sm backdrop-blur-sm lyra-bubble"
         }`}>
           {/* Attached images (user uploads) */}
           {msg.images && msg.images.length > 0 && (
@@ -190,6 +192,8 @@ export default function LyraChat({ persona, referrer }: { persona?: string; refe
   const [conversationId] = useState(generateId);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
+  const [spiritState, setSpiritState] = useState<SpiritState>("idle");
+  const speakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -198,6 +202,25 @@ export default function LyraChat({ persona, referrer }: { persona?: string; refe
     fetch("/api/lyra/warmup", { method: "POST" }).catch(() => {});
     fetch("/api/auth/google/status").then(r => r.json()).then(d => setGoogleConnected(!!d.connected)).catch(() => setGoogleConnected(false));
   }, []);
+
+  // Spirit reacts to loading state
+  useEffect(() => {
+    if (loading) {
+      setSpiritState("thinking");
+    } else if (messages.length > 0 && messages[messages.length - 1].role === "assistant") {
+      const lastMsg = messages[messages.length - 1].content;
+      const isExcited = /(!{2,}|amazing|incredible|perfect|🎉|✨|🚀)/i.test(lastMsg);
+      setSpiritState(isExcited ? "showoff" : "speaking");
+      if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current);
+      speakingTimerRef.current = setTimeout(() => setSpiritState("idle"), 3000);
+    }
+  }, [loading, messages]);
+
+  // Spirit listens when user types
+  useEffect(() => {
+    if (input.length > 0 && !loading) setSpiritState("listening");
+    else if (input.length === 0 && !loading) setSpiritState("idle");
+  }, [input, loading]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -330,9 +353,7 @@ export default function LyraChat({ persona, referrer }: { persona?: string; refe
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-violet-500/30">
-            <Sparkles className="w-3.5 h-3.5 text-white" />
-          </div>
+          <LyraSpirit state={spiritState} size={36} />
           <span className="font-semibold text-sm">Lyra</span>
         </div>
         <div className="ml-2 flex items-center gap-1.5 text-[11px]">
@@ -364,9 +385,8 @@ export default function LyraChat({ persona, referrer }: { persona?: string; refe
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: 0.1, duration: 0.4, ease: "backOut" }}
-                  className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-2xl shadow-violet-500/30"
                 >
-                  <Sparkles className="w-8 h-8 text-white" />
+                  <LyraSpirit state={spiritState} size={100} />
                 </motion.div>
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
@@ -511,6 +531,21 @@ export default function LyraChat({ persona, referrer }: { persona?: string; refe
           ) : null}
         </div>
       </div>
+      <style>{`
+        @keyframes wordFloat {
+          0%   { opacity: 0; transform: translateY(6px) scale(0.92); filter: blur(2px); }
+          60%  { opacity: 1; transform: translateY(-2px) scale(1.02); filter: blur(0); }
+          100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+        }
+        @keyframes wordEscape {
+          0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+          100% { transform: translate(var(--ex, 40px), var(--ey, -60px)) scale(0.5) rotate(var(--er, 15deg)); opacity: 0; }
+        }
+        .lyra-bubble p > span.word {
+          display: inline-block;
+          animation: wordFloat 0.35s ease both;
+        }
+      `}</style>
     </div>
   );
 }

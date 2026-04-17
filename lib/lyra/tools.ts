@@ -1696,7 +1696,7 @@ ACTIONS:
     input_schema: {
       type: "object" as const,
       properties: {
-        action: { type: "string", description: "Action: summary | list_products | create_product | update_product | delete_product | list_orders | create_discount | list_themes | connect_store" },
+        action: { type: "string", description: "Action: summary | list_products | create_product | update_product | delete_product | list_orders | create_discount | list_themes | get_theme_asset | update_theme_asset | design_homepage | connect_store" },
         shop: { type: "string", description: "Shopify store domain e.g. mystore.myshopify.com (optional if only one store connected)" },
         product_title: { type: "string", description: "Product title for create/update" },
         product_description: { type: "string", description: "Product HTML description" },
@@ -1708,6 +1708,10 @@ ACTIONS:
         discount_type: { type: "string", description: "percentage or fixed_amount" },
         discount_value: { type: "string", description: "Discount value e.g. 20 for 20% off" },
         order_status: { type: "string", description: "Filter orders by status: any | open | closed | cancelled" },
+        theme_id: { type: "string", description: "Theme ID for get_theme_asset / update_theme_asset" },
+        asset_key: { type: "string", description: "Theme asset key e.g. templates/index.json or sections/header.liquid" },
+        value: { type: "string", description: "New content for the theme asset (update_theme_asset)" },
+        design_prompt: { type: "string", description: "Homepage design instructions for design_homepage e.g. 'modern dark theme with hero banner and featured products'" },
       },
       required: ["action"],
     },

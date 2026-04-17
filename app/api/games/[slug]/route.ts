@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getGame } from "@/lib/lyra/games";
 import { getMarketplaceGame, setGameHidden, setGameFeatured } from "@/lib/lyra/db";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const game = getMarketplaceGame(slug);
+  // Check new games table first, fall back to marketplace_games
+  const game = getGame(slug) ?? getMarketplaceGame(slug);
   if (!game) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ game });
 }
