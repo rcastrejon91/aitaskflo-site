@@ -2708,6 +2708,88 @@ Return ONLY valid JSON:
     }
   }
 
+  // ── Site Audit (SpiderFoot OSINT) ────────────────────────────────────────
+  if (name === "site_audit") {
+    const target = input.target;
+    if (!target) return "target is required (domain, IP, or email).";
+    const sfUrl = process.env.SPIDERFOOT_URL ?? "http://127.0.0.1:5009";
+    const scanName = `lyra-audit-${Date.now()}`;
+    const modules = input.modules ?? "";
+    const progress = (msg: string) => { try { controller.enqueue(encoder.encode(`\n${msg}`)); } catch { /* closed */ } };
+
+    progress(`🕷️ Starting OSINT audit on **${target}**…`);
+    try {
+      // Start scan
+      const startRes = await fetch(`${sfUrl}/api/v1/scan/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          scanname: scanName,
+          scantarget: target,
+          usecase: input.usecase ?? "all",
+          modulelist: modules,
+          typelist: "",
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!startRes.ok) return `SpiderFoot error: ${startRes.status} — is SpiderFoot running at ${sfUrl}?`;
+      const startData = await startRes.json() as { id?: string };
+      const scanId = startData.id;
+      if (!scanId) return `Failed to start scan — no scan ID returned.`;
+
+      progress(`🔍 Scan started (ID: ${scanId}). Waiting for results…`);
+
+      // Poll for completion (max 3 min)
+      const maxWait = 180_000;
+      const pollInterval = 8_000;
+      const start = Date.now();
+      let status = "RUNNING";
+      while (status === "RUNNING" || status === "STARTING") {
+        if (Date.now() - start > maxWait) break;
+        await new Promise(r => setTimeout(r, pollInterval));
+        try {
+          const statusRes = await fetch(`${sfUrl}/api/v1/scan/${scanId}/status`, { signal: AbortSignal.timeout(5_000) });
+          const statusData = await statusRes.json() as { status?: string };
+          status = statusData.status ?? "UNKNOWN";
+          progress(`⏳ Status: ${status}…`);
+        } catch { break; }
+      }
+
+      // Fetch results
+      const resultsRes = await fetch(`${sfUrl}/api/v1/scan/${scanId}/results`, { signal: AbortSignal.timeout(15_000) });
+      const resultsData = await resultsRes.json() as Array<{ type: string; data: string; module: string; risk: string }>;
+      if (!Array.isArray(resultsData) || resultsData.length === 0) {
+        return `Scan completed for **${target}** but no findings returned. Try a longer scan or check SpiderFoot UI at ${sfUrl}.`;
+      }
+
+      // Summarize findings by risk/type
+      const byRisk: Record<string, string[]> = { HIGH: [], MEDIUM: [], LOW: [], INFO: [] };
+      for (const r of resultsData.slice(0, 200)) {
+        const risk = r.risk ?? "INFO";
+        const line = `[${r.module}] ${r.type}: ${r.data}`;
+        if (byRisk[risk]) byRisk[risk].push(line);
+        else byRisk["INFO"].push(line);
+      }
+
+      const formatSection = (label: string, items: string[]) =>
+        items.length ? `\n**${label} (${items.length})**\n${items.slice(0, 10).map(i => `• ${i}`).join("\n")}` : "";
+
+      return `🕷️ **Site Audit: ${target}**\n` +
+        `Scan ID: \`${scanId}\` | Status: ${status} | Total findings: ${resultsData.length}\n` +
+        formatSection("🔴 HIGH", byRisk.HIGH) +
+        formatSection("🟠 MEDIUM", byRisk.MEDIUM) +
+        formatSection("🟡 LOW", byRisk.LOW) +
+        formatSection("ℹ️ INFO", byRisk.INFO.slice(0, 20)) +
+        `\n\nFull results: ${sfUrl}/scaninfo?id=${scanId}`;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("fetch") || msg.includes("ECONNREFUSED")) {
+        return `SpiderFoot is not running. Start it with:\n\`\`\`bash\ncd ~/spiderfoot && python sf.py -l 127.0.0.1:5009\n\`\`\``;
+      }
+      return `Site audit error: ${msg}`;
+    }
+  }
+
   // ── Defender ─────────────────────────────────────────────────────────────
   if (name === "defend") {
     const isAdmin = userId === "b9969c91-8bb4-4377-aae5-94e2a8b7f718" || userId?.startsWith("admin-");

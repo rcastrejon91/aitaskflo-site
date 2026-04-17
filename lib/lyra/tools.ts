@@ -1307,6 +1307,21 @@ ACTIONS:
     },
   },
 
+  // ── Site Audit (SpiderFoot OSINT) ────────────────────────────────────────
+  {
+    name: "site_audit",
+    description: "Run a full OSINT/recon audit on a domain, IP, or email using SpiderFoot. Discovers subdomains, open ports, WHOIS data, leaked credentials, DNS records, SSL info, exposed services, and security vulnerabilities. Use when user asks to audit a site, scan a domain, check security posture, or do recon on a target.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        target: { type: "string", description: "Target to scan: domain (e.g. example.com), IP address, or email" },
+        usecase: { type: "string", description: "Scan depth: 'all' (comprehensive), 'passive' (no active probing), 'investigate' (focused investigation). Default: all" },
+        modules: { type: "string", description: "Comma-separated SpiderFoot module names to run (optional — leave blank for default set)" },
+      },
+      required: ["target"],
+    },
+  },
+
   // ── Cloudflare (admin only) ───────────────────────────────────────────────
   {
     name: "defend",
