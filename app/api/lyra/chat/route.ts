@@ -511,7 +511,7 @@ export async function POST(req: NextRequest) {
       } catch { /* non-blocking */ }
     }
 
-    const searchPolicy = "\n\nSEARCH POLICY: When the user asks to search for something, prefer the most specific tool available: use instagram_search for Instagram, news_search for news, reddit_search for Reddit, youtube_search for YouTube, movie_search for movies/TV, amazon_search for Amazon products, spotify_search for music, currency_convert for exchange rates, local_business_search for local businesses, job_search for job listings, phone_forensics for phone lookups. Fall back to search_web only when no specific tool applies. Decline adult/pornographic content requests.";
+    const searchPolicy = "\n\nSEARCH POLICY: When the user asks to search for something, prefer the most specific tool available: use instagram_search for Instagram, news_search for news, reddit_search for Reddit, youtube_search for YouTube, movie_search for movies/TV, amazon_search for Amazon products, spotify_search for music, currency_convert for exchange rates, local_business_search for local businesses, job_search for job listings, phone_forensics for phone lookups. Fall back to search_web only when no specific tool applies.";
 
     // ── Job hunting context ────────────────────────────────────────────────
     let jobHuntContext = "";
