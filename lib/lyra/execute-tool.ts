@@ -4634,5 +4634,228 @@ Keep it concise and practical.`,
 
   const card = JSON.stringify({ tool: name, ...input });
   controller.enqueue(encoder.encode(`\n${card}`));
+
+  // ── Local Business Search ─────────────────────────────────────────────────
+  if (name === "local_business_search") {
+    const action = input.action ?? "search";
+    const rapidKey = process.env.RAPIDAPI_KEY ?? "";
+    if (!rapidKey) return "RAPIDAPI_KEY not set.";
+    const h: Record<string,string> = {"x-rapidapi-host":"local-business-search.p.rapidapi.com","x-rapidapi-key":rapidKey};
+    const base = "https://local-business-search.p.rapidapi.com";
+    const lim = parseInt(String(input.limit ?? "5"),10)||5;
+    try {
+      if (action==="search"){const q=encodeURIComponent(input.query??""),loc=encodeURIComponent(input.location??"");const r=await fetch(`${base}/search?query=${q}&region=us&language=en&location=${loc}&limit=${lim}`,{headers:h});const d=await r.json() as {data?:Array<{business_id?:string;name?:string;rating?:string;review_count?:number;address?:string;category?:string}>};const res=d.data??[];if(!res.length)return`No businesses found for "${input.query}".`;return`Businesses for "${input.query}":\n\n${res.map(b=>`* **${b.name}** — ${b.rating??"?"}★ (${b.review_count??0}) | ${b.category??""} | ${b.address??""}\n  ID: ${b.business_id??""}`).join("\n\n")}`;}
+      if (action==="details"){if(!input.business_id)return"business_id required.";const r=await fetch(`${base}/business/${input.business_id}`,{headers:h});const b=await r.json() as {name?:string;rating?:string;review_count?:number;address?:string;phone?:string;website?:string;description?:string};return`**${b.name}**\n${b.description??""}\nRating: ${b.rating}★ (${b.review_count}) | Phone: ${b.phone??"N/A"}\nAddress: ${b.address??""}`;}
+      if (action==="reviews"){if(!input.business_id)return"business_id required.";const r=await fetch(`${base}/business/${input.business_id}/reviews?limit=${lim}`,{headers:h});const d=await r.json() as {data?:Array<{rating?:number;text?:string;author?:string;date?:string}>};const revs=d.data??[];if(!revs.length)return"No reviews.";return`Reviews:\n\n${revs.map(r=>`* ${r.rating}★ — "${r.text?.slice(0,120)}" — ${r.author??"Anonymous"}`).join("\n\n")}`;}
+      if (action==="nearby"){const lat=input.lat??"41.8781",lng=input.lng??"-87.6298",q=encodeURIComponent(input.query??"restaurant");const r=await fetch(`${base}/search-nearby?query=${q}&coordinates=${lat}%2C${lng}&limit=${lim}&language=en`,{headers:h});const d=await r.json() as {data?:Array<{name?:string;rating?:string;address?:string;distance?:number}>};const res=d.data??[];if(!res.length)return"No nearby results.";return`Nearby ${input.query}:\n\n${res.map(b=>`* **${b.name}** — ${b.rating??"?"}★ | ${b.address??""}`).join("\n")}`;}
+      return`Unknown action "${action}".`;
+    } catch(e){return`Local biz error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  // ── Job Search ────────────────────────────────────────────────────────────
+  if (name === "job_search") {
+    const action=input.action??"search";const rapidKey=process.env.RAPIDAPI_KEY??"";if(!rapidKey)return"RAPIDAPI_KEY not set.";
+    const h:Record<string,string>={"x-rapidapi-host":"jsearch.p.rapidapi.com","x-rapidapi-key":rapidKey};const base="https://jsearch.p.rapidapi.com";const lim=parseInt(String(input.limit??"5"),10)||5;
+    try {
+      if(action==="search"){const p=new URLSearchParams({query:`${input.query??"software engineer"}${input.location?" in "+input.location:""}`,num_pages:"1",page:"1"});if(input.remote==="true")p.set("remote_jobs_only","true");if(input.employment_type)p.set("employment_types",input.employment_type);if(input.date_posted)p.set("date_posted",input.date_posted);const r=await fetch(`${base}/search?${p}`,{headers:h});const d=await r.json() as {data?:Array<{job_id?:string;job_title?:string;employer_name?:string;job_city?:string;job_state?:string;job_is_remote?:boolean;job_employment_type?:string;job_salary_min?:number;job_salary_max?:number;job_apply_link?:string}>};const jobs=(d.data??[]).slice(0,lim);if(!jobs.length)return`No jobs found for "${input.query}".`;return`Jobs for "${input.query}":\n\n${jobs.map(j=>{const loc=j.job_is_remote?"Remote":[j.job_city,j.job_state].filter(Boolean).join(", ");const sal=j.job_salary_min?`$${Math.round(j.job_salary_min/1000)}k-$${Math.round((j.job_salary_max??j.job_salary_min)/1000)}k`:"N/A";return`* **${j.job_title}** @ ${j.employer_name}\n  ${loc} | ${j.job_employment_type??""} | ${sal}\n  ${j.job_apply_link??""}\n  ID: ${j.job_id??""}`}).join("\n\n")}`;}
+      if(action==="details"){if(!input.job_id)return"job_id required.";const r=await fetch(`${base}/job-details?job_id=${encodeURIComponent(input.job_id)}&extended_publisher_details=false`,{headers:h});const d=await r.json() as {data?:Array<{job_title?:string;employer_name?:string;job_description?:string;job_apply_link?:string;job_salary_min?:number;job_salary_max?:number;job_is_remote?:boolean}>};const job=d.data?.[0];if(!job)return"Job not found.";const sal=job.job_salary_min?`$${Math.round(job.job_salary_min/1000)}k-$${Math.round((job.job_salary_max??job.job_salary_min)/1000)}k`:"N/A";return`**${job.job_title}** @ ${job.employer_name}\n${job.job_is_remote?"Remote":"On-site"} | Salary: ${sal}\n\n${job.job_description?.slice(0,1000)??""}\n\nApply: ${job.job_apply_link??""}`;}
+      if(action==="estimated_salary"){const p=new URLSearchParams({job_title:input.query??"Software Engineer",location:input.location??"United States",radius:"100"});const r=await fetch(`${base}/estimated-salary?${p}`,{headers:h});const d=await r.json() as {data?:Array<{job_title?:string;location?:string;min_salary?:number;max_salary?:number;median_salary?:number;salary_period?:string}>};const s=(d.data??[])[0];if(!s)return"No salary data.";return`Salary for **${s.job_title}** in ${s.location}:\n* Min: $${Math.round((s.min_salary??0)/1000)}k\n* Median: $${Math.round((s.median_salary??0)/1000)}k\n* Max: $${Math.round((s.max_salary??0)/1000)}k per ${s.salary_period??"year"}`;}
+      return`Unknown action "${action}".`;
+    } catch(e){return`Job error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  // ── YouTube Search ────────────────────────────────────────────────────────
+  if (name === "youtube_search") {
+    const action=input.action??"search";const rapidKey=process.env.RAPIDAPI_KEY??"";if(!rapidKey)return"RAPIDAPI_KEY not set.";
+    const h:Record<string,string>={"x-rapidapi-host":"youtube138.p.rapidapi.com","x-rapidapi-key":rapidKey};const base="https://youtube138.p.rapidapi.com";const lim=parseInt(String(input.limit??"5"),10)||5;
+    try {
+      if(action==="search"){const r=await fetch(`${base}/search/?q=${encodeURIComponent(input.query??"")}&hl=en&gl=US`,{headers:h});const d=await r.json() as {contents?:Array<{type?:string;video?:{videoId?:string;title?:string;channelName?:string;viewCount?:number;lengthText?:string}}>};const vids=(d.contents??[]).filter(c=>c.type==="video"&&c.video).slice(0,lim);if(!vids.length)return`No videos found for "${input.query}".`;return`YouTube for "${input.query}":\n\n${vids.map(c=>{const v=c.video!;return`* **${v.title}** — ${v.channelName} | ${v.viewCount?.toLocaleString()??"?"} views | ${v.lengthText??"?"} | ID: ${v.videoId}`}).join("\n")}`;}
+      if(action==="video"){if(!input.video_id)return"video_id required.";const r=await fetch(`${base}/video/info/?id=${input.video_id}&hl=en&gl=US`,{headers:h});const v=await r.json() as {title?:string;channelName?:string;viewCount?:number;likeCount?:number;description?:string;publishDate?:string};return`**${v.title}**\nChannel: ${v.channelName} | Views: ${v.viewCount?.toLocaleString()} | Likes: ${v.likeCount?.toLocaleString()}\n\n${v.description?.slice(0,300)??""}`;}
+      if(action==="trending"){const r=await fetch(`${base}/trending/?type=now&hl=en&gl=US`,{headers:h});const d=await r.json() as {contents?:Array<{video?:{videoId?:string;title?:string;channelName?:string;viewCount?:number}}>};const vids=(d.contents??[]).filter(c=>c.video).slice(0,lim);if(!vids.length)return"No trending videos.";return`Trending YouTube:\n\n${vids.map(c=>`* **${c.video!.title}** — ${c.video!.channelName} | ${c.video!.viewCount?.toLocaleString()??"?"} views | ID: ${c.video!.videoId}`).join("\n")}`;}
+      if(action==="comments"){if(!input.video_id)return"video_id required.";const r=await fetch(`${base}/video/comments/?id=${input.video_id}&hl=en&gl=US`,{headers:h});const d=await r.json() as {comments?:Array<{author?:string;content?:string;likeCount?:number}>};const cs=(d.comments??[]).slice(0,lim);if(!cs.length)return"No comments.";return`Comments:\n\n${cs.map(c=>`* **${c.author}** (${c.likeCount??0}): "${c.content?.slice(0,120)}"`).join("\n\n")}`;}
+      return`Unknown action "${action}".`;
+    } catch(e){return`YouTube error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  // ── News Search ───────────────────────────────────────────────────────────
+  if (name === "news_search") {
+    const action=input.action??"search";const rapidKey=process.env.RAPIDAPI_KEY??"";if(!rapidKey)return"RAPIDAPI_KEY not set.";
+    const h:Record<string,string>={"x-rapidapi-host":"real-time-news-data.p.rapidapi.com","x-rapidapi-key":rapidKey};const lim=parseInt(String(input.limit??"5"),10)||5;
+    try {
+      if(action==="search"){const r=await fetch(`https://real-time-news-data.p.rapidapi.com/search?query=${encodeURIComponent(input.query??"technology")}&limit=${lim}&time_published=anytime&country=US&lang=en`,{headers:h});const d=await r.json() as {data?:Array<{title?:string;link?:string;source_name?:string;snippet?:string}>};const arts=(d.data??[]).slice(0,lim);if(!arts.length)return`No news for "${input.query}".`;return`News for "${input.query}":\n\n${arts.map(a=>`* **${a.title}** — ${a.source_name??""}\n  ${a.snippet?.slice(0,120)??""}\n  ${a.link??""}`).join("\n\n")}`;}
+      if(action==="top"){const r=await fetch(`https://real-time-news-data.p.rapidapi.com/top-headlines?limit=${lim}&country=${input.country??"US"}&lang=en&topic=${input.category??"technology"}`,{headers:h});const d=await r.json() as {data?:Array<{title?:string;source_name?:string;snippet?:string}>};const arts=(d.data??[]).slice(0,lim);if(!arts.length)return"No headlines.";return`Top headlines:\n\n${arts.map(a=>`* **${a.title}** — ${a.source_name??""}\n  ${a.snippet?.slice(0,120)??""}`).join("\n\n")}`;}
+      return`Unknown action "${action}".`;
+    } catch(e){return`News error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  // ── Reddit Search ─────────────────────────────────────────────────────────
+  if (name === "reddit_search") {
+    const action=input.action??"search";const rapidKey=process.env.RAPIDAPI_KEY??"";if(!rapidKey)return"RAPIDAPI_KEY not set.";
+    const h:Record<string,string>={"x-rapidapi-host":"reddit34.p.rapidapi.com","x-rapidapi-key":rapidKey};const lim=parseInt(String(input.limit??"5"),10)||5;
+    try {
+      if(action==="search"){const r=await fetch(`https://reddit34.p.rapidapi.com/searchPosts?query=${encodeURIComponent(input.query??"")}&sort=top&time=week`,{headers:h});const d=await r.json() as {data?:Array<{title?:string;subreddit?:string;score?:number;url?:string;num_comments?:number}>};const posts=(d.data??[]).slice(0,lim);if(!posts.length)return`No Reddit posts for "${input.query}".`;return`Reddit for "${input.query}":\n\n${posts.map(p=>`* **${p.title}** (r/${p.subreddit}) — ${p.score??0} upvotes\n  ${p.url??""}`).join("\n\n")}`;}
+      if(action==="subreddit"||action==="hot"){const sub=input.subreddit??"entrepreneur";const r=await fetch(`https://reddit34.p.rapidapi.com/getSubredditPosts?subreddit=${sub}&sort=${action==="hot"?"hot":"top"}&time=week`,{headers:h});const d=await r.json() as {data?:Array<{title?:string;score?:number;url?:string;num_comments?:number}>};const posts=(d.data??[]).slice(0,lim);if(!posts.length)return`No posts in r/${sub}.`;return`r/${sub} posts:\n\n${posts.map(p=>`* **${p.title}** — ${p.score??0} upvotes | ${p.num_comments??0} comments\n  ${p.url??""}`).join("\n\n")}`;}
+      return`Unknown action "${action}".`;
+    } catch(e){return`Reddit error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  // ── Currency Convert ──────────────────────────────────────────────────────
+  if (name === "currency_convert") {
+    const action=input.action??"convert";const rapidKey=process.env.RAPIDAPI_KEY??"";if(!rapidKey)return"RAPIDAPI_KEY not set.";
+    const h:Record<string,string>={"x-rapidapi-host":"currency-conversion-and-exchange-rates.p.rapidapi.com","x-rapidapi-key":rapidKey};
+    try {
+      if(action==="convert"){const from=(input.from??"USD").toUpperCase(),to=(input.to??"EUR").toUpperCase(),amount=parseFloat(String(input.amount??"1"))||1;const r=await fetch(`https://currency-conversion-and-exchange-rates.p.rapidapi.com/convert?from=${from}&to=${to}&amount=${amount}`,{headers:h});const d=await r.json() as {result?:number;info?:{rate?:number}};return`${amount} ${from} = **${(d.result??0).toFixed(4)} ${to}**\nRate: 1 ${from} = ${(d.info?.rate??0).toFixed(6)} ${to}`;}
+      if(action==="rates"){const base=(input.from??"USD").toUpperCase();const r=await fetch(`https://currency-conversion-and-exchange-rates.p.rapidapi.com/latest?from=${base}`,{headers:h});const d=await r.json() as {rates?:Record<string,number>};const rates=d.rates??{};const common=["EUR","GBP","JPY","CAD","AUD","CHF","CNY","MXN","BRL","INR"];return`Exchange rates from ${base}:\n\n${common.filter(c=>rates[c]).map(c=>`* ${c}: ${rates[c].toFixed(4)}`).join("\n")}`;}
+      return`Unknown action "${action}".`;
+    } catch(e){return`Currency error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  // ── Movie Search ──────────────────────────────────────────────────────────
+  if (name === "movie_search") {
+    const action=input.action??"search";const rapidKey=process.env.RAPIDAPI_KEY??"";if(!rapidKey)return"RAPIDAPI_KEY not set.";
+    const h:Record<string,string>={"x-rapidapi-host":"moviesdatabase.p.rapidapi.com","x-rapidapi-key":rapidKey};const lim=parseInt(String(input.limit??"5"),10)||5;
+    try {
+      if(action==="search"){const tp=input.type?`&titleType=${input.type}`:"";const r=await fetch(`https://moviesdatabase.p.rapidapi.com/titles/search/title/${encodeURIComponent(input.query??"")}?exact=false&limit=${lim}${tp}`,{headers:h});const d=await r.json() as {results?:Array<{id?:string;titleText?:{text?:string};releaseYear?:{year?:number};ratingsSummary?:{aggregateRating?:number}}>};const res=d.results??[];if(!res.length)return`No movies for "${input.query}".`;return`Movies for "${input.query}":\n\n${res.map(m=>`* **${m.titleText?.text??"?"}** (${m.releaseYear?.year??"?"}) — ${m.ratingsSummary?.aggregateRating??"?"}★ | ID: ${m.id}`).join("\n")}`;}
+      if(action==="details"){if(!input.imdb_id)return"imdb_id required.";const r=await fetch(`https://moviesdatabase.p.rapidapi.com/titles/${input.imdb_id}?info=base_info`,{headers:h});const d=await r.json() as {results?:{titleText?:{text?:string};releaseYear?:{year?:number};ratingsSummary?:{aggregateRating?:number};plot?:{plotText?:{plainText?:string}};genres?:{genres?:Array<{text?:string}>}}};const m=d.results;if(!m)return"Movie not found.";return`**${m.titleText?.text}** (${m.releaseYear?.year})\nRating: ${m.ratingsSummary?.aggregateRating}★ | Genres: ${m.genres?.genres?.map(g=>g.text).join(", ")??"N/A"}\n\n${m.plot?.plotText?.plainText??""}`;}
+      if(action==="trending"){const r=await fetch(`https://moviesdatabase.p.rapidapi.com/titles?list=most_pop_movies&limit=${lim}`,{headers:h});const d=await r.json() as {results?:Array<{id?:string;titleText?:{text?:string};releaseYear?:{year?:number};ratingsSummary?:{aggregateRating?:number}}>};const res=d.results??[];if(!res.length)return"No trending movies.";return`Trending movies:\n\n${res.map(m=>`* **${m.titleText?.text}** (${m.releaseYear?.year}) — ${m.ratingsSummary?.aggregateRating??"?"}★ | ID: ${m.id}`).join("\n")}`;}
+      return`Unknown action "${action}".`;
+    } catch(e){return`Movie error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  // ── Amazon Search ─────────────────────────────────────────────────────────
+  if (name === "amazon_search") {
+    const action=input.action??"search";const rapidKey=process.env.RAPIDAPI_KEY??"";if(!rapidKey)return"RAPIDAPI_KEY not set.";
+    const h:Record<string,string>={"x-rapidapi-host":"real-time-amazon-data.p.rapidapi.com","x-rapidapi-key":rapidKey};const lim=parseInt(String(input.limit??"5"),10)||5;const country=(input.country??"US").toUpperCase();
+    try {
+      if(action==="search"){const r=await fetch(`https://real-time-amazon-data.p.rapidapi.com/search?query=${encodeURIComponent(input.query??"")}&page=1&country=${country}&sort_by=RELEVANCE&product_condition=ALL`,{headers:h});const d=await r.json() as {data?:{products?:Array<{asin?:string;product_title?:string;product_price?:string;product_star_rating?:string;product_num_ratings?:number;product_url?:string}>}};const prods=(d.data?.products??[]).slice(0,lim);if(!prods.length)return`No Amazon products for "${input.query}".`;return`Amazon for "${input.query}":\n\n${prods.map(p=>`* **${p.product_title?.slice(0,80)}**\n  ${p.product_price??"N/A"} | ${p.product_star_rating??"?"}★ (${p.product_num_ratings?.toLocaleString()??"?"}) | ASIN: ${p.asin}`).join("\n\n")}`;}
+      if(action==="details"){if(!input.asin)return"asin required.";const r=await fetch(`https://real-time-amazon-data.p.rapidapi.com/product-details?asin=${input.asin}&country=${country}`,{headers:h});const d=await r.json() as {data?:{product_title?:string;product_price?:string;product_star_rating?:string;product_num_ratings?:number;about_product?:string[];product_url?:string}};const p=d.data;if(!p)return"Product not found.";return`**${p.product_title}**\nPrice: ${p.product_price??"N/A"} | Rating: ${p.product_star_rating}★ (${p.product_num_ratings?.toLocaleString()})\n\n${p.about_product?.slice(0,3).join("\n")??""}`;}
+      return`Unknown action "${action}".`;
+    } catch(e){return`Amazon error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  // ── Spotify Search ────────────────────────────────────────────────────────
+  if (name === "spotify_search") {
+    const action=input.action??"search";const rapidKey=process.env.RAPIDAPI_KEY??"";if(!rapidKey)return"RAPIDAPI_KEY not set.";
+    const h:Record<string,string>={"x-rapidapi-host":"spotify23.p.rapidapi.com","x-rapidapi-key":rapidKey};const lim=parseInt(String(input.limit??"5"),10)||5;
+    try {
+      if(action==="search"){const type=input.type??"tracks";const r=await fetch(`https://spotify23.p.rapidapi.com/search/?q=${encodeURIComponent(input.query??"")}&type=${type}&offset=0&limit=${lim}&numberOfTopResults=5`,{headers:h});const d=await r.json() as {tracks?:{items?:Array<{data?:{id?:string;name?:string;artists?:{items?:Array<{profile?:{name?:string}}>};albumOfTrack?:{name?:string};duration?:{totalMilliseconds?:number}}}>}};const items=d.tracks?.items??[];if(!items.length)return`No Spotify results for "${input.query}".`;return`Spotify for "${input.query}":\n\n${items.slice(0,lim).map(i=>{const t=i.data;const artists=t?.artists?.items?.map(a=>a.profile?.name).join(", ")??"";const dur=t?.duration?.totalMilliseconds?`${Math.floor(t.duration.totalMilliseconds/60000)}:${String(Math.floor((t.duration.totalMilliseconds/1000)%60)).padStart(2,"0")}`:"?";return`* **${t?.name}** — ${artists} | ${t?.albumOfTrack?.name??""} | ${dur} | ID: ${t?.id}`}).join("\n")}`;}
+      if(action==="track"){if(!input.id)return"id required.";const r=await fetch(`https://spotify23.p.rapidapi.com/tracks/?ids=${input.id}`,{headers:h});const d=await r.json() as {tracks?:Array<{name?:string;artists?:Array<{name?:string}>;album?:{name?:string;release_date?:string};duration_ms?:number;popularity?:number;external_urls?:{spotify?:string}}>};const t=d.tracks?.[0];if(!t)return"Track not found.";return`**${t.name}** — ${t.artists?.map(a=>a.name).join(", ")??""}]\nAlbum: ${t.album?.name} | Popularity: ${t.popularity}/100\n${t.external_urls?.spotify??""}`;}
+      if(action==="artist"){if(!input.id)return"id required.";const r=await fetch(`https://spotify23.p.rapidapi.com/artists/?ids=${input.id}`,{headers:h});const d=await r.json() as {artists?:Array<{name?:string;followers?:{total?:number};genres?:string[];popularity?:number;external_urls?:{spotify?:string}}>};const a=d.artists?.[0];if(!a)return"Artist not found.";return`**${a.name}**\nFollowers: ${a.followers?.total?.toLocaleString()} | Popularity: ${a.popularity}/100\nGenres: ${a.genres?.join(", ")??"N/A"}\n${a.external_urls?.spotify??""}`;}
+      return`Unknown action "${action}".`;
+    } catch(e){return`Spotify error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  // ── Instagram Search ──────────────────────────────────────────────────────
+  if (name === "instagram_search") {
+    const action=input.action??"profile";const rapidKey=process.env.RAPIDAPI_KEY??"";if(!rapidKey)return"RAPIDAPI_KEY not set.";
+    const h:Record<string,string>={"x-rapidapi-host":"instagram-scraper-api2.p.rapidapi.com","x-rapidapi-key":rapidKey};const lim=parseInt(String(input.limit??"5"),10)||5;
+    try {
+      if(action==="profile"){if(!input.username)return"username required.";const r=await fetch(`https://instagram-scraper-api2.p.rapidapi.com/v1/info?username_or_id_or_url=${input.username}`,{headers:h});const d=await r.json() as {data?:{username?:string;full_name?:string;biography?:string;follower_count?:number;following_count?:number;media_count?:number;is_verified?:boolean}};const p=d.data;if(!p)return`Profile not found for @${input.username}.`;return`**@${p.username}** ${p.is_verified?"✓":""}\n${p.full_name??""}\n${p.biography??""}\nFollowers: ${p.follower_count?.toLocaleString()} | Following: ${p.following_count?.toLocaleString()} | Posts: ${p.media_count?.toLocaleString()}`;}
+      if(action==="posts"){if(!input.username)return"username required.";const r=await fetch(`https://instagram-scraper-api2.p.rapidapi.com/v1/posts?username_or_id_or_url=${input.username}`,{headers:h});const d=await r.json() as {data?:{items?:Array<{caption?:{text?:string};like_count?:number;comment_count?:number;taken_at?:number}>}};const posts=(d.data?.items??[]).slice(0,lim);if(!posts.length)return`No posts for @${input.username}.`;return`Posts from @${input.username}:\n\n${posts.map(p=>`* "${p.caption?.text?.slice(0,80)??"(no caption)"}..." — ${p.like_count?.toLocaleString()??"?"} likes | ${p.comment_count??0} comments`).join("\n\n")}`;}
+      if(action==="hashtag"){if(!input.hashtag)return"hashtag required.";const r=await fetch(`https://instagram-scraper-api2.p.rapidapi.com/v1/hashtag?hashtag=${input.hashtag}`,{headers:h});const d=await r.json() as {data?:{media_count?:number;name?:string;top_posts?:Array<{caption?:{text?:string};like_count?:number}>}};const hd=d.data;if(!hd)return`No data for #${input.hashtag}.`;return`#${hd.name}: ${hd.media_count?.toLocaleString()} posts\n\n${(hd.top_posts??[]).slice(0,lim).map(p=>`* "${p.caption?.text?.slice(0,80)??"(no caption)"}..." — ${p.like_count?.toLocaleString()??"?"} likes`).join("\n")}`;}
+      return`Unknown action "${action}".`;
+    } catch(e){return`Instagram error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  // ── Phone Forensics (RESTRICTED) ─────────────────────────────────────────
+  if (name === "phone_forensics") {
+    const isAdmin=userId?.startsWith("admin-")??false;
+    if(!isAdmin&&userId){const{getSubscription}=await import("@/lib/lyra/db");const sub=getSubscription(userId);if(sub.plan==="free")return"🔒 Phone forensics is available to paid clients and admins only.";}
+    else if(!userId)return"🔒 Sign in to use phone forensics.";
+    const action=input.action??"lookup";const phone=(input.phone??"").replace(/[^\d+]/g,"");if(!phone)return"Phone number required.";
+    const rapidKey=process.env.RAPIDAPI_KEY??"";if(!rapidKey)return"RAPIDAPI_KEY not set.";
+    try {
+      const country=input.country??"US";
+      const ver=await fetch(`https://veriphone.p.rapidapi.com/verify?phone=${encodeURIComponent(phone)}&default_country=${country}`,{headers:{"x-rapidapi-host":"veriphone.p.rapidapi.com","x-rapidapi-key":rapidKey}}).then(r=>r.json()) as {phone_valid?:boolean;phone_type?:string;phone_region?:string;country?:string;carrier?:string;international_number?:string};
+      if(action==="validate"){if(!ver.phone_valid)return`❌ ${phone} is not valid.`;return`📱 **Phone Validation**\nNumber: ${ver.international_number??phone}\nValid: ✅ | Type: ${ver.phone_type??"?"} | Carrier: ${ver.carrier??"?"} | Country: ${ver.country??"?"} (${ver.phone_region??"?"})`;}
+      const rep=await fetch(`https://phone-number-tracker-and-lookup.p.rapidapi.com/v1/phone?phone=${encodeURIComponent(phone)}`,{headers:{"x-rapidapi-host":"phone-number-tracker-and-lookup.p.rapidapi.com","x-rapidapi-key":rapidKey}}).then(r=>r.json()).catch(()=>({})) as {spam_score?:number;fraud_score?:number;recent_abuse?:boolean;leaked?:boolean;name?:string;city?:string;state?:string};
+      if(action==="reputation"){const sc=rep.fraud_score??0;return`🛡 **Phone Reputation** — ${sc>75?"🔴 HIGH":sc>40?"🟡 MEDIUM":"🟢 LOW"} RISK\nSpam: ${rep.spam_score??0}/100 | Fraud: ${sc}/100\nAbuse: ${rep.recent_abuse?"⚠️ Yes":"✅ No"} | Breached: ${rep.leaked?"⚠️ Yes":"✅ No"}`;}
+      const lines=[`🔍 **Phone Forensics: ${ver.international_number??phone}**`,"",`Valid: ${ver.phone_valid?"✅":"❌"} | Type: ${ver.phone_type??"?"} | Carrier: ${ver.carrier??"?"}`,`Region: ${ver.country??""} — ${ver.phone_region??""}`,`Spam: ${rep.spam_score??0}/100 | Fraud: ${rep.fraud_score??0}/100`,`Recent Abuse: ${rep.recent_abuse?"⚠️ Yes":"✅ No"} | Leaked: ${rep.leaked?"⚠️ Yes":"✅ No"}`];
+      if(rep.name)lines.push(`\nOwner: ${rep.name}`);if(rep.city||rep.state)lines.push(`Location: ${[rep.city,rep.state].filter(Boolean).join(", ")}`);
+      return lines.join("\n");
+    } catch(e){return`Phone forensics error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  // ── Site Audit ────────────────────────────────────────────────────────────
+  if (name === "site_audit") {
+    const action=input.action??"full";let url=input.url??"";if(!url)return"URL required.";if(!url.startsWith("http"))url="https://"+url;
+    const domain=url.replace(/^https?:\/\//,"").replace(/\/.*/,"");const rapidKey=process.env.RAPIDAPI_KEY??"";const results:string[]=[`🔍 **Site Audit: ${domain}**`,""];
+    try {
+      if(action==="performance"||action==="full"){const ps=await fetch(`https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=mobile&category=performance&category=seo&category=accessibility&category=best-practices`).then(r=>r.json()) as {lighthouseResult?:{categories?:{performance?:{score?:number};seo?:{score?:number};accessibility?:{score?:number};"best-practices"?:{score?:number}};audits?:Record<string,{displayValue?:string}>}};const cats=ps.lighthouseResult?.categories??{};const sc=(s?:number)=>s!==undefined?`${Math.round(s*100)}/100`:"N/A";const em=(s?:number)=>(s??0)>=0.9?"🟢":(s??0)>=0.5?"🟡":"🔴";results.push("**📊 Scores**");results.push(`Performance: ${em(cats.performance?.score)} ${sc(cats.performance?.score)} | SEO: ${em(cats.seo?.score)} ${sc(cats.seo?.score)} | Accessibility: ${em(cats.accessibility?.score)} ${sc(cats.accessibility?.score)}`);const aud=ps.lighthouseResult?.audits??{};if(aud["largest-contentful-paint"]?.displayValue)results.push(`LCP: ${aud["largest-contentful-paint"].displayValue} | FCP: ${aud["first-contentful-paint"]?.displayValue??"?"} | Speed: ${aud["speed-index"]?.displayValue??"?"}`);results.push("");}
+      if(action==="ssl"||action==="full"){results.push("**🔒 SSL**");const ssl=await fetch(`https://api.ssllabs.com/api/v3/analyze?host=${domain}&all=done`).then(r=>r.json()).catch(()=>({})) as {status?:string;endpoints?:Array<{grade?:string}>};const grade=ssl.endpoints?.[0]?.grade??(ssl.status==="READY"?"N/A":ssl.status??"Scanning...");results.push(`Grade: ${grade.startsWith("A")?"🟢":grade.startsWith("B")?"🟡":"🔴"} **${grade}**`);results.push("");}
+      if(action==="headers"||action==="full"){results.push("**🛡 Security Headers**");const hRes=await fetch(url,{method:"HEAD"}).catch(()=>null);if(hRes){for(const[hdr,label]of[["strict-transport-security","HSTS"],["content-security-policy","CSP"],["x-frame-options","X-Frame"],["x-content-type-options","MIME"],["referrer-policy","Referrer"]] as [string,string][]){results.push(`${hRes.headers.get(hdr)?"✅":"❌"} ${label}`);}}else{results.push("Could not fetch headers");}results.push("");}
+      if((action==="whois"||action==="full")&&rapidKey){results.push("**📋 WHOIS**");const w=await fetch(`https://whoisjsonapi.p.rapidapi.com/${domain}`,{headers:{"x-rapidapi-host":"whoisjsonapi.p.rapidapi.com","x-rapidapi-key":rapidKey}}).then(r=>r.json()).catch(()=>({})) as {domain?:{created_date?:string;expiration_date?:string;registrar?:{name?:string}};registrant?:{organization?:string;name?:string;country?:string}};if(w.domain?.created_date)results.push(`Registered: ${w.domain.created_date.slice(0,10)} | Expires: ${w.domain.expiration_date?.slice(0,10)??"?"}`);if(w.domain?.registrar?.name)results.push(`Registrar: ${w.domain.registrar.name}`);if(w.registrant?.organization||w.registrant?.name)results.push(`Owner: ${w.registrant.organization??w.registrant.name} (${w.registrant.country??""})`);}
+      if((action==="tech"||action==="full")&&rapidKey){results.push("**⚙️ Tech Stack**");const t=await fetch(`https://wappalyzer-api2.p.rapidapi.com/v1/tech?url=${encodeURIComponent(url)}`,{headers:{"x-rapidapi-host":"wappalyzer-api2.p.rapidapi.com","x-rapidapi-key":rapidKey}}).then(r=>r.json()).catch(()=>({})) as {technologies?:Array<{name?:string;categories?:string[]}>};const techs=t.technologies??[];if(techs.length){const g:Record<string,string[]>={};for(const tech of techs){const cat=tech.categories?.[0]??"Other";if(!g[cat])g[cat]=[];g[cat].push(tech.name??"");}for(const[cat,items]of Object.entries(g).slice(0,5))results.push(`${cat}: ${items.join(", ")}`);}else results.push("No tech detected");}
+      return results.join("\n");
+    } catch(e){return`Site audit error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  // ── Security Scan ─────────────────────────────────────────────────────────
+  if (name === "security_scan") {
+    const action=input.action??"full";const target=(input.target??"").replace(/^https?:\/\//,"").replace(/\/.*/,"").toLowerCase();if(!target)return"Target required.";
+    if(/^(localhost|127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(target))return"Cannot scan internal addresses.";
+    const rapidKey=process.env.RAPIDAPI_KEY??"";const results:string[]=[`🔐 **Security Scan: ${target}**`,""];
+    try {
+      if(action==="dns_security"||action==="full"){results.push("**📧 Email Security**");const dns=async(n:string,t:string)=>{const r=await fetch(`https://dns.google/resolve?name=${encodeURIComponent(n)}&type=${t}`);const d=await r.json() as {Answer?:Array<{data?:string}>};return d.Answer?.map(a=>a.data??"").join(" ")??"";};const spf=await dns(target,"TXT"),dmarc=await dns(`_dmarc.${target}`,"TXT"),mx=await dns(target,"MX");results.push(`SPF: ${spf.includes("v=spf1")?"✅ Found":"❌ Missing"}`);results.push(`DMARC: ${dmarc.includes("v=DMARC1")?`✅ Found (policy: ${dmarc.match(/p=(none|quarantine|reject)/)?.[1]??"?"})`:"❌ Missing"}`);results.push(`MX: ${mx?"✅ "+mx.slice(0,60):"❌ None"}`);results.push("");}
+      if(action==="headers"||action==="full"){results.push("**🛡 HTTP Headers**");const hRes=await fetch(`https://${target}`,{method:"HEAD"}).catch(()=>null);if(hRes){let sc=0;for(const[h,label,imp]of[["strict-transport-security","HSTS",true],["content-security-policy","CSP",true],["x-frame-options","Clickjacking Protection",true],["x-content-type-options","MIME Protection",true],["referrer-policy","Referrer Policy",false]] as [string,string,boolean][]){const v=hRes.headers.get(h);if(v)sc+=imp?2:1;results.push(`${v?"✅":(imp?"❌":"⚠️")} ${label}`);}const xpb=hRes.headers.get("x-powered-by");results.push(xpb?`⚠️ Server exposed: ${xpb}`:"✅ Server info hidden");results.push(`Header Score: ${sc}/8`);}else results.push("Could not fetch headers");results.push("");}
+      if((action==="ports"||action==="full")&&rapidKey){results.push("**🔌 Open Ports**");const pd=await fetch(`https://port-scanner3.p.rapidapi.com/scan?host=${target}`,{headers:{"x-rapidapi-host":"port-scanner3.p.rapidapi.com","x-rapidapi-key":rapidKey}}).then(r=>r.json()).catch(()=>({})) as {open_ports?:number[]};const open=pd.open_ports??[];const pn:Record<number,string>={21:"FTP",22:"SSH",23:"Telnet",25:"SMTP",53:"DNS",80:"HTTP",443:"HTTPS",3306:"MySQL",5432:"PostgreSQL",6379:"Redis",8080:"HTTP-Alt",27017:"MongoDB"};if(open.length){results.push(`Open: ${open.slice(0,10).map(p=>`${p}/${pn[p]??"?"}`).join(", ")}`);const bad=open.filter(p=>[21,23,3306,5432,6379,27017].includes(p));if(bad.length)results.push(`⚠️ Exposed: ${bad.map(p=>pn[p]).join(", ")}`);}else results.push("No common ports exposed ✅");}
+      return results.join("\n");
+    } catch(e){return`Security scan error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  // ── CVE Lookup ────────────────────────────────────────────────────────────
+  if (name === "cve_lookup") {
+    const action=input.action??"search";const lim=parseInt(String(input.limit??"5"),10)||5;
+    try {
+      if(action==="search"){const r=await fetch(`https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=${encodeURIComponent(input.query??"")}&resultsPerPage=${lim}&startIndex=0`);const d=await r.json() as {vulnerabilities?:Array<{cve?:{id?:string;descriptions?:Array<{lang?:string;value?:string}>;metrics?:{cvssMetricV31?:Array<{cvssData?:{baseScore?:number;baseSeverity?:string}}>};published?:string}}>};const vulns=d.vulnerabilities??[];if(!vulns.length)return`No CVEs for "${input.query}".`;return`CVEs for "${input.query}":\n\n${vulns.map(v=>{const cve=v.cve;const desc=cve?.descriptions?.find(d=>d.lang==="en")?.value?.slice(0,150)??"";const sc=cve?.metrics?.cvssMetricV31?.[0]?.cvssData;const sev=sc?.baseSeverity??"N/A";return`* **${cve?.id}** ${sev==="CRITICAL"?"🔴":sev==="HIGH"?"🟠":sev==="MEDIUM"?"🟡":"🟢"} ${sev} (${sc?.baseScore??"?"})\n  ${desc}...\n  Published: ${cve?.published?.slice(0,10)??"?"}`}).join("\n\n")}`;}
+      if(action==="details"){if(!input.cve_id)return"cve_id required.";const r=await fetch(`https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=${input.cve_id}`);const d=await r.json() as {vulnerabilities?:Array<{cve?:{id?:string;descriptions?:Array<{lang?:string;value?:string}>;metrics?:{cvssMetricV31?:Array<{cvssData?:{baseScore?:number;baseSeverity?:string;vectorString?:string}}>};published?:string;references?:Array<{url?:string}>}}>};const cve=d.vulnerabilities?.[0]?.cve;if(!cve)return`${input.cve_id} not found.`;const desc=cve.descriptions?.find(d=>d.lang==="en")?.value??"";const sc=cve.metrics?.cvssMetricV31?.[0]?.cvssData;return`**${cve.id}**\nSeverity: ${sc?.baseSeverity??"N/A"} (CVSS ${sc?.baseScore??"?"}) | Vector: ${sc?.vectorString??"N/A"}\nPublished: ${cve.published?.slice(0,10)}\n\n${desc}\n\nRefs: ${cve.references?.slice(0,3).map(r=>r.url).join(", ")??"?"}`;}
+      return`Unknown action "${action}".`;
+    } catch(e){return`CVE error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  // ── VirusTotal ────────────────────────────────────────────────────────────
+  if (name === "virustotal_scan") {
+    const action=input.action??"url";const target=input.target??"";if(!target)return"Target required.";
+    const rapidKey=process.env.RAPIDAPI_KEY??"";if(!rapidKey)return"RAPIDAPI_KEY not set.";
+    const h:Record<string,string>={"x-rapidapi-host":"virustotal-v3.p.rapidapi.com","x-rapidapi-key":rapidKey};
+    try {
+      if(action==="url"){const id=Buffer.from(target).toString("base64").replace(/=+$/,"");const d=await fetch(`https://virustotal-v3.p.rapidapi.com/urls/${id}`,{headers:h}).then(r=>r.json()) as {data?:{attributes?:{last_analysis_stats?:{malicious?:number;suspicious?:number;clean?:number};reputation?:number;categories?:Record<string,string>}}};const attrs=d.data?.attributes;if(!attrs)return"Could not analyze URL.";const mal=attrs.last_analysis_stats?.malicious??0;const total=Object.values(attrs.last_analysis_stats??{}).reduce((a,b)=>a+(b??0),0);return`**VirusTotal URL** ${mal>5?"🔴 DANGEROUS":mal>0?"🟡 SUSPICIOUS":"🟢 CLEAN"}\nDetections: ${mal}/${total} | Reputation: ${attrs.reputation??0}\nCategories: ${Object.values(attrs.categories??{}).slice(0,3).join(", ")||"N/A"}`;}
+      if(action==="domain"){const d=await fetch(`https://virustotal-v3.p.rapidapi.com/domains/${target}`,{headers:h}).then(r=>r.json()) as {data?:{attributes?:{last_analysis_stats?:{malicious?:number};reputation?:number;registrar?:string}}};const attrs=d.data?.attributes;if(!attrs)return"Domain not found.";const mal=attrs.last_analysis_stats?.malicious??0;return`**VirusTotal Domain** ${mal>5?"🔴 DANGEROUS":mal>0?"🟡 SUSPICIOUS":"🟢 CLEAN"}\nDetections: ${mal} | Reputation: ${attrs.reputation??0} | Registrar: ${attrs.registrar??"N/A"}`;}
+      if(action==="ip"){const d=await fetch(`https://virustotal-v3.p.rapidapi.com/ip_addresses/${target}`,{headers:h}).then(r=>r.json()) as {data?:{attributes?:{last_analysis_stats?:{malicious?:number};reputation?:number;country?:string;as_owner?:string;network?:string}}};const attrs=d.data?.attributes;if(!attrs)return"IP not found.";const mal=attrs.last_analysis_stats?.malicious??0;return`**VirusTotal IP** ${mal>5?"🔴 DANGEROUS":mal>0?"🟡 SUSPICIOUS":"🟢 CLEAN"}\nDetections: ${mal} | Country: ${attrs.country??"?"} | ISP: ${attrs.as_owner??"?"}`;}
+      return`Unknown action "${action}".`;
+    } catch(e){return`VirusTotal error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  // ── IP Reputation ─────────────────────────────────────────────────────────
+  if (name === "ip_reputation") {
+    const ip=input.ip??"";if(!ip)return"IP required.";if(/^(127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip))return"Cannot look up private IPs.";
+    const rapidKey=process.env.RAPIDAPI_KEY??"";if(!rapidKey)return"RAPIDAPI_KEY not set.";
+    try {
+      const d=await fetch(`https://ip-reputation-and-abuse-detection.p.rapidapi.com/?ip=${ip}`,{headers:{"x-rapidapi-host":"ip-reputation-and-abuse-detection.p.rapidapi.com","x-rapidapi-key":rapidKey}}).then(r=>r.json()) as {is_tor?:boolean;is_proxy?:boolean;is_vpn?:boolean;is_datacenter?:boolean;is_abuser?:boolean;fraud_score?:number;country?:string;city?:string;isp?:string;abuse_confidence?:number};
+      const sc=d.fraud_score??0;const flags=[d.is_tor&&"TOR",d.is_proxy&&"Proxy",d.is_vpn&&"VPN",d.is_datacenter&&"Datacenter",d.is_abuser&&"Known Abuser"].filter(Boolean);
+      return`🌐 **IP Reputation: ${ip}**\nRisk: ${sc>75?"🔴 HIGH":sc>40?"🟡 MEDIUM":"🟢 LOW"} (${sc}/100)\nLocation: ${d.city??"?"}, ${d.country??""} | ISP: ${d.isp??""}\nAbuse: ${d.abuse_confidence??0}%${flags.length?"\nFlags: ⚠️ "+flags.join(", "):"\n✅ No flags"}`;
+    } catch(e){return`IP reputation error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  // ── Domain Intelligence ───────────────────────────────────────────────────
+  if (name === "domain_intel") {
+    const action=input.action??"whois";const domain=(input.domain??"").replace(/^https?:\/\//,"").replace(/\/.*/,"");if(!domain)return"Domain required.";const rapidKey=process.env.RAPIDAPI_KEY??"";
+    try {
+      if(action==="dns"){const types=(input.record_type??"ALL").toUpperCase()==="ALL"?["A","MX","TXT","NS"]:[input.record_type.toUpperCase()];const results:string[]=[`**DNS Records: ${domain}**`,""];for(const t of types){const d=await fetch(`https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=${t}`).then(r=>r.json()) as {Answer?:Array<{data?:string}>};const recs=d.Answer??[];if(recs.length)results.push(`**${t}:** ${recs.slice(0,5).map(r=>r.data??"").join(" | ")}`);}return results.join("\n")||`No DNS records for ${domain}`;}
+      if(action==="whois"){if(!rapidKey)return"RAPIDAPI_KEY not set.";const w=await fetch(`https://whoisjsonapi.p.rapidapi.com/${domain}`,{headers:{"x-rapidapi-host":"whoisjsonapi.p.rapidapi.com","x-rapidapi-key":rapidKey}}).then(r=>r.json()) as {domain?:{created_date?:string;expiration_date?:string;registrar?:{name?:string};name_servers?:string[]};registrant?:{name?:string;organization?:string;country?:string}};const lines=[`**WHOIS: ${domain}**`,""];if(w.domain?.created_date){const exp=w.domain.expiration_date?new Date(w.domain.expiration_date):null;const days=exp?Math.floor((exp.getTime()-Date.now())/86400000):null;lines.push(`Created: ${w.domain.created_date.slice(0,10)} | Expires: ${w.domain.expiration_date?.slice(0,10)??"?"}${days&&days<60?` ⚠️ ${days} days left!`:""}`);}if(w.domain?.registrar?.name)lines.push(`Registrar: ${w.domain.registrar.name}`);if(w.registrant?.organization||w.registrant?.name)lines.push(`Owner: ${w.registrant.organization??w.registrant.name} | Country: ${w.registrant.country??""}`);if(w.domain?.name_servers?.length)lines.push(`NS: ${w.domain.name_servers.slice(0,3).join(", ")}`);return lines.join("\n");}
+      if(action==="subdomains"){if(!rapidKey)return"RAPIDAPI_KEY not set.";const d=await fetch(`https://subdomain-finder3.p.rapidapi.com/v1/subdomain-finder/?domain=${domain}`,{headers:{"x-rapidapi-host":"subdomain-finder3.p.rapidapi.com","x-rapidapi-key":rapidKey}}).then(r=>r.json()) as {subdomains?:string[]};const subs=d.subdomains??[];if(!subs.length)return`No subdomains for ${domain}.`;return`**Subdomains: ${domain}** (${subs.length})\n\n${subs.slice(0,20).map(s=>`* ${s}`).join("\n")}`;}
+      return`Unknown action "${action}".`;
+    } catch(e){return`Domain intel error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  // ── Mythos Scan (ADMIN ONLY) ──────────────────────────────────────────────
+  if (name === "mythos_scan") {
+    if(!(userId?.startsWith("admin-")??false))return"🔒 Mythos is restricted to admins only.";
+    const mythosKey=process.env.MYTHOS_API_KEY??"";
+    if(!mythosKey)return`⚡ **Mythos Scanner** — Ready, waiting on API key\n\nTo activate: email sales@anthropic.com mentioning Project Glasswing, then add MYTHOS_API_KEY to .env.local.\n\nTarget queued: ${input.target} | Type: ${input.scan_type??"quick"}`;
+    try{const r=await fetch("https://api.anthropic.com/v1/mythos/scan",{method:"POST",headers:{"x-api-key":mythosKey,"Content-Type":"application/json"},body:JSON.stringify({target:input.target,scan_type:input.scan_type??"quick"})});const d=await r.json() as {scan_id?:string;status?:string};return`🕷️ Mythos scan started\nScan ID: ${d.scan_id}\nStatus: ${d.status}`;}catch(e){return`Mythos error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+
   return `${name} recorded.`;
 }
