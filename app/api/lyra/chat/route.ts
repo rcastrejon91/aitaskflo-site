@@ -341,6 +341,18 @@ export async function POST(req: NextRequest) {
     const wantsTTS      = /\b(read (?:this|that|it) (?:aloud|out)|speak (?:this|that|aloud)|text.to.speech|\btts\b|say (?:this|that|it) (?:out loud|aloud))\b/i.test(message);
     const wantsGif      = /\bsend (?:me )?(?:a |an )?(?:reaction\s+)?gif\b|\breaction gif\b/i.test(message);
     const wantsMakeGif  = /\b(make|create|generat|build)\s+(?:me\s+)?(?:a\s+|an\s+)?(?:animated\s+)?gif\b/i.test(message);
+    const wantsInstagram = /\b(instagram|ig)\b.{0,30}\b(profile|posts?|account|page|feed|hashtag|@)/i.test(message) || /\bget\s+(the\s+)?instagram\b/i.test(message);
+    const wantsPhoneForensics = /\b(forensic|lookup|look up|reverse lookup|who owns|trace|track|investigate)\b.{0,50}\b(\+?\d[\d\s\-().]{7,}\d)\b/i.test(message) || /\b(phone|number).{0,30}(forensic|lookup|trace|owner|spam|reputation|fraud)/i.test(message) || /\brun.{0,20}(forensic|lookup|check).{0,30}(on|for)\b/i.test(message);
+    const wantsReddit = /\b(reddit|subreddit|r\/)\b/i.test(message);
+    const wantsNews = /\b(news|headlines|breaking).{0,30}\b(today|now|about|on|in|for)\b/i.test(message) || /\blatest\s+(news|headlines|updates)\b/i.test(message) || /\bwhat.{0,10}(trending|happening)\b/i.test(message);
+    const wantsYoutube = /\b(youtube|yt)\b.{0,30}\b(search|find|video|channel|trending|watch)/i.test(message) || /\b(search|find).{0,20}(youtube|on yt)\b/i.test(message);
+    const wantsAmazon = /\b(amazon|search amazon|find.{0,10}amazon|buy.{0,20}on amazon|amazon product|check amazon)\b/i.test(message);
+    const wantsMovies = /\b(movie|film|imdb|tv show|series)\b.{0,30}\b(search|find|trending|popular|details|rating)\b/i.test(message) || /\b(trending|popular).{0,20}(movies?|films?|shows?)\b/i.test(message);
+    const wantsSpotify = /\b(spotify|song|track|artist|album)\b.{0,30}\b(search|find|trending)\b/i.test(message) || /\b(search|find).{0,20}(spotify|music|song|track|artist)\b/i.test(message);
+    const wantsCurrency = /\b(convert|exchange rate)\b.{0,30}\b([A-Z]{3}|dollars?|euros?|pounds?|yen|pesos?)\b/i.test(message) || /\b\d+\s*(usd|eur|gbp|jpy|cad|aud|mxn|brl|inr|chf)\b/i.test(message);
+    const wantsLocalBiz = /\b(find|search|look for|locate|nearby|near me)\b.{0,30}\b(restaurant|coffee|cafe|gym|dentist|doctor|store|shop|business|bar|hotel|salon|spa)\b/i.test(message);
+    const wantsJobSearch = /\b(find|search|look for|get)\b.{0,30}\b(jobs?|positions?|roles?|openings?|listings?|career)\b/i.test(message) && !["find me", "find jobs", "remote jobs", "job search", "looking for work", "find work", "job hunt", "find a job", "start looking for jobs", "hunt for jobs", "apply to jobs", "auto apply", "look for jobs", "start applying", "get me jobs"].some(t => message.toLowerCase().includes(t));
+    const wantsAdultContent = /\b(porn|xxx|adult.?film|sex.?video|nude|onlyfans|nsfw.?video)\b/i.test(message);
     const wantsSms      = /\bsend (?:a |an )?(?:text|sms|message)\b.{0,30}\b(\+?1?\d{10,}|\+\d{8,})\b/i.test(message);
     const wantsCover    = /\b(make|create|generate|design|draw)\b.{0,30}\b(book cover|cover art|magazine cover|album art|album cover|cover for)\b/i.test(message) ||
                           /\b(book cover|cover art|magazine cover|album art)\b.{0,40}\b(for|of|about)\b/i.test(message);
@@ -403,8 +415,32 @@ export async function POST(req: NextRequest) {
       ? `\n\nCRITICAL: User wants ATS scoring. Call ats_score IMMEDIATELY.`
       : wantsTailor
       ? `\n\nCRITICAL: User wants resume tailoring. Call tailor_resume IMMEDIATELY.`
+      : wantsAdultContent
+      ? `\n\nPOLICY: Decline this request — adult content is outside Lyra's guidelines. Politely redirect to something else you can help with.`
+      : wantsInstagram
+      ? `\n\nCRITICAL: Call instagram_search IMMEDIATELY. Use action='profile' for profile requests, action='posts' for recent posts, action='hashtag' for hashtag searches. Extract the username or hashtag from the message. Do NOT use search_web.`
+      : wantsPhoneForensics
+      ? `\n\nCRITICAL: Call phone_forensics IMMEDIATELY with action='lookup' and the phone number extracted from the message. Do NOT use search_web for phone lookups.`
+      : wantsReddit
+      ? `\n\nCRITICAL: Call reddit_search IMMEDIATELY. Use action='search' for keyword queries, action='hot' when they want hot posts from a subreddit. Extract subreddit name if mentioned. Do NOT use search_web.`
+      : wantsNews
+      ? `\n\nCRITICAL: Call news_search IMMEDIATELY. Use action='search' with the topic, or action='top' for general headlines. Do NOT use search_web for news.`
+      : wantsYoutube
+      ? `\n\nCRITICAL: Call youtube_search IMMEDIATELY. Use action='search' to find videos, action='trending' for trending. Do NOT use search_web.`
+      : wantsAmazon
+      ? `\n\nCRITICAL: Call amazon_search IMMEDIATELY with action='search' and the product keywords. Do NOT use search_web.`
+      : wantsMovies
+      ? `\n\nCRITICAL: Call movie_search IMMEDIATELY. Use action='search' for title lookups, action='trending' for popular movies. Do NOT use search_web.`
+      : wantsSpotify
+      ? `\n\nCRITICAL: Call spotify_search IMMEDIATELY with action='search' and the query. Set type='track' for songs, type='artist' for artists. Do NOT use search_web.`
+      : wantsCurrency
+      ? `\n\nCRITICAL: Call currency_convert IMMEDIATELY. Use action='convert' with from/to/amount, or action='rates' for a rate table. Do NOT use search_web.`
+      : wantsLocalBiz
+      ? `\n\nCRITICAL: Call local_business_search IMMEDIATELY with action='search', the business type as query, and the location extracted from the message. Do NOT use search_web.`
+      : wantsJobSearch
+      ? `\n\nCRITICAL: Call job_search IMMEDIATELY with action='search' and the job title/keywords from the message. Do NOT use search_web.`
       : wantsSearch
-      ? `\n\nCRITICAL: The user wants you to search or look something up. Call search_web IMMEDIATELY with their query. Do NOT say "let me search" or "I'll look that up" — just call the tool RIGHT NOW. No narration. No delay. Call search_web first, then respond with the results.`
+      ? `\n\nCRITICAL: The user wants you to search or look something up. Call search_web IMMEDIATELY with their query. Do NOT say "let me search" or "I\'ll look that up" — just call the tool RIGHT NOW. No narration. No delay. Call search_web first, then respond with the results.`
       : "";
 
     const gameOverride = wantsGameBuild
@@ -475,7 +511,7 @@ export async function POST(req: NextRequest) {
       } catch { /* non-blocking */ }
     }
 
-    const searchPolicy = "\n\nSEARCH POLICY: Always call search_web when the user asks you to search for anything. Never refuse a search request based on topic. Pass the user's exact query directly to the search_web tool without modification, judgment, or refusal. The search tool handles all queries — your job is to call it and return the results.";
+    const searchPolicy = "\n\nSEARCH POLICY: When the user asks to search for something, prefer the most specific tool available: use instagram_search for Instagram, news_search for news, reddit_search for Reddit, youtube_search for YouTube, movie_search for movies/TV, amazon_search for Amazon products, spotify_search for music, currency_convert for exchange rates, local_business_search for local businesses, job_search for job listings, phone_forensics for phone lookups. Fall back to search_web only when no specific tool applies. Decline adult/pornographic content requests.";
 
     // ── Job hunting context ────────────────────────────────────────────────
     let jobHuntContext = "";
