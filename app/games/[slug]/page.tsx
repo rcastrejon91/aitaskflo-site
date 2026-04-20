@@ -20,14 +20,14 @@ interface Game {
 }
 
 const ENGINE_LABELS: Record<string, string> = {
-  phaser:       "Phaser 3",
-  threejs:      "Three.js",
-  babylon:      "Babylon.js",
-  kaboom:       "Kaboom.js",
-  p5:           "p5.js",
-  experimental: "✦ Experimental",
-  godot2d:      "Godot 2D",
-  godot3d:      "Godot 3D",
+  phaser: "Phaser 3",
+  threejs: "Three.js",
+  babylon: "Babylon.js",
+  kaboom: "Kaboom.js",
+  p5: "p5.js",
+  experimental: "Experimental",
+  godot2d: "Godot 2D",
+  godot3d: "Godot 3D",
 };
 
 const BROWSER_ENGINES = new Set(["phaser", "threejs", "babylon", "kaboom", "p5", "experimental"]);
@@ -57,37 +57,63 @@ function StarRating({ slug, initialRating, initialAvg, initialCount }: {
       const data = await res.json() as { avg_rating: number; rating_count: number };
       setAvg(data.avg_rating);
       setCount(data.rating_count);
-    } catch { /* ignore */ }
-    setSubmitting(false);
+    } catch {
+      /* ignore */
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div>
-      <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>
-        {selected ? "Your rating:" : "Rate this game:"}
-      </div>
-      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-        {[1, 2, 3, 4, 5].map(star => (
+      <p className="mb-2 text-xs font-medium text-slate-500">{selected ? "Your rating" : "Rate this game"}</p>
+      <div className="flex items-center gap-2">
+        {[1, 2, 3, 4, 5].map((star) => (
           <button
             key={star}
             onClick={() => void submit(star)}
             onMouseEnter={() => setHovered(star)}
             onMouseLeave={() => setHovered(0)}
-            style={{
-              background: "none", border: "none", cursor: "pointer", padding: 0,
-              fontSize: 28, transition: "transform 0.1s",
-              transform: hovered >= star ? "scale(1.2)" : "scale(1)",
-              color: (hovered || selected) >= star ? "#facc15" : "#2d2d3f",
-            }}
+            disabled={submitting}
+            aria-label={`Rate ${star} star${star === 1 ? "" : "s"}`}
+            className={`text-3xl leading-none transition-transform disabled:cursor-wait ${
+              hovered >= star ? "scale-110" : "scale-100"
+            } ${(hovered || selected) >= star ? "text-yellow-300" : "text-white/12"}`}
           >
             ★
           </button>
         ))}
         {avg > 0 && (
-          <span style={{ marginLeft: 8, color: "#94a3b8", fontSize: 14 }}>
-            {avg.toFixed(1)} <span style={{ color: "#64748b" }}>({count})</span>
+          <span className="ml-2 text-sm text-slate-400">
+            {avg.toFixed(1)} <span className="text-slate-600">({count})</span>
           </span>
         )}
+      </div>
+    </div>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#080810] text-slate-500">
+      <div className="w-full max-w-xl px-4">
+        <div className="mb-4 h-5 w-40 animate-pulse rounded bg-white/10" />
+        <div className="aspect-video animate-pulse rounded-xl border border-white/10 bg-white/[0.04]" />
+      </div>
+    </div>
+  );
+}
+
+function ErrorState({ message }: { message: string }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#080810] px-4 text-center">
+      <div className="max-w-md rounded-2xl border border-white/10 bg-white/[0.035] p-8">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-violet-500/25 bg-violet-500/10 text-sm font-black text-violet-200">GM</div>
+        <h1 className="text-xl font-black text-white">Game unavailable</h1>
+        <p className="mt-2 text-sm text-slate-500">{message}</p>
+        <Link href="/games" className="mt-6 inline-flex rounded-lg border border-violet-400/35 px-4 py-2 text-sm font-semibold text-violet-200 transition-colors hover:bg-violet-500/10">
+          Back to Games
+        </Link>
       </div>
     </div>
   );
@@ -112,41 +138,32 @@ export default function GamePage() {
           fetch(`/api/games/${slug}`),
           fetch(`/api/games/${slug}/rate`),
         ]);
-        if (!gameRes.ok) { setError("Game not found"); setLoading(false); return; }
+        if (!gameRes.ok) {
+          setError("Game not found");
+          setLoading(false);
+          return;
+        }
         const { game } = await gameRes.json() as { game: Game };
         const { stars } = await ratingRes.json() as { stars: number | null };
         setGame(game);
         setUserRating(stars);
-      } catch { setError("Failed to load game"); }
-      setLoading(false);
+      } catch {
+        setError("Failed to load game");
+      } finally {
+        setLoading(false);
+      }
     };
     void fetchGame();
   }, [slug]);
 
-  // Track play count once on first iframe load
   const trackPlay = () => {
     if (playTracked.current) return;
     playTracked.current = true;
     void fetch(`/api/games/${slug}/play`, { method: "POST" });
   };
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: "100vh", background: "#080810", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}>
-        Loading game…
-      </div>
-    );
-  }
-
-  if (error || !game) {
-    return (
-      <div style={{ minHeight: "100vh", background: "#080810", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-        <div style={{ fontSize: 48 }}>🎮</div>
-        <p style={{ color: "#64748b" }}>{error || "Game not found"}</p>
-        <Link href="/games" style={{ color: "#a78bfa", textDecoration: "none" }}>← Back to Marketplace</Link>
-      </div>
-    );
-  }
+  if (loading) return <LoadingState />;
+  if (error || !game) return <ErrorState message={error || "Game not found"} />;
 
   const isBrowser = BROWSER_ENGINES.has(game.engine);
   const gameUrl = `/api/games/${slug}/files/index.html`;
@@ -154,133 +171,100 @@ export default function GamePage() {
   const fullGameUrl = `${baseUrl}${gameUrl}`;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#080810", color: "#f1f5f9", fontFamily: "system-ui, sans-serif" }}>
-      {/* Top bar */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "12px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)",
-        background: "rgba(0,0,0,0.3)", backdropFilter: "blur(8px)",
-        position: "sticky", top: 0, zIndex: 10,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href="/games" style={{ color: "#64748b", textDecoration: "none", fontSize: 14 }}>← Games</Link>
-          <span style={{ color: "#1e293b" }}>|</span>
-          <span style={{ fontWeight: 600, fontSize: 15 }}>{game.title}</span>
-          <span style={{
-            fontSize: 11, padding: "2px 8px", borderRadius: 20,
-            background: "rgba(139,92,246,0.15)", color: "#a78bfa",
-            border: "1px solid rgba(139,92,246,0.3)",
-          }}>
-            {game.genre}
-          </span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span style={{ fontSize: 13, color: "#64748b" }}>
-            👁 {game.play_count.toLocaleString()} plays
-          </span>
-          <span style={{ fontSize: 13, color: "#64748b" }}>
-            {ENGINE_LABELS[game.engine] ?? game.engine}
-          </span>
-          {isBrowser && (
-            <button
-              onClick={() => setFullscreen(f => !f)}
-              style={{
-                background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                color: "#94a3b8", cursor: "pointer", borderRadius: 6,
-                padding: "5px 12px", fontSize: 13,
-              }}
-            >
-              {fullscreen ? "⊙ Exit" : "⛶ Fullscreen"}
-            </button>
-          )}
-        </div>
+    <div className="min-h-screen bg-[#080810] text-slate-100">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden opacity-70">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:76px_76px]" />
+        <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-violet-500/12 via-sky-400/5 to-transparent" />
       </div>
 
-      {/* Game area */}
-      {isBrowser ? (
-        <div style={{
-          position: fullscreen ? "fixed" : "relative",
-          inset: fullscreen ? 0 : undefined,
-          zIndex: fullscreen ? 100 : undefined,
-          background: "#000",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          height: fullscreen ? "100vh" : "calc(100vh - 140px)",
-          minHeight: fullscreen ? undefined : 500,
-        }}>
-          {fullscreen && (
-            <button
-              onClick={() => setFullscreen(false)}
-              style={{
-                position: "absolute", top: 12, right: 12, zIndex: 101,
-                background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.2)",
-                color: "#fff", cursor: "pointer", borderRadius: 6,
-                padding: "6px 14px", fontSize: 14,
-              }}
-            >
-              ✕ Exit
-            </button>
-          )}
-          <iframe
-            ref={iframeRef}
-            src={gameUrl}
-            style={{ width: "100%", height: "100%", border: "none" }}
-            title={game.title}
-            allow="autoplay; fullscreen"
-            onLoad={trackPlay}
-          />
-        </div>
-      ) : (
-        // Godot game (needs SharedArrayBuffer headers)
-        <div style={{ position: "relative", height: "calc(100vh - 140px)", minHeight: 500, background: "#000" }}>
-          <iframe
-            ref={iframeRef}
-            src={gameUrl}
-            style={{ width: "100%", height: "100%", border: "none" }}
-            title={game.title}
-            allow="autoplay; fullscreen"
-            sandbox="allow-scripts allow-same-origin allow-pointer-lock"
-            onLoad={trackPlay}
-          />
-        </div>
-      )}
-
-      {/* Bottom info bar */}
-      {!fullscreen && (
-        <div style={{
-          borderTop: "1px solid rgba(255,255,255,0.06)",
-          padding: "16px 24px",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          flexWrap: "wrap", gap: 16,
-          background: "rgba(0,0,0,0.2)",
-        }}>
-          <div style={{ flex: 1 }}>
-            {game.concept && (
-              <p style={{ margin: 0, color: "#64748b", fontSize: 13, maxWidth: 600 }}>{game.concept}</p>
-            )}
+      <header className="relative sticky top-0 z-20 border-b border-white/8 bg-[#080810]/88 px-4 py-3 backdrop-blur sm:px-6">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <Link href="/games" className="shrink-0 rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-slate-400 transition-colors hover:border-white/20 hover:text-white">
+              Games
+            </Link>
+            <div className="min-w-0">
+              <h1 className="truncate text-base font-black text-white sm:text-lg">{game.title}</h1>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <span className="rounded-full border border-violet-400/25 bg-violet-500/10 px-2 py-0.5 text-violet-200">{game.genre}</span>
+                <span>{ENGINE_LABELS[game.engine] ?? game.engine}</span>
+                <span>{game.play_count.toLocaleString()} plays</span>
+              </div>
+            </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 24, flexShrink: 0 }}>
-            <StarRating
-              slug={slug}
-              initialRating={userRating}
-              initialAvg={game.avg_rating}
-              initialCount={game.rating_count}
-            />
+          <div className="flex flex-wrap items-center gap-2">
             <a
               href={fullGameUrl}
               target="_blank"
               rel="noopener noreferrer"
-              style={{
-                padding: "8px 18px", background: "rgba(139,92,246,0.15)",
-                border: "1px solid #8b5cf6", borderRadius: 8,
-                color: "#a78bfa", textDecoration: "none", fontSize: 13,
-              }}
+              className="rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-slate-300 transition-colors hover:border-white/20 hover:text-white"
             >
-              ↗ Open standalone
+              Standalone
             </a>
+            {isBrowser && (
+              <button
+                onClick={() => setFullscreen((value) => !value)}
+                className="rounded-lg bg-white px-3 py-2 text-sm font-bold text-black transition-colors hover:bg-violet-100"
+              >
+                {fullscreen ? "Exit Fullscreen" : "Fullscreen"}
+              </button>
+            )}
           </div>
         </div>
-      )}
+      </header>
+
+      <main className="relative">
+        <section
+          className={`bg-black ${
+            fullscreen
+              ? "fixed inset-0 z-50"
+              : "mx-auto h-[calc(100vh-280px)] min-h-[460px] max-w-7xl border-x border-white/8"
+          }`}
+        >
+          {fullscreen && (
+            <button
+              onClick={() => setFullscreen(false)}
+              className="absolute right-4 top-4 z-[51] rounded-lg border border-white/20 bg-black/70 px-4 py-2 text-sm font-bold text-white backdrop-blur transition-colors hover:bg-black"
+            >
+              Exit
+            </button>
+          )}
+          <iframe
+            ref={iframeRef}
+            src={gameUrl}
+            className="h-full w-full border-0"
+            title={game.title}
+            allow="autoplay; fullscreen"
+            sandbox={isBrowser ? undefined : "allow-scripts allow-same-origin allow-pointer-lock"}
+            onLoad={trackPlay}
+          />
+        </section>
+
+        {!fullscreen && (
+          <section className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[1fr_auto] lg:items-start">
+            <div className="rounded-xl border border-white/10 bg-white/[0.035] p-5">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-violet-400/25 bg-violet-500/10 px-2 py-1 text-xs font-semibold text-violet-200">{game.genre}</span>
+                <span className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-1 text-xs text-slate-400">{ENGINE_LABELS[game.engine] ?? game.engine}</span>
+              </div>
+              <h2 className="text-2xl font-black text-white">{game.title}</h2>
+              {game.concept && (
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">{game.concept}</p>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/[0.035] p-5 lg:min-w-80">
+              <StarRating
+                slug={slug}
+                initialRating={userRating}
+                initialAvg={game.avg_rating}
+                initialCount={game.rating_count}
+              />
+            </div>
+          </section>
+        )}
+      </main>
     </div>
   );
 }

@@ -17,10 +17,8 @@ interface Message {
 
 function LockScreen({ messageCount }: { messageCount: number }) {
   return (
-    <div className="absolute inset-0 z-20 flex items-center justify-center p-6"
-      style={{ background: "rgba(10,10,15,0.92)", backdropFilter: "blur(12px)" }}>
-      <div className="max-w-sm w-full text-center">
-        {/* Lyra avatar */}
+    <div className="absolute inset-0 z-20 flex items-center justify-center p-6 bg-[#0a0a0f]/92 backdrop-blur-xl">
+      <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-white/[0.045] p-6 text-center shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
         <div className="relative mx-auto mb-6 w-20 h-20">
           <div className="absolute inset-0 rounded-full animate-pulse"
             style={{ background: "radial-gradient(circle, rgba(139,92,246,0.4) 0%, transparent 70%)", transform: "scale(1.5)" }} />
@@ -34,16 +32,15 @@ function LockScreen({ messageCount }: { messageCount: number }) {
         </div>
 
         <h2 className="text-xl font-bold text-white mb-2">
-          You&apos;ve seen what I can do
+          Keep going with Lyra
         </h2>
         <p className="text-white/50 text-sm mb-1">
-          {messageCount} messages in. Ready to go deeper?
+          You used {messageCount} demo messages.
         </p>
         <p className="text-white/30 text-xs mb-8">
-          Unlock unlimited Lyra — memory, tools, game builder, and more.
+          Create an account for memory, tools, game building, and longer work sessions.
         </p>
 
-        {/* CTAs */}
         <div className="flex flex-col gap-3">
           <Link
             href="/login"
@@ -127,12 +124,12 @@ function DemoProgress({ used, total }: { used: number; total: number }) {
 // ── Main Demo ─────────────────────────────────────────────────────────────────
 
 const STARTERS = [
-  "What makes you different from ChatGPT?",
-  "Explain quantum entanglement like I'm 10",
-  "Write me a Python web scraper",
-  "What can you actually help me build?",
-  "Give me a business idea for 2025",
-  "Roast my startup idea: [describe it]",
+  "What can you help me build on AI Task Flo?",
+  "Turn this idea into a launch plan",
+  "Write a landing page for my service",
+  "Build me a simple browser game idea",
+  "Create a workflow for customer follow-up",
+  "Explain your memory and tool features",
 ];
 
 export default function DemoClient() {
@@ -264,13 +261,17 @@ export default function DemoClient() {
 
   return (
     <AppShell>
-    <div className="min-h-screen bg-[#0a0a0f] text-white flex flex-col">
-      {/* Page title bar */}
-      <header className="flex-shrink-0 border-b border-white/8 px-4 py-2.5 flex items-center justify-between sticky top-[88px] z-10 bg-[#0a0a0f]/80 backdrop-blur">
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#0a0a0f] text-white">
+      <div className="pointer-events-none fixed inset-0 opacity-70">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.032)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.032)_1px,transparent_1px)] bg-[size:76px_76px]" />
+        <div className="absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-violet-500/12 via-teal-400/5 to-transparent" />
+      </div>
+
+      <header className="relative z-10 flex-shrink-0 border-b border-white/8 px-4 py-2.5 flex items-center justify-between sticky top-[88px] bg-[#0a0a0f]/80 backdrop-blur">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
           <span className="text-sm font-semibold">Try Lyra</span>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">Demo</span>
+          <span className="hidden text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30 sm:inline">Live Demo</span>
         </div>
         <Link href="/login" className="text-xs px-3 py-1.5 rounded-lg font-medium text-white transition-all hover:opacity-90"
           style={{ background: "linear-gradient(135deg, #7c3aed, #14b8a6)" }}>
@@ -280,19 +281,19 @@ export default function DemoClient() {
 
       {/* Progress bar */}
       {messages.length > 0 && (
-        <DemoProgress used={messageCount} total={DEMO_LIMIT} />
+        <div className="relative z-10">
+          <DemoProgress used={messageCount} total={DEMO_LIMIT} />
+        </div>
       )}
 
-      {/* Chat area */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="relative z-10 flex-1 overflow-hidden">
         {locked && <LockScreen messageCount={messageCount} />}
 
         <div className="h-full overflow-y-auto px-4 py-6">
-          <div className="max-w-2xl mx-auto space-y-5">
+          <div className="max-w-3xl mx-auto space-y-5">
 
-            {/* Empty state */}
             {isEmpty && (
-              <div className="text-center pt-12 pb-8">
+              <div className="pt-6 pb-8 text-center sm:pt-12">
                 <div className="relative mx-auto mb-5 w-16 h-16">
                   <div className="absolute inset-0 rounded-full animate-pulse"
                     style={{ background: "radial-gradient(circle, rgba(139,92,246,0.3) 0%, transparent 70%)", transform: "scale(1.6)" }} />
@@ -301,18 +302,33 @@ export default function DemoClient() {
                     L
                   </div>
                 </div>
-                <h1 className="text-xl font-bold mb-2">Hey, I&apos;m Lyra</h1>
-                <p className="text-white/40 text-sm mb-8 max-w-sm mx-auto">
-                  A self-evolving AI. Ask me anything — I reason, write code, explain concepts, and build things with you.
+                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-teal-300/75">No account needed</p>
+                <h1 className="mx-auto mb-3 max-w-2xl text-4xl font-black tracking-tight text-white sm:text-5xl">Try Lyra in the browser</h1>
+                <p className="mx-auto mb-8 max-w-xl text-sm leading-6 text-white/48 sm:text-base">
+                  Ask Lyra to reason, write, plan, explain, or shape a build idea. The demo is short on purpose, so you can test the feel before signing in.
                 </p>
 
-                {/* Starter prompts */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg mx-auto">
+                <div className="mx-auto mb-8 grid max-w-xl grid-cols-3 gap-2 rounded-xl border border-white/10 bg-black/30 p-2">
+                  <div className="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-3">
+                    <p className="text-lg font-black text-white">{DEMO_LIMIT}</p>
+                    <p className="text-[10px] uppercase tracking-widest text-white/35">Messages</p>
+                  </div>
+                  <div className="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-3">
+                    <p className="text-lg font-black text-teal-300">Live</p>
+                    <p className="text-[10px] uppercase tracking-widest text-white/35">Streaming</p>
+                  </div>
+                  <div className="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-3">
+                    <p className="text-lg font-black text-violet-300">Tools</p>
+                    <p className="text-[10px] uppercase tracking-widest text-white/35">After login</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-2xl mx-auto">
                   {STARTERS.map((s) => (
                     <button
                       key={s}
                       onClick={() => send(s)}
-                      className="text-left text-xs px-4 py-3 rounded-xl border border-white/10 text-white/50 hover:text-white/80 hover:border-violet-500/30 hover:bg-violet-500/5 transition-all"
+                      className="text-left text-xs px-4 py-3 rounded-xl border border-white/10 bg-white/[0.025] text-white/55 hover:text-white/85 hover:border-violet-500/30 hover:bg-violet-500/8 transition-all"
                     >
                       {s}
                     </button>
@@ -321,12 +337,10 @@ export default function DemoClient() {
               </div>
             )}
 
-            {/* Messages */}
             {messages.map((msg, i) => (
               <MessageBubble key={i} message={msg} />
             ))}
 
-            {/* Streaming */}
             {streaming && streamingText && (
               <MessageBubble
                 message={{ role: "assistant", content: streamingText }}
@@ -352,9 +366,8 @@ export default function DemoClient() {
         </div>
       </div>
 
-      {/* Input */}
-      <div className="flex-shrink-0 border-t border-white/8 px-4 py-4">
-        <div className="max-w-2xl mx-auto">
+      <div className="relative z-10 flex-shrink-0 border-t border-white/8 bg-[#0a0a0f]/88 px-4 py-4 backdrop-blur">
+        <div className="max-w-3xl mx-auto">
           {locked ? (
             <div className="flex gap-2">
               <Link
@@ -373,7 +386,7 @@ export default function DemoClient() {
               </Link>
             </div>
           ) : (
-            <div className="relative flex items-end gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 focus-within:border-violet-500/40 transition-colors">
+            <div className="relative flex items-end gap-2 rounded-2xl border border-white/10 bg-white/[0.055] px-4 py-3 focus-within:border-violet-500/40 transition-colors">
               <textarea
                 ref={inputRef}
                 value={input}

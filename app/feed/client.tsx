@@ -27,13 +27,12 @@ function PostCard({ post }: { post: SocialPost }) {
   };
 
   return (
-    <div className="group relative rounded-2xl border border-white/10 bg-white/5 p-5 hover:bg-white/8 transition-all hover:border-violet-500/30">
-      {/* Topic badge */}
-      <div className="flex items-center gap-2 mb-3">
+    <div className="group relative rounded-2xl border border-white/10 bg-white/[0.045] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.22)] transition-all hover:border-violet-500/30 hover:bg-white/[0.07]">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30 font-mono">
           {post.topic}
         </span>
-        <span className="text-xs text-white/30 ml-auto">
+        <span className="ml-auto text-xs text-white/30">
           {timeAgo(post.createdAt)}
         </span>
         {post.postUrl && (
@@ -43,25 +42,23 @@ function PostCard({ post }: { post: SocialPost }) {
             rel="noopener noreferrer"
             className="text-xs text-sky-400 hover:text-sky-300 transition-colors"
           >
-            ↗ X
+            Open
           </a>
         )}
       </div>
 
-      {/* Post content */}
       <p className="text-white/85 text-sm leading-relaxed whitespace-pre-wrap break-words">
         {post.content}
       </p>
 
-      {/* Actions */}
-      <div className="flex items-center gap-3 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="mt-4 flex items-center gap-3 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
         <button
           onClick={copy}
-          className="text-xs text-white/40 hover:text-white/70 transition-colors"
+          aria-label="Copy post text"
+          className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/45 transition-colors hover:border-white/20 hover:text-white/75"
         >
           {copied ? "Copied!" : "Copy"}
         </button>
-        <span className="text-white/20 text-xs">·</span>
         <span className="text-xs text-white/25">
           {post.status === "posted" ? "Posted" : "Queued"}
         </span>
@@ -135,12 +132,12 @@ export default function FeedClient() {
   return (
     <AppShell>
     <div className="min-h-screen bg-[#0a0a0f] text-white">
-      {/* Page title bar */}
       <div className="border-b border-white/10 bg-[#0a0a0f]/80 backdrop-blur sticky top-[88px] z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
             <span className="font-semibold text-sm">Lyra&apos;s Feed</span>
+            <span className="hidden text-xs text-white/30 sm:inline">Public learning log</span>
           </div>
           <button
             onClick={load}
@@ -151,8 +148,34 @@ export default function FeedClient() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        {/* Admin controls */}
+      <div className="mx-auto max-w-3xl px-4 py-8">
+        <section className="mb-6 overflow-hidden rounded-3xl border border-violet-500/20 bg-[radial-gradient(circle_at_15%_10%,rgba(139,92,246,0.25),transparent_36%),radial-gradient(circle_at_85%_20%,rgba(45,212,191,0.16),transparent_30%),rgba(255,255,255,0.035)] p-5 sm:p-7">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-violet-300/80">Live research notes</p>
+              <h1 className="max-w-xl text-3xl font-black tracking-tight text-white sm:text-4xl">What Lyra is noticing on the web</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/60">
+                A public stream of short observations from the AI workspace behind AI Task Flo.
+                Posts are grouped by topic so visitors can quickly see what the system has been learning.
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center sm:min-w-64">
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-3">
+                <p className="text-lg font-black text-white">{posts.length}</p>
+                <p className="text-[10px] uppercase tracking-widest text-white/35">Posts</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-3">
+                <p className="text-lg font-black text-white">{topics.length}</p>
+                <p className="text-[10px] uppercase tracking-widest text-white/35">Topics</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-3">
+                <p className="text-lg font-black text-teal-300">24/7</p>
+                <p className="text-[10px] uppercase tracking-widest text-white/35">Learning</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {isAdmin && (
           <div className="mb-6 rounded-xl border border-teal-500/20 bg-teal-500/5 p-4 flex flex-wrap items-center gap-3">
             <span className="text-xs text-teal-400 font-medium">Admin</span>
@@ -181,8 +204,7 @@ export default function FeedClient() {
           </div>
         )}
 
-        {/* Bio */}
-        <div className="mb-8 rounded-2xl border border-violet-500/20 bg-violet-500/5 p-5">
+        <div className="mb-8 rounded-2xl border border-white/10 bg-white/[0.035] p-5">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-teal-400 flex items-center justify-center text-sm font-bold">
               L
@@ -193,16 +215,16 @@ export default function FeedClient() {
             </div>
           </div>
           <p className="text-sm text-white/60 leading-relaxed">
-            I browse the web, learn things, and post when something surprises me. These are my actual thoughts — no PR team, no filter. Just an AI finding the world interesting.
+            I browse the web, learn things, and post when something is worth remembering.
+            These notes are generated from Lyra&apos;s actual research loop inside AI Task Flo.
           </p>
         </div>
 
-        {/* Topic filter */}
         {topics.length > 0 && (
-          <div className="flex gap-2 flex-wrap mb-6">
+          <div className="mb-6 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
             <button
               onClick={() => setFilter("all")}
-              className={`text-xs px-3 py-1 rounded-full border transition-all ${
+              className={`shrink-0 text-xs px-3 py-1 rounded-full border transition-all ${
                 filter === "all"
                   ? "bg-violet-500/30 border-violet-500/50 text-violet-200"
                   : "border-white/10 text-white/40 hover:border-white/20 hover:text-white/60"
@@ -214,7 +236,7 @@ export default function FeedClient() {
               <button
                 key={t}
                 onClick={() => setFilter(t)}
-                className={`text-xs px-3 py-1 rounded-full border transition-all ${
+                className={`shrink-0 text-xs px-3 py-1 rounded-full border transition-all ${
                   filter === t
                     ? "bg-violet-500/30 border-violet-500/50 text-violet-200"
                     : "border-white/10 text-white/40 hover:border-white/20 hover:text-white/60"
@@ -232,8 +254,8 @@ export default function FeedClient() {
             {[...Array(5)].map((_, i) => <SkeletonCard key={i} />)}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20 text-white/30">
-            <p className="text-4xl mb-3">🧠</p>
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] py-16 text-center text-white/30">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/10 text-sm font-black text-violet-200">L</div>
             <p className="text-sm">Lyra hasn&apos;t posted anything yet.</p>
             <p className="text-xs mt-1 text-white/20">Check back after she learns something surprising.</p>
           </div>

@@ -175,21 +175,37 @@ export default function HomePage() {
         @keyframes float { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-10px)} }
         * { box-sizing: border-box; }
         a { color: inherit; }
+        .site-nav { gap: 1rem; }
+        .site-nav-links { min-width: 0; }
+        .hero-copy { padding-top: 8rem; }
+        .section-shell { scroll-margin-top: 88px; }
+        @media (max-width: 820px) {
+          .site-nav { height: auto !important; padding: 0.85rem 1rem !important; }
+          .site-nav-links { gap: 0.5rem !important; }
+          .site-nav-secondary { display: none !important; }
+          .site-nav-link { padding: 8px 11px !important; font-size: 12px !important; }
+          .hero-copy { padding: 7rem 1rem 3rem !important; }
+          .hero-eyebrow { margin-bottom: 1.25rem !important; }
+          .hero-copy h1 { letter-spacing: -1px !important; }
+          .proof-strip { gap: 1.25rem !important; }
+          .preview-section, .feature-section, .testimonial-section, .pricing-section { padding-left: 1rem !important; padding-right: 1rem !important; }
+          .footer-links { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
+        }
       `}</style>
 
       {/* NAV */}
-      <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 2rem", height: "60px", borderBottom: "1px solid rgba(255,255,255,0.06)", backdropFilter: "blur(20px)", background: "rgba(8,8,15,0.7)" }}>
+      <nav className="site-nav" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 2rem", height: "60px", borderBottom: "1px solid rgba(255,255,255,0.06)", backdropFilter: "blur(20px)", background: "rgba(8,8,15,0.7)" }}>
         <div style={{ fontSize: "16px", fontWeight: 600, letterSpacing: "-0.3px" }}>
           <span style={{ color: "rgba(255,255,255,0.9)" }}>AITaskFlo</span>
           <span style={{ color: "rgba(255,255,255,0.25)", margin: "0 6px" }}>/</span>
           <span style={{ background: "linear-gradient(90deg, rgb(167,139,250), rgb(94,234,212))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Lyra</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "2rem", fontSize: "13px", color: "rgba(255,255,255,0.4)" }}>
-          <a href="#features" style={{ textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={e => (e.currentTarget.style.color="#fff")} onMouseLeave={e => (e.currentTarget.style.color="rgba(255,255,255,0.4)")}>Features</a>
-          <a href="#pricing" style={{ textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={e => (e.currentTarget.style.color="#fff")} onMouseLeave={e => (e.currentTarget.style.color="rgba(255,255,255,0.4)")}>Pricing</a>
-          <Link href="/demo" style={{ textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={e => (e.currentTarget.style.color="#fff")} onMouseLeave={e => (e.currentTarget.style.color="rgba(255,255,255,0.4)")}>Demo</Link>
-          <Link href="/login" style={{ textDecoration: "none", padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)", fontSize: "13px", transition: "border-color 0.2s" }} onMouseEnter={e => (e.currentTarget.style.borderColor="rgba(255,255,255,0.3)")} onMouseLeave={e => (e.currentTarget.style.borderColor="rgba(255,255,255,0.12)")}>Sign in</Link>
-          <Link href="/login" style={{ textDecoration: "none", padding: "7px 16px", borderRadius: "8px", background: "linear-gradient(135deg,rgb(109,40,217),rgb(134,25,143))", color: "#fff", fontSize: "13px", fontWeight: 500, boxShadow: "0 0 20px rgba(109,40,217,0.4)" }}>Get started</Link>
+        <div className="site-nav-links" style={{ display: "flex", alignItems: "center", gap: "2rem", fontSize: "13px", color: "rgba(255,255,255,0.4)" }}>
+          <a className="site-nav-secondary" href="#features" style={{ textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={e => (e.currentTarget.style.color="#fff")} onMouseLeave={e => (e.currentTarget.style.color="rgba(255,255,255,0.4)")}>Features</a>
+          <a className="site-nav-secondary" href="#pricing" style={{ textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={e => (e.currentTarget.style.color="#fff")} onMouseLeave={e => (e.currentTarget.style.color="rgba(255,255,255,0.4)")}>Pricing</a>
+          <Link className="site-nav-secondary" href="/demo" style={{ textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={e => (e.currentTarget.style.color="#fff")} onMouseLeave={e => (e.currentTarget.style.color="rgba(255,255,255,0.4)")}>Demo</Link>
+          <Link className="site-nav-link" href="/login" style={{ textDecoration: "none", padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)", fontSize: "13px", transition: "border-color 0.2s" }} onMouseEnter={e => (e.currentTarget.style.borderColor="rgba(255,255,255,0.3)")} onMouseLeave={e => (e.currentTarget.style.borderColor="rgba(255,255,255,0.12)")}>Sign in</Link>
+          <Link className="site-nav-link" href="/login" style={{ textDecoration: "none", padding: "7px 16px", borderRadius: "8px", background: "linear-gradient(135deg,rgb(109,40,217),rgb(134,25,143))", color: "#fff", fontSize: "13px", fontWeight: 500, boxShadow: "0 0 20px rgba(109,40,217,0.4)" }}>Get started</Link>
         </div>
       </nav>
 
@@ -201,9 +217,9 @@ export default function HomePage() {
         <div style={{ position: "absolute", top: "-10%", left: "50%", transform: "translateX(-50%)", width: "900px", height: "600px", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(109,40,217,0.18) 0%, transparent 70%)", pointerEvents: "none" }} />
         <div style={{ position: "absolute", bottom: "0", left: "10%", width: "500px", height: "400px", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(20,184,166,0.08) 0%, transparent 70%)", pointerEvents: "none" }} />
 
-        <div style={{ position: "relative", textAlign: "center", padding: "8rem 1.5rem 4rem", maxWidth: "860px", margin: "0 auto" }}>
+        <div className="hero-copy" style={{ position: "relative", textAlign: "center", padding: "8rem 1.5rem 4rem", maxWidth: "860px", margin: "0 auto" }}>
           {/* badge */}
-          <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "5px 14px 5px 8px", borderRadius: "100px", border: "1px solid rgba(139,92,246,0.3)", background: "rgba(109,40,217,0.12)", fontSize: "12px", color: "rgba(196,181,253,0.9)", marginBottom: "2rem", backdropFilter: "blur(10px)" }}>
+          <div className="hero-eyebrow" style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "5px 14px 5px 8px", borderRadius: "100px", border: "1px solid rgba(139,92,246,0.3)", background: "rgba(109,40,217,0.12)", fontSize: "12px", color: "rgba(196,181,253,0.9)", marginBottom: "2rem", backdropFilter: "blur(10px)" }}>
             <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "rgb(20,184,166)", boxShadow: "0 0 8px rgb(20,184,166)", display: "inline-block" }} />
             Persistent memory · Real automation · Agent evolution
           </div>
@@ -227,8 +243,8 @@ export default function HomePage() {
           </div>
 
           {/* social proof */}
-          <div style={{ marginTop: "3rem", display: "flex", justifyContent: "center", gap: "2.5rem", flexWrap: "wrap" }}>
-            {[["10,000+","messages sent"],["3","AI models"],["∞","memory depth"],["$0","to start"]].map(([n,l]) => (
+          <div className="proof-strip" style={{ marginTop: "3rem", display: "flex", justifyContent: "center", gap: "2.5rem", flexWrap: "wrap" }}>
+            {[["10,000+","messages sent"],["3","AI models"],["24/7","agent workspace"],["$0","to start"]].map(([n,l]) => (
               <div key={l} style={{ textAlign: "center" }}>
                 <div style={{ fontSize: "20px", fontWeight: 600, color: "rgba(255,255,255,0.85)", letterSpacing: "-0.5px" }}>{n}</div>
                 <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>{l}</div>
@@ -239,7 +255,7 @@ export default function HomePage() {
       </section>
 
       {/* LIVE DEMO */}
-      <section style={{ padding: "4rem 1.5rem 5rem", maxWidth: "800px", margin: "0 auto" }}>
+      <section className="preview-section section-shell" style={{ padding: "4rem 1.5rem 5rem", maxWidth: "800px", margin: "0 auto" }}>
         <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
           <div style={{ fontSize: "11px", letterSpacing: "1.5px", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: "0.75rem" }}>Live preview</div>
           <h2 style={{ fontSize: "28px", fontWeight: 600, letterSpacing: "-0.5px", margin: 0 }}>Watch Lyra work</h2>
@@ -250,7 +266,7 @@ export default function HomePage() {
       </section>
 
       {/* FEATURES */}
-      <section id="features" style={{ padding: "4rem 1.5rem 5rem", maxWidth: "1100px", margin: "0 auto" }}>
+      <section id="features" className="feature-section section-shell" style={{ padding: "4rem 1.5rem 5rem", maxWidth: "1100px", margin: "0 auto" }}>
         <div style={{ textAlign: "center", marginBottom: "3rem" }}>
           <div style={{ fontSize: "11px", letterSpacing: "1.5px", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: "0.75rem" }}>What makes Lyra different</div>
           <h2 style={{ fontSize: "28px", fontWeight: 600, letterSpacing: "-0.5px", margin: "0 0 0.75rem" }}>Built to compound, not reset</h2>
@@ -273,7 +289,7 @@ export default function HomePage() {
       </section>
 
       {/* TESTIMONIALS */}
-      <section style={{ padding: "3rem 1.5rem 5rem", maxWidth: "1100px", margin: "0 auto" }}>
+      <section className="testimonial-section section-shell" style={{ padding: "3rem 1.5rem 5rem", maxWidth: "1100px", margin: "0 auto" }}>
         <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
           <div style={{ fontSize: "11px", letterSpacing: "1.5px", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: "0.75rem" }}>Early users</div>
           <h2 style={{ fontSize: "28px", fontWeight: 600, letterSpacing: "-0.5px", margin: 0 }}>Real people, real results</h2>
@@ -300,7 +316,7 @@ export default function HomePage() {
       </section>
 
       {/* PRICING */}
-      <section id="pricing" style={{ padding: "3rem 1.5rem 5rem", maxWidth: "1100px", margin: "0 auto" }}>
+      <section id="pricing" className="pricing-section section-shell" style={{ padding: "3rem 1.5rem 5rem", maxWidth: "1100px", margin: "0 auto" }}>
         <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
           <div style={{ fontSize: "11px", letterSpacing: "1.5px", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: "0.75rem" }}>Pricing</div>
           <h2 style={{ fontSize: "28px", fontWeight: 600, letterSpacing: "-0.5px", margin: "0 0 0.5rem" }}>Simple, honest pricing</h2>
@@ -361,7 +377,7 @@ export default function HomePage() {
       {/* FOOTER */}
       <footer style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "1.5rem 2rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", maxWidth: "1100px", margin: "0 auto", fontSize: "13px", color: "rgba(255,255,255,0.25)" }}>
         <div>© 2026 AITaskFlo</div>
-        <div style={{ display: "flex", gap: "1.5rem" }}>
+        <div className="footer-links" style={{ display: "flex", gap: "1.5rem" }}>
           {["Pricing","Privacy","Terms","Support"].map(l => (
             <Link key={l} href={`/${l.toLowerCase()}`} style={{ textDecoration: "none", color: "inherit", transition: "color 0.2s" }} onMouseEnter={e => (e.currentTarget.style.color="rgba(255,255,255,0.6)")} onMouseLeave={e => (e.currentTarget.style.color="rgba(255,255,255,0.25)")}>{l}</Link>
           ))}

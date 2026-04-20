@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import AuthSessionProvider from "@/components/AuthSessionProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 import MaintenanceBanner from "@/components/MaintenanceBanner";
 
@@ -52,10 +53,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <MaintenanceBanner />
-          {children}
+          <AuthSessionProvider>{children}</AuthSessionProvider>
         </ThemeProvider>
       </body>
     </html>
   );
 }
-

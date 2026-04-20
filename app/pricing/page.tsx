@@ -34,6 +34,21 @@ const BUTTON_STYLES = {
   business: "bg-fuchsia-600 hover:bg-fuchsia-500 text-white shadow-lg shadow-fuchsia-900/40",
 };
 
+const PLAN_COPY = {
+  free: {
+    line: "Try Lyra with memory, search, weather, and image generation.",
+    bestFor: "Best for testing the workspace",
+  },
+  pro: {
+    line: "Run Lyra as your daily AI workspace with unlimited messages.",
+    bestFor: "Best for individuals and builders",
+  },
+  business: {
+    line: "Add team workflows, API access, analytics, and white-label options.",
+    bestFor: "Best for teams and client work",
+  },
+};
+
 export default function PricingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
@@ -84,9 +99,17 @@ export default function PricingPage() {
           <h1 className="text-4xl font-bold mb-4 tracking-tight">
             Choose your plan
           </h1>
-          <p className="text-white/45 text-lg max-w-md mx-auto">
-            Start free. Upgrade when you need more.
+          <p className="text-white/45 text-lg max-w-xl mx-auto">
+            Start with the free workspace. Upgrade when Lyra becomes part of your daily work.
           </p>
+        </div>
+
+        <div className="mb-8 grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
+          {["Cancel anytime", "Secure Stripe checkout", "Private account memory"].map((item) => (
+            <div key={item} className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3 text-xs text-white/45">
+              {item}
+            </div>
+          ))}
         </div>
 
         {/* Plans */}
@@ -113,6 +136,12 @@ export default function PricingPage() {
                   </div>
                   <p className="text-xs text-white/30">
                     {plan.messagesPerDay === Infinity ? "Unlimited messages" : `${plan.messagesPerDay} messages/day`}
+                  </p>
+                  <p className="mt-4 text-sm text-white/50 leading-relaxed">
+                    {PLAN_COPY[key].line}
+                  </p>
+                  <p className="mt-3 text-[11px] uppercase tracking-[0.16em] text-white/25">
+                    {PLAN_COPY[key].bestFor}
                   </p>
                 </div>
 

@@ -74,10 +74,10 @@ function AgencyChat() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-3 sm:bottom-6 sm:right-6">
       {open && (
         <div
-          className="w-80 rounded-2xl border border-white/10 flex flex-col overflow-hidden shadow-2xl"
+          className="flex w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-white/10 shadow-2xl sm:w-80"
           style={{ background: "#0d0d1a", height: "420px" }}
         >
           {/* Header */}
@@ -89,7 +89,7 @@ function AgencyChat() {
               </div>
               <span className="text-sm font-medium text-white">Lyra — Agency</span>
             </div>
-            <button onClick={() => setOpen(false)} className="text-white/40 hover:text-white/70 transition-colors">
+            <button onClick={() => setOpen(false)} aria-label="Close agency chat" className="text-white/40 hover:text-white/70 transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -147,6 +147,7 @@ function AgencyChat() {
       {/* Toggle button */}
       <button
         onClick={() => setOpen((v) => !v)}
+        aria-label={open ? "Close agency chat" : "Open agency chat"}
         className="w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all hover:scale-105"
         style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))" }}
       >
@@ -159,17 +160,17 @@ function AgencyChat() {
 // ── Feature cards ─────────────────────────────────────────────────────────────
 const FEATURES = [
   {
-    icon: "✦",
+    icon: "CM",
     title: "Content & Marketing",
     desc: "Automate social posts, email campaigns, blog drafts, and ad copy. Your brand stays active without the manual overhead.",
   },
   {
-    icon: "◈",
+    icon: "SO",
     title: "Sales & Outreach",
     desc: "AI-driven lead follow-up, CRM updates, proposal generation, and pipeline tracking — all running in the background.",
   },
   {
-    icon: "⬡",
+    icon: "OP",
     title: "Operations & Admin",
     desc: "Invoicing, scheduling, reporting, onboarding flows. The back-office work that drains hours, handled automatically.",
   },
@@ -238,52 +239,62 @@ export default function AgencyPage() {
   }
 
   return (
-    <div className="min-h-screen text-white flex flex-col" style={{ background: "#080810" }}>
-      {/* Background blobs */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-20"
-          style={{ background: "radial-gradient(circle, rgb(109,40,217) 0%, transparent 70%)", filter: "blur(80px)" }} />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15"
-          style={{ background: "radial-gradient(circle, rgb(134,25,143) 0%, transparent 70%)", filter: "blur(80px)" }} />
-        <div className="absolute top-[40%] right-[20%] w-[400px] h-[400px] rounded-full opacity-10"
-          style={{ background: "radial-gradient(circle, rgb(79,70,229) 0%, transparent 70%)", filter: "blur(100px)" }} />
+    <div className="min-h-screen text-white flex flex-col bg-[#080810]">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden opacity-70">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:72px_72px]" />
+        <div className="absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-violet-500/10 via-teal-400/5 to-transparent" />
       </div>
 
-      <div className="relative z-10 max-w-5xl mx-auto px-6 py-20 w-full">
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
+        <header className="mb-16 flex items-center justify-between gap-4">
+          <a href="/" className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-sm font-black text-black">AI</span>
+            <span className="text-sm font-semibold text-white">AI Task Flo</span>
+          </a>
+          <nav className="hidden items-center gap-5 text-sm text-white/50 sm:flex">
+            <a href="#systems" className="transition-colors hover:text-white">Systems</a>
+            <a href="#pricing" className="transition-colors hover:text-white">Plans</a>
+            <a href="/demo" className="transition-colors hover:text-white">Demo</a>
+          </nav>
+          <a href="#pricing" className="rounded-lg border border-white/12 px-4 py-2 text-sm font-semibold text-white/75 transition-colors hover:border-white/24 hover:text-white">
+            Start
+          </a>
+        </header>
 
         {/* Hero */}
-        <div className="text-center mb-24">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium mb-8"
-            style={{ background: "rgba(109,40,217,0.15)", border: "1px solid rgba(109,40,217,0.3)", color: "rgb(167,139,250)" }}>
+        <div className="mb-24 text-center">
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-teal-400/25 bg-teal-400/10 px-3 py-1.5 text-xs font-medium text-teal-200">
             <Zap className="w-3 h-3" /> AI-powered automation agency
           </div>
-          <h1 className="text-5xl md:text-6xl font-bold mb-6 tracking-tight leading-[1.1]">
-            Your entire business.<br />
-            <span style={{ background: "linear-gradient(135deg, rgb(167,139,250), rgb(217,70,239))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              Automated.
-            </span>
+          <h1 className="mx-auto mb-6 max-w-4xl text-5xl font-black leading-[0.98] tracking-tight sm:text-6xl md:text-7xl">
+            AI automation systems for service businesses
           </h1>
-          <p className="text-white/45 text-lg max-w-xl mx-auto mb-10">
-            We build custom AI automation systems that handle your marketing, sales, and operations — so you can focus on growth.
+          <p className="mx-auto mb-10 max-w-2xl text-base leading-7 text-white/55 sm:text-lg">
+            We build the workflows, agents, and integrations that handle follow-up, content, reporting, scheduling, and client support while your team stays focused on revenue.
           </p>
           <a
             href="#pricing"
-            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105"
-            style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 8px 32px rgba(109,40,217,0.35)" }}
+            className="inline-flex items-center gap-2 rounded-lg bg-white px-7 py-3.5 text-sm font-bold text-black transition-all hover:bg-teal-100"
           >
-            See plans <span className="text-white/70">→</span>
+            See plans
           </a>
+          <div className="mx-auto mt-14 grid max-w-3xl grid-cols-3 gap-2 rounded-xl border border-white/10 bg-black/35 p-2 text-center backdrop-blur">
+            {["Marketing", "Sales", "Operations"].map((item) => (
+              <div key={item} className="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/35">{item}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Feature cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-24">
+        <div id="systems" className="mb-24 grid grid-cols-1 gap-4 md:grid-cols-3">
           {FEATURES.map((f) => (
             <div
               key={f.title}
-              className="rounded-2xl border border-white/8 p-7 flex flex-col gap-4"
-              style={{ background: "rgba(255,255,255,0.03)" }}
+              className="flex flex-col gap-4 rounded-lg border border-white/8 bg-white/[0.035] p-6"
             >
-              <span className="text-2xl text-violet-400">{f.icon}</span>
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-teal-400/20 bg-teal-400/10 text-xs font-black text-teal-200">{f.icon}</span>
               <h3 className="text-base font-semibold text-white">{f.title}</h3>
               <p className="text-white/45 text-sm leading-relaxed">{f.desc}</p>
             </div>
@@ -295,7 +306,7 @@ export default function AgencyPage() {
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-3 tracking-tight">Simple, outcome-based pricing</h2>
             <p className="text-white/40 text-base max-w-md mx-auto">
-              No retainers. No guesswork. Choose the level of automation your business needs.
+              Choose the level of build-out your business needs. Every plan includes setup, launch support, and ongoing optimization.
             </p>
           </div>
 
@@ -303,7 +314,7 @@ export default function AgencyPage() {
             {AGENCY_PLANS.map((plan) => (
               <div
                 key={plan.key}
-                className={`relative rounded-2xl border bg-gradient-to-br p-7 flex flex-col ${plan.gradient} ${plan.border}`}
+                className={`relative flex flex-col rounded-lg border bg-gradient-to-br p-7 ${plan.gradient} ${plan.border}`}
               >
                 {plan.highlight && (
                   <div
@@ -336,7 +347,7 @@ export default function AgencyPage() {
                 <button
                   onClick={() => checkout(plan.key)}
                   disabled={loading === plan.key}
-                  className={`w-full py-3 rounded-xl text-sm font-medium transition-all disabled:opacity-50 ${plan.button}`}
+                  className={`w-full rounded-lg py-3 text-sm font-medium transition-all disabled:opacity-50 ${plan.button}`}
                 >
                   {loading === plan.key ? "Redirecting…" : `Get ${plan.name}`}
                 </button>

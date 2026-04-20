@@ -1,96 +1,11 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Loader2, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Starfield } from "@/components/lyra/Starfield";
-
-// ── Mini demo window (reused from landing page) ───────────────────────────────
-
-const DEMO_MESSAGES = [
-  { role: "user",  text: "Build me a space shooter game" },
-  { role: "lyra",  text: "Generating Godot 4 scene — player ship, enemies, bullets, boss fight + mobile controls." },
-  { role: "system", text: "⚡ game_build · SpaceShooter.gd · 340 lines" },
-  { role: "user",  text: "Buy 5 NVDA shares if it dips below $900" },
-  { role: "lyra",  text: "Price: $887.40. Executing market buy via Alpaca — 5 shares at $887.40. Filled." },
-  { role: "system", text: "✅ trade_execute · NVDA ×5 · $4,437 filled" },
-  { role: "user",  text: "Summarize Gmail & draft reply to investor thread" },
-  { role: "lyra",  text: "3 unread investor emails. Drafting reply to Marcus at Gradient Ventures — referencing your $350K GCP credit." },
-];
-
-function DemoWindow() {
-  const [visible, setVisible] = useState(0);
-
-  useEffect(() => {
-    if (visible >= DEMO_MESSAGES.length) return;
-    const t = setTimeout(() => setVisible((v) => v + 1), visible === 0 ? 600 : 1800);
-    return () => clearTimeout(t);
-  }, [visible]);
-
-  // restart after fully shown
-  useEffect(() => {
-    if (visible < DEMO_MESSAGES.length) return;
-    const t = setTimeout(() => setVisible(0), 3000);
-    return () => clearTimeout(t);
-  }, [visible]);
-
-  return (
-    <div className="w-full rounded-2xl overflow-hidden shadow-2xl" style={{ border: "1px solid rgba(255,255,255,0.08)", background: "#0d0d1a" }}>
-      {/* Browser chrome */}
-      <div className="flex items-center gap-1.5 px-4 py-2.5" style={{ background: "rgba(255,255,255,0.04)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        <div className="w-2 h-2 rounded-full bg-red-500/60" />
-        <div className="w-2 h-2 rounded-full bg-yellow-500/60" />
-        <div className="w-2 h-2 rounded-full bg-green-500/60" />
-        <div className="ml-2 flex-1 rounded px-2 py-0.5 text-[11px]" style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.25)" }}>
-          aitaskflo.com/lyra
-        </div>
-      </div>
-      {/* Chat messages */}
-      <div className="p-4 space-y-2.5 min-h-[280px]">
-        <AnimatePresence>
-          {DEMO_MESSAGES.slice(0, visible).map((msg, i) => (
-            <motion.div key={`${i}-${visible}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
-              {msg.role === "user" && (
-                <div className="flex justify-end">
-                  <div className="px-3 py-1.5 rounded-2xl rounded-tr-sm text-xs max-w-[75%]" style={{ background: "rgba(109,40,217,0.35)", color: "rgba(255,255,255,0.9)" }}>
-                    {msg.text}
-                  </div>
-                </div>
-              )}
-              {msg.role === "lyra" && (
-                <div className="flex items-start gap-2">
-                  <div className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))" }}>
-                    <Sparkles className="w-2.5 h-2.5 text-white" />
-                  </div>
-                  <div className="px-3 py-1.5 rounded-2xl rounded-tl-sm text-xs max-w-[80%]" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.75)" }}>
-                    {msg.text}
-                  </div>
-                </div>
-              )}
-              {msg.role === "system" && (
-                <div className="flex justify-center">
-                  <div className="px-2.5 py-1 rounded-full text-[10px] font-mono" style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)", color: "rgb(110,231,183)" }}>
-                    {msg.text}
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          ))}
-        </AnimatePresence>
-        {visible < DEMO_MESSAGES.length && (
-          <div className="flex items-center gap-1.5 pl-7">
-            <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "300ms" }} />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ── Login form ────────────────────────────────────────────────────────────────
 
@@ -105,6 +20,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [devAdminLoading, setDevAdminLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
@@ -138,6 +54,39 @@ function LoginForm() {
     }
   }
 
+  async function handleDevAdminSignIn() {
+    setError("");
+    setDevAdminLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/dev-admin", { method: "POST" });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Could not create local admin");
+        setDevAdminLoading(false);
+        return;
+      }
+
+      const result = await signIn("credentials", {
+        email: data.email,
+        password: data.password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError("Local admin created, but sign-in failed");
+        setDevAdminLoading(false);
+        return;
+      }
+
+      router.push(callbackUrl);
+    } catch {
+      setError("Could not sign in as local admin");
+      setDevAdminLoading(false);
+    }
+  }
+
   return (
     <div
       className="min-h-screen flex items-center justify-center px-4 py-12"
@@ -158,11 +107,11 @@ function LoginForm() {
         <ArrowLeft className="w-4 h-4" /> Home
       </Link>
 
-      {/* Two-column layout on md+ */}
-      <div className="relative w-full max-w-4xl flex flex-col md:flex-row items-center gap-10 md:gap-16">
+      {/* Two-column layout on lg+ */}
+      <div className="relative w-full max-w-5xl grid grid-cols-1 lg:grid-cols-[1fr_400px] items-center gap-10 lg:gap-16">
 
-        {/* Left — demo */}
-        <div className="hidden md:flex flex-col flex-1 gap-6">
+        {/* Left — static pitch */}
+        <div className="hidden lg:flex flex-col gap-8">
           <div>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))" }}>
@@ -174,21 +123,25 @@ function LoginForm() {
               Builds games,<br />trades stocks,<br />handles your inbox.
             </h2>
             <p className="text-sm mt-2" style={{ color: "rgba(255,255,255,0.35)" }}>
-              One AI that does it all — no plugins needed.
+              One private workspace for chat, memory, automation, and the tools you already use.
             </p>
           </div>
-          <DemoWindow />
-          <div className="flex items-center gap-4 text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>
-            <span>🔒 End-to-end encrypted</span>
-            <span>·</span>
-            <span>⚡ Streaming responses</span>
-            <span>·</span>
-            <span>🧠 Memory-aware</span>
+
+          <div className="grid gap-3 text-sm text-white/45">
+            <div className="rounded-xl border border-white/[0.08] bg-white/[0.035] px-4 py-3">
+              Private account workspace with isolated data and saved context.
+            </div>
+            <div className="rounded-xl border border-white/[0.08] bg-white/[0.035] px-4 py-3">
+              Streaming chat, memory, file work, images, research, and automation tools after sign-in.
+            </div>
+            <div className="rounded-xl border border-white/[0.08] bg-white/[0.035] px-4 py-3">
+              Billing and plan controls stay in your account settings.
+            </div>
           </div>
         </div>
 
         {/* Right — form */}
-        <div className="w-full max-w-sm flex-shrink-0">
+        <div className="w-full max-w-sm justify-self-center lg:justify-self-end">
           {/* Logo (mobile only) */}
           <div className="flex flex-col items-center mb-8 md:hidden">
             <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 shadow-2xl" style={{ background: "linear-gradient(135deg, rgb(109,40,217), rgb(134,25,143))", boxShadow: "0 8px 32px rgba(109,40,217,0.35)" }}>
@@ -199,21 +152,13 @@ function LoginForm() {
           </div>
 
           <div className="rounded-2xl p-6 backdrop-blur-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            {/* Mode tabs */}
-            <div className="flex rounded-xl bg-white/[0.04] p-1 mb-6">
-              {(["login", "register"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => { setMode(tab); setError(""); }}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-                    mode === tab
-                      ? "bg-violet-500 text-white shadow-lg shadow-violet-500/20"
-                      : "text-white/40 hover:text-white/60"
-                  }`}
-                >
-                  {tab === "login" ? "Sign in" : "Create account"}
-                </button>
-              ))}
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-white">
+                {mode === "login" ? "Sign in to Lyra" : "Create your account"}
+              </h2>
+              <p className="mt-1 text-sm text-white/35">
+                {mode === "login" ? "Use your account to open the Lyra workspace." : "Start with a private Lyra account."}
+              </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -259,6 +204,7 @@ function LoginForm() {
                     className="w-full bg-white/[0.05] border border-white/[0.09] rounded-xl px-4 py-2.5 pr-10 text-sm text-white placeholder-white/25 focus:outline-none focus:border-violet-500/50 transition-colors"
                   />
                   <button type="button" onClick={() => setShowPass(!showPass)}
+                    aria-label={showPass ? "Hide password" : "Show password"}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors">
                     {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -276,14 +222,35 @@ function LoginForm() {
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-600 hover:from-violet-400 hover:to-fuchsia-500 disabled:opacity-40 text-white text-sm font-semibold transition-all shadow-lg shadow-violet-500/20 flex items-center justify-center gap-2"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                {mode === "login" ? "Sign in → Lyra" : "Create account"}
+                {mode === "login" ? "Continue to Lyra" : "Create account"}
               </button>
+
+              {process.env.NODE_ENV !== "production" && (
+                <button
+                  type="button"
+                  onClick={handleDevAdminSignIn}
+                  disabled={devAdminLoading}
+                  className="w-full py-2.5 rounded-xl border border-emerald-400/20 bg-emerald-400/10 hover:bg-emerald-400/15 disabled:opacity-40 text-emerald-200 text-sm font-semibold transition-all flex items-center justify-center gap-2"
+                >
+                  {devAdminLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  Sign in as local admin
+                </button>
+              )}
+
+              <div className="border-t border-white/[0.08] pt-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}
+                  className="text-sm text-violet-200 hover:text-white transition-colors"
+                >
+                  {mode === "login" ? "Need an account? Create one" : "Already have an account? Sign in"}
+                </button>
+                <p className="text-xs text-white/20 mt-3">
+                  Your data is private, isolated to your account, and used to keep Lyra useful across sessions.
+                </p>
+              </div>
             </form>
           </div>
-
-          <p className="text-center text-xs text-white/20 mt-4">
-            Your data is private and isolated to your account.
-          </p>
         </div>
       </div>
     </div>
