@@ -789,7 +789,7 @@ export async function POST(req: NextRequest) {
         } catch (err) {
           const safeEnqueue = (msg: string) => { try { controller.enqueue(encoder.encode(msg)); } catch { /* stream closed */ } };
           const errMsg = err instanceof Error ? err.message : String(err);
-          if (errMsg.includes("credit") || errMsg.includes("billing") || errMsg.includes("quota")) {
+          if (errMsg.includes("credit") || errMsg.includes("billing") || errMsg.includes("quota") || errMsg.includes("usage limit")) {
             try {
               await streamGroqFallback(systemPrompt, messages as Array<{ role: string; content: string }>, encoder, controller);
             } catch {

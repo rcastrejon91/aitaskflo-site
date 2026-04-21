@@ -189,7 +189,7 @@ export async function streamGrokFallback(
       clientIp
     );
   } catch {
-    await streamClaudeTextFallback(systemPrompt, messages, encoder, controller);
+    controller.enqueue(encoder.encode("⚠️ All AI providers are currently unavailable. Please try again shortly."));
   }
 }
 
