@@ -478,10 +478,26 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
     { icon: "🌐", text: "Search Reddit for dark fantasy community feedback", label: "Research" },
   ];
 
-  const [QUICK_PROMPTS] = useState(() => {
+  const [QUICK_PROMPTS, setQUICK_PROMPTS] = useState(() => {
     const shuffled = [...ALL_QUICK_PROMPTS].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, 6);
   });
+  const [lyraPersonality, setLyraPersonality] = useState<{ greeting?: string; tagline?: string } | null>(null);
+
+  // Fetch Lyra's current personality on load — she occasionally reforms her words
+  useEffect(() => {
+    // 1 in 3 chance she reforms on each page load
+    if (Math.random() < 0.33) {
+      fetch("/api/lyra/reform-ui", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "random" }) })
+        .then(r => r.json())
+        .then((data: { prompts?: typeof ALL_QUICK_PROMPTS; greeting?: string; tagline?: string }) => {
+          if (data.prompts) setQUICK_PROMPTS(data.prompts);
+          if (data.greeting || data.tagline) setLyraPersonality({ greeting: data.greeting, tagline: data.tagline });
+        })
+        .catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Activity toast ──────────────────────────────────────────────────────────
   const ACTIVITY_EVENTS = [
@@ -639,7 +655,7 @@ export function Dashboard({ initial, userId }: { initial: DashboardData; userId:
                   </div>
                   <h2 className="text-xl font-semibold text-white mb-1">{activeAgent.name}</h2>
                   <p className="text-sm" style={{ color: "rgba(255,255,255,0.3)" }}>
-                    Generation {activeAgent.generation} · Ask me anything
+                    {lyraPersonality?.greeting ?? `Generation ${activeAgent.generation} · Ask me anything`}
                   </p>
                 </div>
 

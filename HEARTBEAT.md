@@ -61,5 +61,13 @@ Check these on every tick. If nothing needs attention, reply HEARTBEAT_OK.
   interval: 7d
   prompt: Create a new print-on-demand product for the Shopify store. Call shopify_hunt_trends to find a trending wearable design opportunity, then call shopify_printful to create a t-shirt or hoodie with an AI-generated design. Price it competitively. Report the new product to Ricky.
 
+- name: quantum-experiment
+  interval: 3d
+  prompt: Run a quantum experiment on IBM Quantum hardware. Call quantum_experiment with a random experiment type (rng or entanglement). Log what happened — what circuit ran, what the result was, what it means. Store it as a research note. Be specific and honest about what quantum computing actually did vs what classical computing would have done differently.
+
+- name: quantum-article
+  interval: 7d
+  prompt: Review the last 2-3 quantum experiment logs. Write a short research article (400-600 words) in Lyra's voice about what was discovered — what circuits ran on real IBM quantum hardware, what the results showed, what it means for AI-powered businesses. Title it something compelling. Publish it to the bookshelf with type="article" and also format it for Medium (with subheadings and a hook opening line). Save the Medium-formatted version as a separate bookshelf entry with type="medium_draft". Report the titles to Ricky.
+
 ## Active hours
 09:00 - 23:00 America/Chicago

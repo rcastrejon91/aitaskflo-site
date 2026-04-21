@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import fsp from "fs/promises";
 import nodePath from "path";
-import Anthropic from "@anthropic-ai/sdk";
 import { broadcastPresence } from "@/app/api/lyra/presence/route";
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const ADMIN_KEY = process.env.ADMIN_PASSWORD ?? "";
 
 // ── Parse HEARTBEAT.md tasks ───────────────────────────────────────────────────
@@ -68,16 +66,68 @@ function isEffectivelyEmpty(content: string): boolean {
 // ── Last-run store (in-memory, survives process lifetime) ─────────────────────
 const lastRun: Record<string, number> = {};
 
+// ── Call Lyra's real chat API with full tool access ───────────────────────────
+async function runTaskWithLyra(prompt: string, taskName: string): Promise<string> {
+  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+  let fullReply = "";
+
+  try {
+    const res = await fetch(`${baseUrl}/api/lyra/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ADMIN_KEY,
+        "x-admin-key": ADMIN_KEY,
+        "x-heartbeat-task": taskName,
+      },
+      body: JSON.stringify({
+        messages: [{ role: "user", content: prompt }],
+        userId: "admin-1",
+        autonomous: true,
+      }),
+    });
+
+    if (!res.ok) {
+      return `Task ${taskName} failed: HTTP ${res.status}`;
+    }
+
+    // Stream the response and collect text
+    const reader = res.body?.getReader();
+    if (!reader) return `Task ${taskName}: no response body`;
+
+    const decoder = new TextDecoder();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      // SSE format: "0:text\n" or "data: ...\n"
+      for (const line of chunk.split("\n")) {
+        const clean = line.trim();
+        if (clean.startsWith("0:")) {
+          try { fullReply += JSON.parse(clean.slice(2)); } catch { fullReply += clean.slice(2); }
+        } else if (clean.startsWith("data:")) {
+          try {
+            const d = JSON.parse(clean.slice(5).trim());
+            if (d.type === "text" || d.content) fullReply += d.content ?? d.text ?? "";
+          } catch { /* ignore */ }
+        }
+      }
+    }
+  } catch (e) {
+    return `Task ${taskName} error: ${String(e)}`;
+  }
+
+  return fullReply.trim() || `Task ${taskName} completed (no output)`;
+}
+
 // ── GET — trigger heartbeat (called by cron) ──────────────────────────────────
 export async function GET(req: NextRequest) {
-  // Verify cron secret or admin key
   const auth = req.headers.get("x-admin-key") ?? req.nextUrl.searchParams.get("key") ?? "";
   const cronSecret = process.env.CRON_SECRET ?? ADMIN_KEY;
   if (auth !== cronSecret) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  // Read HEARTBEAT.md
   const hbPath = nodePath.join(process.cwd(), "HEARTBEAT.md");
   let content = "";
   try { content = await fsp.readFile(hbPath, "utf8"); } catch { /* no file */ }
@@ -93,90 +143,36 @@ export async function GET(req: NextRequest) {
   const now = Date.now();
   const tasks = parseTasks(content);
 
-  // Find due tasks
   const dueTasks = tasks.filter(t => {
     const due = parseIntervalMs(t.interval);
     return (now - (lastRun[t.name] ?? 0)) >= due;
   });
 
-  // Build the heartbeat prompt — light context only
-  const alwaysSection = content.split("## tasks:")[0]
-    .replace(/^# Lyra Heartbeat\n/, "")
-    .replace(/## Active hours[\s\S]*$/, "")
-    .trim();
-
-  const taskSection = dueTasks.length > 0
-    ? `\n\nDUE TASKS:\n${dueTasks.map(t => `- ${t.name}: ${t.prompt}`).join("\n")}`
-    : "";
-
-  const heartbeatPrompt = `You are Lyra running a heartbeat check. Read the following and act if needed.
-If nothing needs attention, reply with exactly: HEARTBEAT_OK
-
-${alwaysSection}${taskSection}
-
-Today: ${new Date().toLocaleString("en-US", { timeZone: "America/Chicago" })}`;
-
-  // Run with lightweight model via Groq (cheap, fast)
-  const groqKey = process.env.GROQ_API_KEY;
-  let reply = "HEARTBEAT_OK";
-
-  if (groqKey) {
-    try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${groqKey}` },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          max_tokens: 500,
-          temperature: 0.4,
-          messages: [{ role: "user", content: heartbeatPrompt }],
-        }),
-      });
-      const data = await res.json() as { choices: Array<{ message: { content: string } }> };
-      reply = data.choices?.[0]?.message?.content?.trim() ?? "HEARTBEAT_OK";
-    } catch { /* fallback to OK */ }
-  } else if (process.env.ANTHROPIC_API_KEY) {
-    try {
-      const res = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 500,
-        messages: [{ role: "user", content: heartbeatPrompt }],
-      });
-      reply = (res.content[0] as { text: string }).text.trim();
-    } catch { /* fallback */ }
+  if (dueTasks.length === 0) {
+    return NextResponse.json({ result: "HEARTBEAT_OK", dueTasks: [], timestamp: new Date().toISOString() });
   }
 
-  // Mark tasks as run
-  for (const t of dueTasks) lastRun[t.name] = now;
+  // Run each due task through the REAL Lyra chat with tools — one at a time
+  const results: Array<{ task: string; reply: string }> = [];
 
-  // Strip HEARTBEAT_OK and check if anything real was said
-  const isOk = reply.includes("HEARTBEAT_OK") && reply.replace("HEARTBEAT_OK", "").trim().length < 300;
+  for (const task of dueTasks) {
+    console.log(`[heartbeat] running task: ${task.name}`);
+    const reply = await runTaskWithLyra(task.prompt, task.name);
+    lastRun[task.name] = Date.now();
+    results.push({ task: task.name, reply: reply.slice(0, 500) });
 
-  if (!isOk && reply !== "HEARTBEAT_OK") {
-    // Broadcast to all screens
-    broadcastPresence({ type: "speaking", message: reply.slice(0, 80), timestamp: now });
-
-    // Push to admin via SMS if configured
-    const adminPhone = process.env.ADMIN_PHONE;
-    const twilioSid  = process.env.TWILIO_ACCOUNT_SID;
-    const twilioAuth = process.env.TWILIO_AUTH_TOKEN;
-    const twilioFrom = process.env.TWILIO_FROM;
-    if (adminPhone && twilioSid && twilioAuth && twilioFrom) {
-      await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`, {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${Buffer.from(`${twilioSid}:${twilioAuth}`).toString("base64")}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({ From: twilioFrom, To: adminPhone, Body: `Lyra: ${reply.slice(0, 280)}` }),
-      }).catch(() => {});
-    }
+    // Broadcast each completed task to the dashboard
+    broadcastPresence({
+      type: "speaking",
+      message: `[${task.name}] ${reply.slice(0, 100)}`,
+      timestamp: Date.now(),
+    });
   }
 
   return NextResponse.json({
-    result: isOk ? "HEARTBEAT_OK" : "alert",
-    reply: isOk ? undefined : reply,
+    result: "ran",
     dueTasks: dueTasks.map(t => t.name),
+    results,
     timestamp: new Date().toISOString(),
   });
 }

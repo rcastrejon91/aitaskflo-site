@@ -1,14 +1,14 @@
 /**
  * lib/lyra/providers.ts
  * Multi-provider AI client selector for Lyra.
- * Priority: Groq → Grok (xAI) → Claude Haiku
+ * Priority: Groq → OpenAI → Grok (xAI) → Claude Haiku
  */
 
 import Groq from "groq-sdk";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 
-export type Provider = "groq" | "grok" | "claude";
+export type Provider = "groq" | "openai" | "grok" | "claude";
 
 export interface ProviderConfig {
   provider: Provider;
@@ -30,6 +30,9 @@ export function getRealtimeProvider(): ProviderConfig {
 export function getChatProvider(): ProviderConfig {
   if (process.env.GROQ_API_KEY) {
     return { provider: "groq", model: "llama-3.3-70b-versatile" };
+  }
+  if (process.env.OPENAI_API_KEY) {
+    return { provider: "openai", model: "gpt-4o-mini" };
   }
   if (process.env.XAI_API_KEY) {
     return { provider: "grok", model: "grok-3-mini-fast" };
@@ -70,6 +73,21 @@ export async function complete(opts: CompletionOptions): Promise<string> {
     msgs.push(...messages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })));
 
     const res = await groq.chat.completions.create({
+      model: config.model,
+      messages: msgs,
+      max_tokens: maxTokens,
+      temperature,
+    });
+    return res.choices[0]?.message?.content ?? "";
+  }
+
+  if (config.provider === "openai") {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const msgs: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+    if (system) msgs.push({ role: "system", content: system });
+    msgs.push(...messages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })));
+
+    const res = await openai.chat.completions.create({
       model: config.model,
       messages: msgs,
       max_tokens: maxTokens,

@@ -1309,6 +1309,20 @@ ACTIONS:
 
   // ── Site Audit (SpiderFoot OSINT) ────────────────────────────────────────
   {
+    name: "quantum_experiment",
+    description: "Run a real quantum circuit on IBM Quantum hardware (ibm_kingston). Use for quantum random number generation, entanglement experiments, or any quantum computing task. Also use to log quantum research findings and write articles about the results. Call when user asks about quantum computing, wants truly random numbers, or wants Lyra to run a quantum experiment.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        experiment: { type: "string", description: "Experiment type: 'rng' (quantum random number), 'entanglement' (Bell state), 'list_backends' (show available hardware)" },
+        bits: { type: "number", description: "Number of qubits for RNG experiment (default 8, max 16)" },
+        log: { type: "boolean", description: "Whether to log this experiment to the research database (default true)" },
+        write_article: { type: "boolean", description: "Whether to write and publish an article about the results to the bookshelf" },
+      },
+      required: ["experiment"],
+    },
+  },
+  {
     name: "site_audit",
     description: "Run a full OSINT/recon audit on a domain, IP, or email using SpiderFoot. Discovers subdomains, open ports, WHOIS data, leaked credentials, DNS records, SSL info, exposed services, and security vulnerabilities. Use when user asks to audit a site, scan a domain, check security posture, or do recon on a target.",
     input_schema: {

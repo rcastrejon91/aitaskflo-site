@@ -46,20 +46,12 @@ export async function GET(
   const contentType = MIME[ext] ?? "application/octet-stream";
 
   // ── Filesystem candidates ──────────────────────────────────────────────────
-  // Use data/games as the default (writable on any OS, matches the DB dir)
-  const cwd = process.cwd(/*turbopackIgnore: true*/);
-  const dataGamesDir = path.join(
-    process.env.APP_DIR ?? cwd,
-    "data", "games"
-  );
-  const legacyDir = process.env.GAME_DIR
-    ? path.dirname(process.env.GAME_DIR)
-    : "/home/aitaskflo/game";
+  // Runtime game assets live outside the source tree in production. Keep this
+  // route away from process.cwd() so Turbopack does not trace the repo root.
+  const gameRoot = "/home/aitaskflo/game";
 
   const candidates = [
-    path.join(dataGamesDir, slug),               // new default: data/games/{slug}
-    path.join(legacyDir, slug),                   // legacy production path
-    path.join(cwd, "public", "games", slug),      // static fallback
+    path.join(gameRoot, slug),
   ];
 
   for (const base of candidates) {
