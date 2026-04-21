@@ -15,6 +15,7 @@ boot_splash/show_image=false
 [autoload]
 
 GameManager="*res://scripts/GameManager.gd"
+EventBus="*res://scripts/EventBus.gd"
 
 [display]
 
