@@ -34,9 +34,10 @@ async function runOpenAIToolLoop(
   controller: ReadableStreamDefaultController,
   userId?: string,
   clientIp?: string,
-  maxToolTurns = 5
+  maxToolTurns = 5,
+  maxTools = 128
 ): Promise<void> {
-  const tools = LYRA_TOOLS.map(t => ({
+  const tools = LYRA_TOOLS.slice(0, maxTools).map(t => ({
     type: "function" as const,
     function: {
       name: t.name,
