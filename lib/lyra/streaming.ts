@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { LYRA_TOOLS } from "@/lib/lyra/tools";
+import { LYRA_TOOLS, TOOL_PRIORITY } from "@/lib/lyra/tools";
 import { executeTool } from "@/lib/lyra/execute-tool";
 
 // ── Shared content flattener ──────────────────────────────────────────────────
@@ -37,7 +37,12 @@ async function runOpenAIToolLoop(
   maxToolTurns = 5,
   maxTools = 128
 ): Promise<void> {
-  const tools = LYRA_TOOLS.slice(0, maxTools).map(t => ({
+  const sortedTools = [...LYRA_TOOLS].sort((a, b) => {
+    const ai = TOOL_PRIORITY.indexOf(a.name);
+    const bi = TOOL_PRIORITY.indexOf(b.name);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
+  const tools = sortedTools.slice(0, maxTools).map(t => ({
     type: "function" as const,
     function: {
       name: t.name,

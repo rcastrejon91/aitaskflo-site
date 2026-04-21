@@ -2033,6 +2033,61 @@ ACTIONS:
   { name: "mythos_scan", description: "ADMIN ONLY — Mythos advanced security scanner (Anthropic Project Glasswing). action: scan|status. target, scan_type=quick|deep|full.", input_schema: { type: "object" as const, properties: { action: {type:"string"}, target: {type:"string"}, scan_type: {type:"string"} }, required: ["action","target"] } },
 ];
 
+// Priority order for Groq's 128-tool limit — money tools first
+export const TOOL_PRIORITY: string[] = [
+  // ── Income / Store ────────────────────────────────────────────────────────
+  "shopify_store", "shopify_printful", "shopify_hunt_trends", "shopify_create_store",
+  "sell_product", "check_earnings", "execute_gig", "plan_today",
+  "create_gumroad_post", "sell_prompt_pack", "email_buyers",
+  "write_book", "make_cover", "make_document", "make_comic",
+  // ── Media generation ──────────────────────────────────────────────────────
+  "image_gen", "fal_image", "fal_video", "fal_music", "fal_tts",
+  "fal_edit_image", "fal_remove_bg", "fal_upscale", "fal_img_to_video",
+  "xai_image", "cf_image_gen", "make_gif", "send_gif",
+  // ── Social / Marketing ────────────────────────────────────────────────────
+  "post_social", "fal_sing",
+  // ── Google Workspace ──────────────────────────────────────────────────────
+  "gmail_send", "gmail_read", "calendar_create", "calendar_get",
+  "drive_list", "drive_read", "drive_write", "send_email",
+  // ── Research / Web ────────────────────────────────────────────────────────
+  "search_web", "browse_web", "read_url", "get_news", "wikipedia",
+  "analyze_image", "arxiv_search", "hf_model_search", "hf_inference",
+  // ── Productivity ──────────────────────────────────────────────────────────
+  "create_task", "list_tasks", "send_sms", "call_api",
+  "crm", "query_crm", "hubspot",
+  // ── Trading ───────────────────────────────────────────────────────────────
+  "trading_buy", "trading_sell", "trading_analyze", "trading_oracle",
+  "trading_account", "trading_orders", "trading_backtest", "stock_price",
+  // ── Game dev ──────────────────────────────────────────────────────────────
+  "build_game", "godot_builder", "improve_game", "game_multiplayer",
+  "game_walkthrough",
+  // ── Jobs / Business ───────────────────────────────────────────────────────
+  "find_jobs", "auto_apply", "set_job_profile", "draft_application",
+  "ats_score", "tailor_resume", "build_business",
+  // ── Smart home / Drone ────────────────────────────────────────────────────
+  "smart_home_control", "smart_home_list", "smart_home_scene",
+  "smart_home_story_react", "story_mode", "drone_control", "robot_arm",
+  // ── Utility ───────────────────────────────────────────────────────────────
+  "maps_search", "maps_distance", "maps_geocode", "maps_timezone",
+  "get_weather", "get_datetime", "calculate", "translate",
+  "currency_convert", "generate_qr", "ip_lookup",
+  "github_search", "cloudflare", "site_audit", "defend",
+  "cf_transcribe", "cf_summarize",
+  "write_research_paper", "run_experiment", "write_skill", "discover_tool",
+  "persona_hero_gen", "persona_hero_confirm", "persona_generate",
+  "persona_pulid_expand", "persona_lora_train", "persona_status",
+  "ads_overview", "ads_performance", "ads_keywords", "ads_spend",
+  "ads_create_campaign", "ads_pause_campaign", "ads_enable_campaign",
+  "ehr_patient", "ehr_encounter", "clinical_research", "medical_book_search",
+  "quantum_experiment", "computer_use", "browse_web",
+  "hos_log", "hos_status", "load_search", "obd_data", "openpilot_status",
+  // ── Filler (last — will be cut by 128 limit) ──────────────────────────────
+  "moon_phase", "sun_times", "world_clock", "user_location",
+  "get_recipe", "get_cocktail", "movie_lookup", "country_info",
+  "rhyme_word", "nutrition_info", "nasa_apod", "random_joke", "trivia",
+  "color_info", "define_word", "generate_password",
+];
+
 export function pollinationsUrl(prompt: string): string {
   const token = process.env.POLLINATIONS_TOKEN ? `&key=${process.env.POLLINATIONS_TOKEN}` : "";
   const seed = Math.floor(Math.random() * 999999);
