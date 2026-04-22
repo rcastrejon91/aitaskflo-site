@@ -52,6 +52,9 @@ export async function POST(req: NextRequest) {
     const resolvedPersona = persona ?? detectPersona({ email: userEmail, referrer: referrer ?? null, conversationText: message });
     const personaAddendum = getPersonaAddendum(resolvedPersona);
 
+    // Heartbeat/automated jobs bypass Claude — use OpenAI directly (no Anthropic billing blocks)
+    const isAutomatedJob = !!req.headers.get("x-heartbeat-task");
+
     // Client IP for user_location tool
     const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
       ?? req.headers.get("x-real-ip")
@@ -583,11 +586,14 @@ export async function POST(req: NextRequest) {
     ];
 
     // ── Router: classify task before deciding which model handles it ──────
-    const decision = await routeTask(message, cleanHistory).catch(() => ({
-      route: "groq" as const,
-      taskType: "analysis" as const,
-      useParallel: false,
-    }));
+    // Automated/heartbeat jobs skip Claude entirely — go straight to OpenAI
+    const decision = isAutomatedJob
+      ? { route: "openai" as const, taskType: "tool" as const, useParallel: false }
+      : await routeTask(message, cleanHistory).catch(() => ({
+          route: "groq" as const,
+          taskType: "analysis" as const,
+          useParallel: false,
+        }));
 
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
