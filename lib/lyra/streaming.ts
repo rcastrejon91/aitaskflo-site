@@ -162,7 +162,7 @@ export async function streamGroqFallback(
       clientIp
     );
   } catch {
-    await streamGrokFallback(systemPrompt, messages, encoder, controller, userId, clientIp);
+    await streamOpenAIFallback(systemPrompt, messages, encoder, controller, userId, clientIp);
   }
 }
 
@@ -292,7 +292,9 @@ export async function streamOpenAIFallback(
       encoder,
       controller,
       userId,
-      clientIp
+      clientIp,
+      5,
+      999 // OpenAI has no tool count limit
     );
   } catch {
     await streamGrokFallback(systemPrompt, messages, encoder, controller, userId, clientIp);
