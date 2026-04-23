@@ -73,6 +73,7 @@ async function runOpenAIToolLoop(
 
     if (!res.ok) {
       const errText = await res.text().catch(() => `status ${res.status}`);
+      console.error(`[runOpenAIToolLoop] ${baseUrl} ${res.status}: ${errText.slice(0, 300)}`);
       throw new Error(`API ${res.status}: ${errText.slice(0, 200)}`);
     }
 
@@ -161,7 +162,8 @@ export async function streamGroqFallback(
       userId,
       clientIp
     );
-  } catch {
+  } catch (err) {
+    console.error("[streamGroqFallback] Groq failed, trying OpenAI:", (err as Error).message);
     await streamOpenAIFallback(systemPrompt, messages, encoder, controller, userId, clientIp);
   }
 }
