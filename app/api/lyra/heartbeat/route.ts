@@ -5,6 +5,79 @@ import { broadcastPresence } from "@/app/api/lyra/presence/route";
 
 const ADMIN_KEY = process.env.ADMIN_PASSWORD ?? "";
 
+// ── Guardian: SQLite-backed task history ──────────────────────────────────────
+
+function getDb() {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require("better-sqlite3");
+    const DATA_DIR = process.env.DATA_DIR ?? "/home/aitaskflo/data";
+    const db = new Database(nodePath.join(DATA_DIR, "lyra.db"));
+    db.pragma("journal_mode = WAL");
+    db.exec(`CREATE TABLE IF NOT EXISTS heartbeat_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task TEXT NOT NULL,
+      ran_at INTEGER NOT NULL,
+      result TEXT,
+      success INTEGER DEFAULT 1
+    )`);
+    return db;
+  } catch { return null; }
+}
+
+function logTaskRun(task: string, result: string, success: boolean) {
+  const db = getDb();
+  if (!db) return;
+  try {
+    db.prepare("INSERT INTO heartbeat_log (task, ran_at, result, success) VALUES (?, ?, ?, ?)")
+      .run(task, Date.now(), result.slice(0, 500), success ? 1 : 0);
+  } catch { /* ignore */ }
+}
+
+function getTaskContext(task: string): string {
+  const db = getDb();
+  if (!db) return "";
+  try {
+    const rows = db.prepare(
+      "SELECT ran_at, result, success FROM heartbeat_log WHERE task = ? ORDER BY ran_at DESC LIMIT 3"
+    ).all(task) as Array<{ ran_at: number; result: string; success: number }>;
+    if (rows.length === 0) return "";
+
+    const lines = rows.map(r => {
+      const ago = Math.round((Date.now() - r.ran_at) / 60000);
+      const status = r.success ? "✅" : "❌";
+      return `${status} ${ago}m ago: ${r.result.slice(0, 150)}`;
+    });
+    return `\n\n[Guardian context for ${task}]\nLast ${rows.length} run(s):\n${lines.join("\n")}\nDon't repeat what already worked. Fix what failed.`;
+  } catch { return ""; }
+}
+
+function shouldSkipTask(task: string): { skip: boolean; reason: string } {
+  const db = getDb();
+  if (!db) return { skip: false, reason: "" };
+  try {
+    const recent = db.prepare(
+      "SELECT success FROM heartbeat_log WHERE task = ? AND ran_at > ? ORDER BY ran_at DESC LIMIT 3"
+    ).all(task, Date.now() - 3600000) as Array<{ success: number }>;
+
+    // Skip if 3 consecutive failures in last hour
+    if (recent.length >= 3 && recent.every(r => r.success === 0)) {
+      return { skip: true, reason: "3 consecutive failures in last hour" };
+    }
+    return { skip: false, reason: "" };
+  } catch { return { skip: false, reason: "" }; }
+}
+
+// Persist lastRun to DB so it survives restarts
+function getLastRun(task: string): number {
+  const db = getDb();
+  if (!db) return 0;
+  try {
+    const row = db.prepare("SELECT ran_at FROM heartbeat_log WHERE task = ? ORDER BY ran_at DESC LIMIT 1").get(task) as { ran_at: number } | undefined;
+    return row?.ran_at ?? 0;
+  } catch { return 0; }
+}
+
 // ── Parse HEARTBEAT.md tasks ───────────────────────────────────────────────────
 interface HeartbeatTask { name: string; interval: string; prompt: string; }
 
@@ -63,13 +136,15 @@ function isEffectivelyEmpty(content: string): boolean {
   });
 }
 
-// ── Last-run store (in-memory, survives process lifetime) ─────────────────────
-const lastRun: Record<string, number> = {};
+// ── Last-run store (in-memory cache, DB is source of truth) ───────────────────
+const lastRunCache: Record<string, number> = {};
 
 // ── Call Lyra's real chat API with full tool access ───────────────────────────
 async function runTaskWithLyra(prompt: string, taskName: string): Promise<string> {
   const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   let fullReply = "";
+  const context = getTaskContext(taskName);
+  const fullPrompt = prompt + context;
 
   try {
     const res = await fetch(`${baseUrl}/api/lyra/chat`, {
@@ -81,7 +156,7 @@ async function runTaskWithLyra(prompt: string, taskName: string): Promise<string
         "x-heartbeat-task": taskName,
       },
       body: JSON.stringify({
-        messages: [{ role: "user", content: prompt }],
+        messages: [{ role: "user", content: fullPrompt }],
         userId: "admin-1",
         autonomous: true,
       }),
@@ -145,7 +220,8 @@ export async function GET(req: NextRequest) {
 
   const dueTasks = tasks.filter(t => {
     const due = parseIntervalMs(t.interval);
-    return (now - (lastRun[t.name] ?? 0)) >= due;
+    const last = lastRunCache[t.name] ?? getLastRun(t.name);
+    return (now - last) >= due;
   });
 
   if (dueTasks.length === 0) {
@@ -153,12 +229,22 @@ export async function GET(req: NextRequest) {
   }
 
   // Run each due task through the REAL Lyra chat with tools — one at a time
-  const results: Array<{ task: string; reply: string }> = [];
+  const results: Array<{ task: string; reply: string; skipped?: boolean }> = [];
 
   for (const task of dueTasks) {
+    // Guardian: check if this task should be skipped
+    const { skip, reason } = shouldSkipTask(task.name);
+    if (skip) {
+      console.log(`[heartbeat] skipping ${task.name}: ${reason}`);
+      results.push({ task: task.name, reply: `Skipped: ${reason}`, skipped: true });
+      continue;
+    }
+
     console.log(`[heartbeat] running task: ${task.name}`);
     const reply = await runTaskWithLyra(task.prompt, task.name);
-    lastRun[task.name] = Date.now();
+    const success = !reply.includes("error") && !reply.includes("failed") && !reply.includes("unavailable");
+    lastRunCache[task.name] = Date.now();
+    logTaskRun(task.name, reply, success);
     results.push({ task: task.name, reply: reply.slice(0, 500) });
 
     // Broadcast each completed task to the dashboard
