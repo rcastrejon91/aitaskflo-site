@@ -78,6 +78,69 @@ function getLastRun(task: string): number {
   } catch { return 0; }
 }
 
+// Pull relevant skills + learnings to inject into task context
+function getLyraKnowledge(task: string): string {
+  const db = getDb();
+  if (!db) return "";
+  try {
+    const keywords = task.split(/[-_]/).filter(w => w.length > 3);
+    const sections: string[] = [];
+
+    // Relevant skills
+    const skillRows = db.prepare(
+      "SELECT name, description, content FROM skills WHERE status = 'active' ORDER BY success_rate DESC LIMIT 5"
+    ).all() as Array<{ name: string; description: string; content: string }>;
+    if (skillRows.length > 0) {
+      const relevant = skillRows.filter(s =>
+        keywords.some(k => s.name.includes(k) || s.description.toLowerCase().includes(k))
+      ).slice(0, 2);
+      const others = skillRows.slice(0, 2);
+      const toUse = relevant.length > 0 ? relevant : others;
+      sections.push("Skills you have:\n" + toUse.map(s => `• ${s.name}: ${s.description}`).join("\n"));
+    }
+
+    // Recent learnings
+    const learnings = db.prepare(
+      "SELECT content FROM lyra_learnings ORDER BY created_at DESC LIMIT 3"
+    ).all() as Array<{ content: string }>;
+    if (learnings.length > 0) {
+      sections.push("Recent learnings:\n" + learnings.map(l => `• ${l.content.slice(0, 120)}`).join("\n"));
+    }
+
+    // Best past RL episodes for this task type
+    const episodes = db.prepare(
+      "SELECT task, terminal_state, reward_total, rollout FROM rl_episodes WHERE reward_total > 0 ORDER BY reward_total DESC LIMIT 2"
+    ).all() as Array<{ task: string; terminal_state: string; reward_total: number; rollout: string }>;
+    if (episodes.length > 0) {
+      sections.push("Best past approaches:\n" + episodes.map(e =>
+        `• ${e.task} (reward: ${e.reward_total.toFixed(1)}): ${String(e.rollout).slice(0, 100)}`
+      ).join("\n"));
+    }
+
+    if (sections.length === 0) return "";
+    return "\n\n[Lyra's knowledge bank]\n" + sections.join("\n\n");
+  } catch { return ""; }
+}
+
+// Log RL episode after task completes
+function logRlEpisode(task: string, result: string, success: boolean) {
+  const db = getDb();
+  if (!db) return;
+  try {
+    const reward = success ? 1.0 : 0.0;
+    db.prepare(`INSERT INTO rl_episodes (id, task, agent_name, rollout, terminal_state, reward_task, reward_total, created_at)
+      VALUES (?, ?, 'lyra-heartbeat', ?, ?, ?, ?, datetime('now'))`)
+      .run(
+        Math.random().toString(36).slice(2),
+        task,
+        result.slice(0, 300),
+        success ? "success" : "failure",
+        reward,
+        reward
+      );
+  } catch { /* ignore */ }
+}
+
 // ── Parse HEARTBEAT.md tasks ───────────────────────────────────────────────────
 interface HeartbeatTask { name: string; interval: string; prompt: string; }
 
@@ -144,7 +207,8 @@ async function runTaskWithLyra(prompt: string, taskName: string): Promise<string
   const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   let fullReply = "";
   const context = getTaskContext(taskName);
-  const fullPrompt = prompt + context;
+  const knowledge = getLyraKnowledge(taskName);
+  const fullPrompt = prompt + context + knowledge;
 
   try {
     const res = await fetch(`${baseUrl}/api/lyra/chat`, {
@@ -245,6 +309,7 @@ export async function GET(req: NextRequest) {
     const success = !reply.includes("error") && !reply.includes("failed") && !reply.includes("unavailable");
     lastRunCache[task.name] = Date.now();
     logTaskRun(task.name, reply, success);
+    logRlEpisode(task.name, reply, success);
     results.push({ task: task.name, reply: reply.slice(0, 500) });
 
     // Broadcast each completed task to the dashboard
