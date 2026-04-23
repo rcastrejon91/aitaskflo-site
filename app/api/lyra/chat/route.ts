@@ -588,7 +588,7 @@ export async function POST(req: NextRequest) {
     // ── Router: classify task before deciding which model handles it ──────
     // Automated/heartbeat jobs skip Claude entirely — go straight to OpenAI
     const decision = isAutomatedJob
-      ? { route: "openai" as const, taskType: "tool" as const, useParallel: false }
+      ? { route: "grok" as const, taskType: "tool" as const, useParallel: false }
       : await routeTask(message, cleanHistory).catch(() => ({
           route: "groq" as const,
           taskType: "analysis" as const,
@@ -670,8 +670,9 @@ export async function POST(req: NextRequest) {
                 });
 
                 if (!oaiRes.ok) {
-                  // OpenAI failed — fall through to Claude
-                  break;
+                  // OpenAI failed — fall back to Grok
+                  await streamGrokFallback(systemPrompt, flatMessages, encoder, controller, userId, clientIp);
+                  return;
                 }
 
                 const oaiData = await oaiRes.json();
