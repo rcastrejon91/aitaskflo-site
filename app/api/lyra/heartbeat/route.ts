@@ -2,18 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import fsp from "fs/promises";
 import nodePath from "path";
 import { broadcastPresence } from "@/app/api/lyra/presence/route";
+import { getDb as getMainDb } from "@/lib/lyra/db";
 
 const ADMIN_KEY = process.env.ADMIN_PASSWORD ?? "";
 
 // ── Guardian: SQLite-backed task history ──────────────────────────────────────
 
 function getDb() {
+  const db = getMainDb();
+  if (!db) return null;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require("better-sqlite3");
-    const DATA_DIR = process.env.DATA_DIR ?? "/home/aitaskflo/data";
-    const db = new Database(nodePath.join(DATA_DIR, "lyra.db"));
-    db.pragma("journal_mode = WAL");
     db.exec(`CREATE TABLE IF NOT EXISTS heartbeat_log (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       task TEXT NOT NULL,
@@ -21,8 +19,8 @@ function getDb() {
       result TEXT,
       success INTEGER DEFAULT 1
     )`);
-    return db;
-  } catch { return null; }
+  } catch { /* table may already exist */ }
+  return db;
 }
 
 function logTaskRun(task: string, result: string, success: boolean) {
