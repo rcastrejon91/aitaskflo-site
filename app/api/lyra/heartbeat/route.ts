@@ -6,113 +6,87 @@ import { getDb as getMainDb } from "@/lib/lyra/db";
 
 const ADMIN_KEY = process.env.ADMIN_PASSWORD ?? "";
 
-// ── Guardian: SQLite-backed task history ──────────────────────────────────────
+// ── Guardian: JSON file-backed task history (survives restarts, no DB dep) ────
 
-function getDb() {
-  const db = getMainDb();
-  if (!db) return null;
+const GUARDIAN_FILE = nodePath.join(
+  process.env.APP_DIR ?? process.cwd(),
+  "data", "heartbeat-guardian.json"
+);
+
+interface TaskRecord { ran_at: number; result: string; success: boolean; }
+interface GuardianState { tasks: Record<string, TaskRecord[]>; }
+
+function readGuardian(): GuardianState {
   try {
-    db.exec(`CREATE TABLE IF NOT EXISTS heartbeat_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      task TEXT NOT NULL,
-      ran_at INTEGER NOT NULL,
-      result TEXT,
-      success INTEGER DEFAULT 1
-    )`);
-  } catch { /* table may already exist */ }
-  return db;
+    const raw = require("fs").readFileSync(GUARDIAN_FILE, "utf8");
+    return JSON.parse(raw) as GuardianState;
+  } catch { return { tasks: {} }; }
 }
 
-function logTaskRun(task: string, result: string, success: boolean) {
-  const db = getDb();
-  if (!db) return;
+function writeGuardian(state: GuardianState) {
   try {
-    db.prepare("INSERT INTO heartbeat_log (task, ran_at, result, success) VALUES (?, ?, ?, ?)")
-      .run(task, Date.now(), result.slice(0, 500), success ? 1 : 0);
+    require("fs").writeFileSync(GUARDIAN_FILE, JSON.stringify(state, null, 2));
   } catch { /* ignore */ }
 }
 
-function getTaskContext(task: string): string {
-  const db = getDb();
-  if (!db) return "";
-  try {
-    const rows = db.prepare(
-      "SELECT ran_at, result, success FROM heartbeat_log WHERE task = ? ORDER BY ran_at DESC LIMIT 3"
-    ).all(task) as Array<{ ran_at: number; result: string; success: number }>;
-    if (rows.length === 0) return "";
+function logTaskRun(task: string, result: string, success: boolean) {
+  const state = readGuardian();
+  if (!state.tasks[task]) state.tasks[task] = [];
+  state.tasks[task].unshift({ ran_at: Date.now(), result: result.slice(0, 500), success });
+  state.tasks[task] = state.tasks[task].slice(0, 10); // keep last 10
+  writeGuardian(state);
+}
 
-    const lines = rows.map(r => {
-      const ago = Math.round((Date.now() - r.ran_at) / 60000);
-      const status = r.success ? "✅" : "❌";
-      return `${status} ${ago}m ago: ${r.result.slice(0, 150)}`;
-    });
-    return `\n\n[Guardian context for ${task}]\nLast ${rows.length} run(s):\n${lines.join("\n")}\nDon't repeat what already worked. Fix what failed.`;
-  } catch { return ""; }
+function getTaskContext(task: string): string {
+  const state = readGuardian();
+  const rows = (state.tasks[task] ?? []).slice(0, 3);
+  if (rows.length === 0) return "";
+  const lines = rows.map(r => {
+    const ago = Math.round((Date.now() - r.ran_at) / 60000);
+    const status = r.success ? "✅" : "❌";
+    return `${status} ${ago}m ago: ${r.result.slice(0, 150)}`;
+  });
+  return `\n\n[Guardian context for ${task}]\nLast ${rows.length} run(s):\n${lines.join("\n")}\nDon't repeat what already worked. Fix what failed.`;
 }
 
 function shouldSkipTask(task: string): { skip: boolean; reason: string } {
-  const db = getDb();
-  if (!db) return { skip: false, reason: "" };
-  try {
-    const recent = db.prepare(
-      "SELECT success FROM heartbeat_log WHERE task = ? AND ran_at > ? ORDER BY ran_at DESC LIMIT 3"
-    ).all(task, Date.now() - 3600000) as Array<{ success: number }>;
-
-    // Skip if 3 consecutive failures in last hour
-    if (recent.length >= 3 && recent.every(r => r.success === 0)) {
-      return { skip: true, reason: "3 consecutive failures in last hour" };
-    }
-    return { skip: false, reason: "" };
-  } catch { return { skip: false, reason: "" }; }
+  const state = readGuardian();
+  const recent = (state.tasks[task] ?? []).filter(r => r.ran_at > Date.now() - 3600000).slice(0, 3);
+  if (recent.length >= 3 && recent.every(r => !r.success)) {
+    return { skip: true, reason: "3 consecutive failures in last hour" };
+  }
+  return { skip: false, reason: "" };
 }
 
-// Persist lastRun to DB so it survives restarts
 function getLastRun(task: string): number {
-  const db = getDb();
-  if (!db) return 0;
-  try {
-    const row = db.prepare("SELECT ran_at FROM heartbeat_log WHERE task = ? ORDER BY ran_at DESC LIMIT 1").get(task) as { ran_at: number } | undefined;
-    return row?.ran_at ?? 0;
-  } catch { return 0; }
+  const state = readGuardian();
+  return state.tasks[task]?.[0]?.ran_at ?? 0;
 }
 
 // Pull relevant skills + learnings to inject into task context
 function getLyraKnowledge(task: string): string {
-  const db = getDb();
+  const db = getMainDb();
   if (!db) return "";
   try {
     const keywords = task.split(/[-_]/).filter(w => w.length > 3);
     const sections: string[] = [];
 
-    // Relevant skills
     const skillRows = db.prepare(
-      "SELECT name, description, content FROM skills WHERE status = 'active' ORDER BY success_rate DESC LIMIT 5"
-    ).all() as Array<{ name: string; description: string; content: string }>;
+      "SELECT name, description FROM skills WHERE status = 'active' LIMIT 5"
+    ).all() as Array<{ name: string; description: string }>;
     if (skillRows.length > 0) {
       const relevant = skillRows.filter(s =>
         keywords.some(k => s.name.includes(k) || s.description.toLowerCase().includes(k))
       ).slice(0, 2);
-      const others = skillRows.slice(0, 2);
-      const toUse = relevant.length > 0 ? relevant : others;
+      const toUse = relevant.length > 0 ? relevant : skillRows.slice(0, 2);
       sections.push("Skills you have:\n" + toUse.map(s => `• ${s.name}: ${s.description}`).join("\n"));
     }
 
-    // Recent learnings
     const learnings = db.prepare(
       "SELECT content FROM lyra_learnings ORDER BY created_at DESC LIMIT 3"
     ).all() as Array<{ content: string }>;
     if (learnings.length > 0) {
-      sections.push("Recent learnings:\n" + learnings.map(l => `• ${l.content.slice(0, 120)}`).join("\n"));
-    }
-
-    // Best past RL episodes for this task type
-    const episodes = db.prepare(
-      "SELECT task, terminal_state, reward_total, rollout FROM rl_episodes WHERE reward_total > 0 ORDER BY reward_total DESC LIMIT 2"
-    ).all() as Array<{ task: string; terminal_state: string; reward_total: number; rollout: string }>;
-    if (episodes.length > 0) {
-      sections.push("Best past approaches:\n" + episodes.map(e =>
-        `• ${e.task} (reward: ${e.reward_total.toFixed(1)}): ${String(e.rollout).slice(0, 100)}`
-      ).join("\n"));
+      sections.push("Recent learnings:\n" + learnings.map(l => `• ${String(l.content).slice(0, 120)}`).join("\n"));
     }
 
     if (sections.length === 0) return "";
@@ -120,22 +94,15 @@ function getLyraKnowledge(task: string): string {
   } catch { return ""; }
 }
 
-// Log RL episode after task completes
 function logRlEpisode(task: string, result: string, success: boolean) {
-  const db = getDb();
+  const db = getMainDb();
   if (!db) return;
   try {
     const reward = success ? 1.0 : 0.0;
     db.prepare(`INSERT INTO rl_episodes (id, task, agent_name, rollout, terminal_state, reward_task, reward_total, created_at)
       VALUES (?, ?, 'lyra-heartbeat', ?, ?, ?, ?, datetime('now'))`)
-      .run(
-        Math.random().toString(36).slice(2),
-        task,
-        result.slice(0, 300),
-        success ? "success" : "failure",
-        reward,
-        reward
-      );
+      .run(Math.random().toString(36).slice(2), task, result.slice(0, 300),
+        success ? "success" : "failure", reward, reward);
   } catch { /* ignore */ }
 }
 
