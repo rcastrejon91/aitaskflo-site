@@ -187,7 +187,7 @@ export async function quickCreateMerch(opts: {
   productType: keyof typeof POPULAR_BLUEPRINTS;
   retailPrice: number;
   tags?: string[];
-}): Promise<{ success: boolean; productId?: string; message: string }> {
+}): Promise<{ success: boolean; productId?: string; shopifyUrl?: string; message: string }> {
   try {
     const blueprintId = POPULAR_BLUEPRINTS[opts.productType];
 
@@ -229,9 +229,22 @@ export async function quickCreateMerch(opts: {
     // Publish to Shopify
     await publishProduct(opts.shopId, product.id);
 
+    // Get Shopify product URL from published product handle
+    let shopifyUrl = "";
+    try {
+      await new Promise(r => setTimeout(r, 2000)); // brief wait for Shopify sync
+      const published = await getProduct(opts.shopId, product.id) as { external?: { handle?: string; id?: string } };
+      const handle = published?.external?.handle;
+      const shopDomain = process.env.SHOPIFY_SHOP ?? "";
+      if (handle && shopDomain) {
+        shopifyUrl = `https://${shopDomain}/products/${handle}`;
+      }
+    } catch { /* URL is optional */ }
+
     return {
       success: true,
       productId: product.id,
+      shopifyUrl,
       message: `Created and published "${opts.title}" (${opts.productType}) at $${opts.retailPrice} via ${provider.title}`,
     };
   } catch (e) {

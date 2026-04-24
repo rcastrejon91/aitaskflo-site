@@ -1845,7 +1845,8 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
       });
 
       if (!result.success) return `Printify error: ${result.message}`;
-      return `✅ **${input.name}** is live on your Shopify store. Design was generated, background removed, upscaled to print resolution, and published via Printify — fully automated.\n\n${result.message}`;
+      const shopLink = result.shopifyUrl ? `\n\n🔗 **View product:** ${result.shopifyUrl}` : "";
+      return `✅ **${input.name}** is live on your Shopify store. Design was generated, background removed, upscaled to print resolution, and published via Printify — fully automated.\n\n${result.message}${shopLink}`;
     } catch (e) {
       return `Printify error: ${e instanceof Error ? e.message : String(e)}`;
     }
