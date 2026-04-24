@@ -151,20 +151,24 @@ export async function streamGroqFallback(
   }
 
   try {
+    // Groq free tier: 12K TPM limit — trim system prompt to stay under budget
+    const trimmedPrompt = systemPrompt.length > 3000 ? systemPrompt.slice(0, 3000) + "\n[context trimmed]" : systemPrompt;
     await runOpenAIToolLoop(
       "https://api.groq.com/openai/v1",
       groqKey,
       "llama-3.3-70b-versatile",
-      systemPrompt,
+      trimmedPrompt,
       messages,
       encoder,
       controller,
       userId,
-      clientIp
+      clientIp,
+      5,
+      60 // Groq: keep under token budget with fewer tools
     );
   } catch (err) {
-    console.error("[streamGroqFallback] Groq failed, trying OpenAI:", (err as Error).message);
-    await streamOpenAIFallback(systemPrompt, messages, encoder, controller, userId, clientIp);
+    console.error("[streamGroqFallback] Groq failed, trying Grok:", (err as Error).message);
+    await streamGrokFallback(systemPrompt, messages, encoder, controller, userId, clientIp);
   }
 }
 
