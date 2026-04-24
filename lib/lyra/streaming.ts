@@ -164,7 +164,7 @@ export async function streamGroqFallback(
       userId,
       clientIp,
       5,
-      60 // Groq: keep under token budget with fewer tools
+      30 // Groq free tier: 12K TPM — use only top priority tools
     );
   } catch (err) {
     console.error("[streamGroqFallback] Groq failed, trying Grok:", (err as Error).message);
