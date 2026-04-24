@@ -70,14 +70,44 @@ For facts: extract things like preferred_language, occupation, location, interes
           parsed = { summary: "Conversation completed." };
         }
       } catch (err) {
-        // Log the FULL error (JSON.stringify expands nested [Object])
         const detail = err instanceof Error
           ? { message: err.message, error: JSON.stringify((err as { error?: unknown }).error ?? null) }
           : String(err);
         console.error("[Lyra Reflect] Anthropic error:", detail);
         parsed = { summary: "Conversation completed." };
       }
-    } else {
+    }
+
+    // ── Groq fallback for reflection (when Anthropic is unavailable) ─────────
+    if (!parsed.summary || parsed.summary === "Conversation completed.") {
+      const groqKey = process.env.GROQ_API_KEY;
+      if (groqKey) {
+        try {
+          const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${groqKey}` },
+            body: JSON.stringify({
+              model: "llama-3.1-8b-instant",
+              max_tokens: 512,
+              temperature: 0,
+              messages: [{
+                role: "user",
+                content: `Analyze this conversation. Return ONLY valid JSON, no markdown.\n\nTRANSCRIPT:\n${transcriptText}\n\nReturn exactly:\n{"summary":"1-2 sentence summary","facts":[{"key":"fact_name","value":"value"}],"user_name":null}\n\nExtract up to 5 facts about the user (occupation, interests, location, projects, etc.).`,
+              }],
+            }),
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (groqRes.ok) {
+            const d = await groqRes.json();
+            const raw = d.choices?.[0]?.message?.content ?? "{}";
+            const clean = raw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
+            try { parsed = JSON.parse(clean.match(/\{[\s\S]*\}/)?.[0] ?? "{}"); } catch { /* keep blank */ }
+          }
+        } catch { /* Groq also failed — keep blank summary */ }
+      }
+    }
+
+    if (!parsed.summary) {
       parsed = { summary: "Conversation completed." };
     }
 

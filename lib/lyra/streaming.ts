@@ -325,17 +325,17 @@ export async function routeTask(
   const ollamaKeywords = /\b(use local|go local|raw mode|no filter|unfiltered|dark mode|unleash|go raw|beast mode|no limits|local ai|offline mode|shadow mode|uncensored)\b/i;
   if (ollamaKeywords.test(message)) return { ...DEFAULT, route: "ollama", taskType: "creative" };
 
-  // Code → Claude (best at code, agentic file operations)
+  // Code → Grok (Claude is unavailable; Grok handles code well)
   const codeKeywords = /\b(code|function|class|debug|fix (?:the |this )?(?:bug|error|issue)|refactor|write (?:a |me )?(?:script|function|class|component)|implement|algorithm|typescript|javascript|python|sql|regex|api endpoint)\b/i;
-  if (codeKeywords.test(message)) return { ...DEFAULT, route: "claude", taskType: "code" };
+  if (codeKeywords.test(message)) return { ...DEFAULT, route: "grok", taskType: "code" };
 
-  // Image/video/audio generation → Claude (best tool reliability)
+  // Image/video/audio generation → Groq (fastest with tools)
   const mediaKeywords = /generat(?:e|ing) (?:an? )?(?:image|video|music|song|audio)|draw (?:me |a |an )?|create (?:an? )?(?:image|video|song)|make (?:a |an )?(?:image|picture|photo|video|song|beat|music)/i;
-  if (mediaKeywords.test(message)) return { ...DEFAULT, route: "claude", taskType: "tool" };
+  if (mediaKeywords.test(message)) return { ...DEFAULT, route: "groq", taskType: "tool" };
 
-  // Trucker tools → Claude
+  // Trucker tools → Groq (handles tool calls well)
   const truckerKeywords = /\b(hours of service|hos\b|log (?:my |a )?(?:drive|driving|off duty|on duty|sleeper)|started driving|going off duty|load board|find (?:a |me )?(?:load|loads|freight)|obd|check engine|openpilot|comma\.?ai|adas)\b/i;
-  if (truckerKeywords.test(message)) return { ...DEFAULT, route: "claude", taskType: "tool" };
+  if (truckerKeywords.test(message)) return { ...DEFAULT, route: "groq", taskType: "tool" };
 
   // Everything else — Groq handles it with tools now
   const groqKey = process.env.GROQ_API_KEY;

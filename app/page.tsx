@@ -161,7 +161,7 @@ const FEATURES = [
 ];
 
 const PLANS = [
-  { name: "Free", price: "$0", sub: "forever", features: ["50 messages / month", "Persistent memory", "Gmail integration", "Conversation history"], cta: "Get started free", href: "/login", accent: false },
+  { name: "Free", price: "$0", sub: "forever", features: ["40 messages / day", "Persistent memory", "Image generation", "Web search"], cta: "Get started free", href: "/login", accent: false },
   { name: "Pro", price: "$29", sub: "/ month", features: ["Unlimited messages", "Full automation suite", "Google Drive + Calendar", "Agent evolution", "Image + video generation", "Browser agent"], cta: "Start Pro", href: "/login?plan=pro", accent: true },
   { name: "Business", price: "$49", sub: "/ month", features: ["Everything in Pro", "Multi-agent workflows", "Skill factory", "Admin analytics", "API access"], cta: "Get Business", href: "/login?plan=business", accent: false },
 ];

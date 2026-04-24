@@ -15,11 +15,12 @@ export default async function LyraPage() {
 
   const userId = (session.user as { id: string }).id;
 
+  // Free users can access the chat — message limits are enforced in the API
+  // Only hard-block if account is explicitly suspended (not just free plan)
   const ADMIN_IDS = ["admin-1", "b9969c91-8bb4-4377-aae5-94e2a8b7f718"];
-  const allowFreeAccess = process.env.NODE_ENV !== "production";
-  if (!allowFreeAccess && !ADMIN_IDS.includes(userId)) {
+  if (!ADMIN_IDS.includes(userId)) {
     const sub = getSubscription(userId);
-    if (sub.plan === "free" || sub.status !== "active") redirect("/pricing");
+    if (sub.status === "suspended") redirect("/pricing");
   }
 
   const agents = getAllAgents();
