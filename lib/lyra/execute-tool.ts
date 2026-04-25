@@ -1784,11 +1784,11 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
       const raw = await (async () => {
         const { fal } = await import("@fal-ai/client");
         fal.config({ credentials: process.env.FAL_KEY });
-        const result = await fal.run("fal-ai/flux/dev", {
+        const result = await fal.run("fal-ai/flux/schnell", {
           input: {
             prompt: `${designPrompt}, isolated graphic, no background, centered subject, print on demand design, high contrast, sharp edges`,
             image_size: "portrait_4_3",
-            num_inference_steps: 28,
+            num_inference_steps: 4,
             num_images: 1,
             enable_safety_checker: true,
           },
