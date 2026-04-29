@@ -9,7 +9,7 @@
     "lint": "eslint app components lib scripts auth.ts auth.config.ts proxy.ts next.config.js --ext .ts,.tsx,.js,.jsx"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.88.0",
+    "@anthropic-ai/sdk": "^0.91.1",
     "@fal-ai/client": "^1.9.5",
     "@react-pdf/renderer": "^4.4.1",
     "@stripe/stripe-js": "^9.1.0",
