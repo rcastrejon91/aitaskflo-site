@@ -52,9 +52,11 @@ const PLAN_COPY = {
 export default function PricingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   async function upgrade(plan: "pro" | "business") {
     setLoading(plan);
+    setCheckoutError(null);
     try {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
@@ -65,10 +67,10 @@ export default function PricingPage() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        alert(data.error ?? "Something went wrong");
+        setCheckoutError(data.error ?? "Something went wrong — try again.");
       }
     } catch {
-      alert("Checkout failed — try again");
+      setCheckoutError("Checkout failed — please try again.");
     } finally {
       setLoading(null);
     }
@@ -175,6 +177,12 @@ export default function PricingPage() {
           })}
         </div>
 
+        {checkoutError && (
+          <p className="text-center text-red-400 text-sm mt-6 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 max-w-md mx-auto">
+            {checkoutError}
+          </p>
+        )}
+
         <p className="text-center text-white/25 text-xs mt-10">
           Cancel anytime · Secure payments via Stripe · No hidden fees
         </p>
@@ -186,7 +194,7 @@ export default function PricingPage() {
             {[
               {
                 q: "What counts as a message?",
-                a: "Every time you send a message to Lyra and receive a response counts as one message. Free accounts get 10 per day. Pro and Business are unlimited.",
+                a: "Every time you send a message to Lyra and receive a response counts as one message. Free accounts get 40 per day, resetting at midnight UTC. Pro and Business are unlimited.",
               },
               {
                 q: "Can I cancel anytime?",

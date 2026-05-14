@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import { MessageRenderer } from "@/components/lyra/MessageRenderer";
 import { Send, Mic, Paperclip, MoreHorizontal } from "lucide-react";
 
@@ -25,6 +26,8 @@ function TypingDots() {
 }
 
 export default function PersonalPage() {
+  const { data: session } = useSession();
+  const firstName = (session?.user?.name ?? "").split(" ")[0] || "there";
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -144,16 +147,16 @@ export default function PersonalPage() {
               L
             </div>
             <div>
-              <p className="text-white font-semibold text-lg">Hey Ricky.</p>
+              <p className="text-white font-semibold text-lg">Hey {firstName}.</p>
               <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.4)" }}>What&apos;s on your mind?</p>
             </div>
             <div className="flex flex-wrap gap-2 justify-center mt-2 max-w-sm">
               {[
-                "What should we build today?",
-                "Plan today's gigs",
-                "Check earnings",
-                "New Gumroad product idea",
-                "What's next on aitaskflo?",
+                "What should we work on today?",
+                "Plan today's tasks",
+                "Check my earnings",
+                "What can Lyra automate for me?",
+                "Show me what's possible",
               ].map(s => (
                 <button key={s} onClick={() => send(s)}
                   className="text-xs px-3 py-2 rounded-full transition-colors"

@@ -124,7 +124,7 @@ function DemoProgress({ used, total }: { used: number; total: number }) {
 // ── Main Demo ─────────────────────────────────────────────────────────────────
 
 const STARTERS = [
-  "What can you help me build on AI Task Flo?",
+  "What can you help me build on AITaskFlo?",
   "Turn this idea into a launch plan",
   "Write a landing page for my service",
   "Build me a simple browser game idea",

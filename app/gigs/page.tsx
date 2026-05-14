@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/lyra/AppShell";
 import { Zap, RefreshCw, ExternalLink, Clock, CheckCircle2, XCircle, Play } from "lucide-react";
 
@@ -208,6 +209,11 @@ export default function GigsPage() {
             <p className="text-white/20 text-xs mt-2 max-w-xs mx-auto">
               Tell Lyra <em>"plan today"</em> and she&apos;ll propose 3 things she can do right now to make you money.
             </p>
+            <Link href="/lyra?q=plan+today"
+              className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-full text-xs font-medium transition-all"
+              style={{ background: "rgba(109,40,217,0.15)", border: "1px solid rgba(139,92,246,0.3)", color: "rgba(167,139,250,0.9)" }}>
+              <Zap className="w-3 h-3" /> Open Lyra → plan today
+            </Link>
           </div>
         )}
       </div>

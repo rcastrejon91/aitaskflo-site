@@ -7,8 +7,8 @@ import { signOut } from "next-auth/react";
 import { SupportWidget } from "@/components/lyra/SupportWidget";
 import {
   ArrowLeft, Settings, LogOut, ChevronLeft, ChevronRight,
-  MessageSquare, GraduationCap, Truck, Gamepad2, Play, BookOpen, Library,
-  Briefcase, Building2, Users, TrendingUp, Rss, FlaskConical, Sparkles, Brain, Search, PenLine, Store, Wand2, ClipboardList, Zap, Heart,
+  MessageSquare, GraduationCap, Truck, Gamepad2, BookOpen, Library,
+  Briefcase, Building2, Users, TrendingUp, Rss, FlaskConical, Sparkles, Brain, Search, PenLine, Store, Wand2, ClipboardList, Zap, Heart, Target, Share2,
 } from "lucide-react";
 
 const NAV_TABS = [
@@ -18,7 +18,6 @@ const NAV_TABS = [
   { href: "/learn",      icon: GraduationCap, label: "Learn"     },
   { href: "/trucker",    icon: Truck,         label: "Trucker"   },
   { href: "/games",      icon: Gamepad2,      label: "Games"     },
-  { href: "/play",       icon: Play,          label: "Play"      },
   { href: "/book",       icon: BookOpen,      label: "Book"      },
   { href: "/bookshelf",  icon: Library,       label: "Shelf"     },
   { href: "/lab",        icon: FlaskConical,  label: "Lab"       },
@@ -27,6 +26,8 @@ const NAV_TABS = [
   { href: "/jobs",       icon: ClipboardList, label: "Jobs"      },
   { href: "/gigs",       icon: Zap,           label: "Gigs"      },
   { href: "/personal",   icon: Heart,         label: "Personal"  },
+  { href: "/clients",   icon: Target,        label: "Clients"   },
+  { href: "/social",    icon: Share2,        label: "Social"    },
   { href: "/biz",       icon: Briefcase,     label: "Biz"       },
   { href: "/agency",    icon: Building2,     label: "Agency"    },
   { href: "/careers",   icon: Users,         label: "Careers"   },

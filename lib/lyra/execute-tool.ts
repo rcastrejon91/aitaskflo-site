@@ -811,6 +811,72 @@ Reason: ${reason}`;
     ).join("\n");
   }
 
+  // ── Code sandbox (Wandbox — free, no API key needed) ─────────────────────
+  if (name === "run_code") {
+    const { language = "python", code, stdin = "" } = input as { language?: string; code: string; stdin?: string };
+
+    // Wandbox compiler IDs
+    const COMPILERS: Record<string, string> = {
+      python: "cpython-3.12.0", py: "cpython-3.12.0",
+      javascript: "nodejs-20.9.0", js: "nodejs-20.9.0", node: "nodejs-20.9.0",
+      typescript: "typescript-5.3.2", ts: "typescript-5.3.2",
+      bash: "bash", shell: "bash", sh: "bash",
+      c: "gcc-13.2.0",
+      cpp: "gcc-13.2.0", "c++": "gcc-13.2.0",
+      java: "openjdk-jdk-21+35",
+      go: "go-1.21.3", golang: "go-1.21.3",
+      ruby: "ruby-3.2.2", rb: "ruby-3.2.2",
+      rust: "rust-1.73.0", rs: "rust-1.73.0",
+      php: "php-8.2.11",
+    };
+
+    const compiler = COMPILERS[language.toLowerCase()] ?? "cpython-3.12.0";
+    const langLabel = language.toLowerCase();
+
+    controller.enqueue(encoder.encode(`\n💻 Running **${langLabel}** in sandbox…\n`));
+
+    try {
+      const res = await fetch("https://wandbox.org/api/compile.json", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          compiler,
+          stdin: stdin || "",
+          "compiler-option-raw": "",
+          "runtime-option-raw": "",
+        }),
+      });
+
+      if (!res.ok) throw new Error(`Wandbox error: ${res.status}`);
+
+      const data = await res.json() as {
+        status?: string;
+        program_output?: string;
+        program_error?: string;
+        compiler_output?: string;
+        compiler_error?: string;
+      };
+
+      const stdout = data.program_output?.trim() ?? "";
+      const stderr = data.program_error?.trim() ?? "";
+      const compileErr = (data.compiler_error ?? data.compiler_output ?? "").trim();
+      const exitCode = data.status ? parseInt(data.status) : 0;
+
+      let out = "```\n";
+      if (compileErr) out += `[compile]\n${compileErr}\n`;
+      if (stdout) out += stdout + "\n";
+      if (stderr) out += `[stderr]\n${stderr}\n`;
+      if (!stdout && !stderr && !compileErr) out += "(no output)";
+      out += "```";
+      if (exitCode !== 0) out += `\n\nExited with code **${exitCode}**.`;
+
+      return out;
+    } catch (e) {
+      return `Sandbox error: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+
   // ── Autonomous web browsing (server-side Playwright) ─────────────────────
   if (name === "browse_web") {
     const { url, task } = input as { url: string; task: string };
@@ -2061,6 +2127,141 @@ Return ONLY valid JSON:
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       return `Grok image generation failed: ${msg}`;
+    }
+  }
+
+  // ── Client demo generator ─────────────────────────────────────────────────
+  if (name === "create_client_demo") {
+    const clientName   = (input.client_name   ?? "Client").trim();
+    const businessType = (input.business_type ?? "business").trim();
+    const useCase      = (input.use_case      ?? `automate workflows and grow ${clientName}'s business`).trim();
+    const demoType     = (input.demo_type     ?? "all").toLowerCase();
+    const tone         = (input.tone          ?? "professional").toLowerCase();
+
+    const progress = (msg: string) => {
+      try { controller.enqueue(encoder.encode(`\n${msg}`)); } catch { /* closed */ }
+    };
+
+    const keepAlive = setInterval(() => {
+      try { controller.enqueue(encoder.encode(" ")); } catch { /* closed */ }
+    }, 4_000);
+
+    try {
+      progress(`🎯 Building demo package for ${clientName}…`);
+
+      // ── 1. Pitch script ────────────────────────────────────────────────────
+      const toneMap: Record<string, string> = {
+        professional: "confident, polished, business-forward",
+        casual: "friendly, conversational, relatable",
+        hype: "energetic, bold, exciting — like a product launch",
+        warm: "empathetic, personal, trust-building",
+      };
+      const toneDesc = toneMap[tone] ?? toneMap.professional;
+
+      const scriptPrompt = [
+        `You are writing a sales demo package for a product called Lyra by AITaskFlo (aitaskflo.com).`,
+        `Client: ${clientName}`,
+        `Business type: ${businessType}`,
+        `What Lyra does for them: ${useCase}`,
+        `Tone: ${toneDesc}`,
+        ``,
+        `Generate ALL of the following sections clearly labeled:`,
+        ``,
+        `## ELEVATOR PITCH (2 sentences max — what Lyra does for ${clientName} specifically)`,
+        ``,
+        `## TIKTOK SCRIPT (30-second voiceover script, hook → problem → Lyra solution → CTA, casual and punchy)`,
+        ``,
+        `## WALKTHROUGH SCRIPT (step-by-step narration of a live demo: user opens Lyra, types a request related to ${businessType}, Lyra executes it — 5 steps, each 1-2 sentences)`,
+        ``,
+        `## KEY SELLING POINTS (3 bullet points specific to ${clientName}'s business)`,
+        ``,
+        `## EMAIL SUBJECT LINE (cold outreach, curiosity-driven)`,
+        ``,
+        `## EMAIL BODY (4 sentences, ${toneDesc} tone, personalized to ${clientName})`,
+      ].join("\n");
+
+      // Use the main LLM to generate the script
+      const Anthropic = (await import("@anthropic-ai/sdk")).default;
+      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      const scriptRes = await anthropic.messages.create({
+        model: "claude-haiku-4-5",
+        max_tokens: 1200,
+        messages: [{ role: "user", content: scriptPrompt }],
+      });
+      const script = scriptRes.content[0].type === "text" ? scriptRes.content[0].text : "";
+
+      progress(`✅ Scripts generated`);
+
+      // ── 2. Cover image ─────────────────────────────────────────────────────
+      let coverUrl = "";
+      if (process.env.FAL_KEY) {
+        try {
+          progress(`🎨 Generating demo visual…`);
+          const { falImageGen } = await import("@/lib/lyra/fal-tools");
+          const imgPrompt = `Professional product demo thumbnail for an AI assistant tool. Dark futuristic UI, purple and teal color scheme, showing a sleek chat interface with the text "${clientName}" and glowing automation icons. Clean, modern, cinematic lighting. No text overlay.`;
+          coverUrl = await falImageGen(imgPrompt, "fast");
+          if (coverUrl) {
+            controller.enqueue(encoder.encode(`\n__IMG__${coverUrl}__IMG__`));
+            progress(`✅ Cover image ready`);
+          }
+        } catch { /* image gen optional */ }
+      }
+
+      // ── 3. TikTok video clip (if tiktok or all) ────────────────────────────
+      let videoUrl = "";
+      if ((demoType === "tiktok" || demoType === "all") && process.env.FAL_KEY) {
+        try {
+          progress(`🎬 Generating TikTok demo clip… (~60s)`);
+          const { falTextToVideo } = await import("@/lib/lyra/fal-tools");
+          const vidPrompt = `Cinematic product demo clip. Sleek dark AI interface glowing purple and teal on screen. Person types a request, AI instantly responds with automation — emails sending, data flowing, tasks completing. Fast-paced, satisfying, high-tech aesthetic. No text.`;
+          videoUrl = await falTextToVideo(vidPrompt, 5);
+          if (videoUrl) {
+            const card = JSON.stringify({ tool: "fal_video", url: videoUrl, prompt: vidPrompt.slice(0, 80) });
+            controller.enqueue(encoder.encode(`\n${card}`));
+            progress(`✅ TikTok video clip ready`);
+          }
+        } catch { /* video gen optional */ }
+      }
+
+      // ── 4. Voiceover for TikTok script ────────────────────────────────────
+      let audioUrl = "";
+      const ttsSection = script.match(/## TIKTOK SCRIPT\s*([\s\S]*?)(?=##|$)/)?.[1]?.trim() ?? "";
+      if (ttsSection && (demoType === "tiktok" || demoType === "all")) {
+        try {
+          progress(`🔊 Generating voiceover…`);
+          if (process.env.ELEVENLABS_API_KEY) {
+            const { elevenLabsTTS } = await import("@/lib/lyra/fal-tools");
+            audioUrl = await elevenLabsTTS(ttsSection, "aria");
+          } else if (process.env.FAL_KEY) {
+            const { falTTS } = await import("@/lib/lyra/fal-tools");
+            audioUrl = await falTTS(ttsSection, "aria");
+          }
+          if (audioUrl) {
+            const card = JSON.stringify({ tool: "fal_audio", url: audioUrl, type: "speech", voice: "aria", preview: ttsSection.slice(0, 60) });
+            controller.enqueue(encoder.encode(`\n${card}`));
+            progress(`✅ Voiceover ready`);
+          }
+        } catch { /* audio optional */ }
+      }
+
+      clearInterval(keepAlive);
+
+      const summary = [
+        `## Demo Package — ${clientName}`,
+        ``,
+        script,
+        ``,
+        `---`,
+        `**Assets generated:**`,
+        coverUrl ? `- Cover image: ${coverUrl}` : "",
+        videoUrl ? `- TikTok video clip: ${videoUrl}` : "",
+        audioUrl ? `- Voiceover audio: ${audioUrl}` : "",
+      ].filter(Boolean).join("\n");
+
+      return summary;
+    } catch (e) {
+      clearInterval(keepAlive);
+      return `Demo generation failed: ${e instanceof Error ? e.message : String(e)}`;
     }
   }
 
@@ -4855,6 +5056,102 @@ Keep it concise and practical.`,
     const mythosKey=process.env.MYTHOS_API_KEY??"";
     if(!mythosKey)return`⚡ **Mythos Scanner** — Ready, waiting on API key\n\nTo activate: email sales@anthropic.com mentioning Project Glasswing, then add MYTHOS_API_KEY to .env.local.\n\nTarget queued: ${input.target} | Type: ${input.scan_type??"quick"}`;
     try{const r=await fetch("https://api.anthropic.com/v1/mythos/scan",{method:"POST",headers:{"x-api-key":mythosKey,"Content-Type":"application/json"},body:JSON.stringify({target:input.target,scan_type:input.scan_type??"quick"})});const d=await r.json() as {scan_id?:string;status?:string};return`🕷️ Mythos scan started\nScan ID: ${d.scan_id}\nStatus: ${d.status}`;}catch(e){return`Mythos error: ${e instanceof Error?e.message:String(e)}`;}
+  }
+
+  if (name === "shopify_connect") {
+    const { listUserShops } = await import("@/lib/lyra/shopify");
+    const resolvedUserId = userId ?? "admin-1";
+    const base = process.env.NEXTAUTH_URL ?? "https://aitaskflo.com";
+
+    if (input.action === "list") {
+      const shops = listUserShops(resolvedUserId);
+      if (!shops.length) return `No Shopify stores connected yet. Share this link with a merchant to connect their store:\n${base}/api/shopify/install?shop=THEIR-STORE.myshopify.com`;
+      return `**Connected Shopify stores:**\n${shops.map((s: { shop: string }) => `• ${s.shop}`).join("\n")}`;
+    }
+
+    if (input.action === "install") {
+      const shop = (input.shop ?? "").trim();
+      if (!shop) return "Provide the store domain, e.g. mystore.myshopify.com";
+      const installUrl = `${base}/api/shopify/install?shop=${encodeURIComponent(shop)}`;
+      return `Install link for **${shop}**:\n${installUrl}\n\nSend this to the store owner. They'll be redirected to approve the app, then come back here automatically.`;
+    }
+
+    return "action must be 'install' or 'list'";
+  }
+
+  if (name === "social_post") {
+    const { postToAll } = await import("@/lib/lyra/social-post");
+    const platforms = input.platforms
+      ? (input.platforms as string).split(",").map((s: string) => s.trim()) as Array<"facebook" | "instagram" | "tiktok">
+      : undefined;
+    const results = await postToAll(userId ?? "admin-1", {
+      text: input.text ?? "",
+      imageUrl: input.image_url,
+      videoUrl: input.video_url,
+    }, platforms);
+    const lines = results.map(r =>
+      r.success
+        ? `✅ ${r.platform}${r.url ? ` — ${r.url}` : ""}`
+        : `❌ ${r.platform}: ${r.error}`
+    );
+    return lines.join("\n");
+  }
+
+  if (name === "schedule_task") {
+    const taskName  = (input.name    ?? "").trim().replace(/\s+/g, "-").toLowerCase();
+    const interval  = (input.interval ?? "24h").trim();
+    const prompt    = (input.prompt   ?? "").trim();
+    if (!taskName || !prompt) return "Need a task name and prompt to schedule.";
+
+    const fsp = await import("fs/promises");
+    const heartbeatPath = nodePath.join(process.cwd(), "HEARTBEAT.md");
+    let content = "";
+    try { content = await fsp.readFile(heartbeatPath, "utf8"); } catch { /* file might not exist */ }
+
+    const taskBlock = `\n- name: ${taskName}\n  interval: ${interval}\n  prompt: ${prompt}\n`;
+
+    const existing = new RegExp(`\\n- name: ${taskName}\\n  interval: [^\\n]+\\n  prompt: [^\\n]+\\n`, "g");
+    if (existing.test(content)) {
+      content = content.replace(existing, taskBlock);
+    } else if (content.includes("## Active hours")) {
+      content = content.replace("## Active hours", `${taskBlock}\n## Active hours`);
+    } else {
+      content += taskBlock;
+    }
+
+    await fsp.writeFile(heartbeatPath, content, "utf8");
+    return `Scheduled: **${taskName}** — runs every ${interval}.\nPrompt: "${prompt}"\n\nWritten to HEARTBEAT.md. It'll fire automatically on the next heartbeat cycle.`;
+  }
+
+  if (name === "write_notebook") {
+    const title = (input.title ?? "").trim();
+    const body = (input.body ?? "").trim();
+    if (!title || !body) return "write_notebook: title and body are required.";
+    const { saveNotebookEntry } = await import("@/lib/lyra/db");
+    const tags: string[] = Array.isArray(input.tags) ? input.tags : [];
+    const type: string = input.type ?? "journal";
+    const id = saveNotebookEntry({ title, body, type, tags, source: "lyra" });
+    if (!id) return "Notebook unavailable — entry not saved.";
+    shoutout("notebook", `📓 ${title}`, type);
+    return `Saved to notebook: **${title}** (${type}). Entry ID: ${id}`;
+  }
+
+  if (name === "unschedule_task") {
+    const taskName = (input.name ?? "").trim().replace(/\s+/g, "-").toLowerCase();
+    if (!taskName) return "Need the task name to remove.";
+
+    const fsp = await import("fs/promises");
+    const heartbeatPath = nodePath.join(process.cwd(), "HEARTBEAT.md");
+    let content = "";
+    try { content = await fsp.readFile(heartbeatPath, "utf8"); } catch { return "HEARTBEAT.md not found."; }
+
+    const before = content;
+    const existing = new RegExp(`\\n- name: ${taskName}\\n  interval: [^\\n]+\\n  prompt: [^\\n]+\\n`, "g");
+    content = content.replace(existing, "\n");
+
+    if (content === before) return `No task named "${taskName}" found in the schedule.`;
+    await fsp.writeFile(heartbeatPath, content, "utf8");
+    return `Removed **${taskName}** from the schedule.`;
   }
 
 

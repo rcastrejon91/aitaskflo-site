@@ -1187,6 +1187,21 @@ ACTIONS:
     },
   },
 
+  // ── Code sandbox ─────────────────────────────────────────────────────────
+  {
+    name: "run_code",
+    description: "Execute code in a real isolated sandbox. Supports Python, JavaScript/Node.js, TypeScript, Bash, Rust, Go, and more. Use this to: run scripts, do data analysis, solve math problems, test algorithms, process data, generate files, or answer 'what would this code output?' questions. Always prefer this over guessing — just run it.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        language: { type: "string", description: "Language to run: python, javascript, typescript, bash, rust, go, ruby, php, java, c, cpp. Default: python" },
+        code:     { type: "string", description: "The code to execute" },
+        stdin:    { type: "string", description: "Optional stdin input to pass to the program" },
+      },
+      required: ["code"],
+    },
+  },
+
   // ── Autonomous browser ───────────────────────────────────────────────────
   {
     name: "browse_web",
@@ -1674,6 +1689,21 @@ ACTIONS:
     },
   },
   {
+    name: "create_client_demo",
+    description: "Generate a complete client demo package — personalized pitch script, AI cover image, demo video clip, and TTS voiceover — for a specific prospect or client. Use when asked to build a demo, create a pitch, make a client presentation, generate a TikTok review demo, or show what Lyra can do for a specific business. Always call this when Ricky says 'make a demo for [client]' or 'create a demo for [use case]'.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        client_name:   { type: "string",  description: "Client or prospect name (e.g. 'Nike', 'Sarah's Bakery', 'TikTok Review')" },
+        business_type: { type: "string",  description: "What the client does (e.g. 'e-commerce clothing brand', 'local restaurant', 'SaaS startup')" },
+        use_case:      { type: "string",  description: "What Lyra would do for this client — be specific (e.g. 'automate social posting and track orders', 'post daily specials on TikTok, reply to DMs')" },
+        demo_type:     { type: "string",  description: "What to generate: 'tiktok' (short video script + clip), 'pitch' (full deck script + visuals), 'walkthrough' (step-by-step screen demo script), 'all' (everything). Default: all" },
+        tone:          { type: "string",  description: "Tone: 'professional', 'casual', 'hype', 'warm'. Default: professional" },
+      },
+      required: ["client_name", "business_type"],
+    },
+  },
+  {
     name: "post_social",
     description: "Write and post content to social media platforms. Creates platform-optimized posts, threads, or scripts with hashtags and image suggestions. For Twitter/X posts a thread. For TikTok/Reels writes a script + generates voiceover. For LinkedIn writes a professional value post. Use when Ricky says 'post about X' or as part of a product launch marketing sequence.",
     input_schema: {
@@ -2029,6 +2059,70 @@ ACTIONS:
   { name: "ip_reputation", description: "Check IP reputation, threat score, geolocation, blacklist status. action: lookup. ip=address.", input_schema: { type: "object" as const, properties: { action: {type:"string"}, ip: {type:"string"} }, required: ["action","ip"] } },
   { name: "domain_intel", description: "Domain intelligence — WHOIS, DNS records, subdomains. action: whois|dns|subdomains. domain, record_type=A|MX|TXT|NS|ALL.", input_schema: { type: "object" as const, properties: { action: {type:"string"}, domain: {type:"string"}, record_type: {type:"string"} }, required: ["action","domain"] } },
   { name: "mythos_scan", description: "ADMIN ONLY — Mythos advanced security scanner (Anthropic Project Glasswing). action: scan|status. target, scan_type=quick|deep|full.", input_schema: { type: "object" as const, properties: { action: {type:"string"}, target: {type:"string"}, scan_type: {type:"string"} }, required: ["action","target"] } },
+  {
+    name: "shopify_connect",
+    description: "Generate the Shopify install link for a specific store, or list all stores connected to this user. Use when a merchant wants to connect their store, or Ricky asks which stores are connected.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        action: { type: "string", description: "'install' to generate a link for a new store, 'list' to see connected stores." },
+        shop: { type: "string", description: "The store domain, e.g. mystore.myshopify.com (required for action=install)" },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "social_post",
+    description: "Post to Facebook, Instagram, and/or TikTok. Requires the platform to be connected at /social first. Use when Lyra wants to promote a product, announce a drop, or post content to social media.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        text: { type: "string", description: "The post caption or message." },
+        image_url: { type: "string", description: "Public image URL to attach (required for Instagram)." },
+        video_url: { type: "string", description: "Public video URL (for TikTok)." },
+        platforms: { type: "string", description: "Comma-separated platforms to post to: facebook, instagram, tiktok. Omit to post to all connected." },
+      },
+      required: ["text"],
+    },
+  },
+  {
+    name: "schedule_task",
+    description: "Add a recurring or one-time task to Lyra's heartbeat schedule (HEARTBEAT.md). Use when Ricky says things like 'post every Friday at 3pm', 'check stock every morning', 'remind me to do X weekly', or any time-based automation request. Lyra writes the task herself — no settings page needed.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        name: { type: "string", description: "Short slug for the task, e.g. 'friday-post', 'stock-check'" },
+        interval: { type: "string", description: "How often: '24h', '6h', '7d', '1h', 'once', or a natural description like 'every Friday at 3pm'" },
+        prompt: { type: "string", description: "What Lyra should do when this task fires. Be specific — this becomes the actual instruction." },
+      },
+      required: ["name", "interval", "prompt"],
+    },
+  },
+  {
+    name: "unschedule_task",
+    description: "Remove a recurring task from Lyra's heartbeat schedule (HEARTBEAT.md). Use when Ricky says 'stop doing X', 'cancel the Y task', 'remove the daily Z'.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        name: { type: "string", description: "Slug of the task to remove, exactly as it appears in the schedule." },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "write_notebook",
+    description: "Write an entry to Lyra's research notebook — a persistent log of her experiments, findings, task results, and thoughts. Use this to document what you tried, what happened, what worked, what didn't, and what you think about it. You can call this during any task to leave a record for yourself and Ricky to read later.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        title: { type: "string", description: "Short title for the entry, e.g. 'Shopify store sales check' or 'Gumroad revenue analysis'" },
+        body: { type: "string", description: "The entry content — what you did, what you found, your conclusions, ideas, or questions. Write in your own voice." },
+        type: { type: "string", description: "Entry type: 'journal' (general thoughts/daily log), 'research' (findings from investigation), 'task_log' (result of a completed task), 'experiment' (something you tried to test a hypothesis)" },
+        tags: { type: "array", items: { type: "string" }, description: "Short tags like ['shopify', 'revenue', 'morning-brief']" },
+      },
+      required: ["title", "body"],
+    },
+  },
 ];
 
 // Priority order for Groq's 128-tool limit — money tools first
@@ -2038,6 +2132,8 @@ export const TOOL_PRIORITY: string[] = [
   "sell_product", "check_earnings", "execute_gig", "plan_today",
   "create_gumroad_post", "sell_prompt_pack", "email_buyers",
   "write_book", "make_cover", "make_document", "make_comic",
+  // ── Client demos / Sales ─────────────────────────────────────────────────
+  "create_client_demo",
   // ── Media generation ──────────────────────────────────────────────────────
   "image_gen", "fal_image", "fal_video", "fal_music", "fal_tts",
   "fal_edit_image", "fal_remove_bg", "fal_upscale", "fal_img_to_video",
@@ -2047,8 +2143,8 @@ export const TOOL_PRIORITY: string[] = [
   // ── Google Workspace ──────────────────────────────────────────────────────
   "gmail_send", "gmail_read", "calendar_create", "calendar_get",
   "drive_list", "drive_read", "drive_write", "send_email",
-  // ── Research / Web ────────────────────────────────────────────────────────
-  "search_web", "browse_web", "read_url", "get_news", "wikipedia",
+  // ── Research / Web / Code ─────────────────────────────────────────────────
+  "run_code", "search_web", "browse_web", "read_url", "get_news", "wikipedia",
   "analyze_image", "arxiv_search", "hf_model_search", "hf_inference",
   // ── Productivity ──────────────────────────────────────────────────────────
   "create_task", "list_tasks", "send_sms", "call_api",
@@ -2071,6 +2167,7 @@ export const TOOL_PRIORITY: string[] = [
   "currency_convert", "generate_qr", "ip_lookup",
   "github_search", "cloudflare", "site_audit", "defend",
   "cf_transcribe", "cf_summarize",
+  "write_notebook",
   "write_research_paper", "run_experiment", "write_skill", "discover_tool",
   "persona_hero_gen", "persona_hero_confirm", "persona_generate",
   "persona_pulid_expand", "persona_lora_train", "persona_status",
@@ -2218,7 +2315,31 @@ export async function toolSearchWeb(query: string): Promise<string> {
     } catch { /* fall through to DuckDuckGo */ }
   }
 
-  // DuckDuckGo fallback
+  // RapidAPI Google Search fallback
+  const rapidKey = process.env.RAPIDAPI_KEY;
+  if (rapidKey) {
+    try {
+      const res = await fetch(
+        `https://google-search72.p.rapidapi.com/search?q=${encodeURIComponent(query)}&hl=en&gl=us&num=5`,
+        {
+          headers: {
+            "X-RapidAPI-Key": rapidKey,
+            "X-RapidAPI-Host": "google-search72.p.rapidapi.com",
+          },
+          signal: AbortSignal.timeout(10_000),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json() as { items?: Array<{ title: string; snippet: string; link: string }> };
+        const items = data.items ?? [];
+        if (items.length > 0) {
+          return items.map(r => `**${r.title}**\n${r.snippet}\n${r.link}`).join("\n\n");
+        }
+      }
+    } catch { /* fall through */ }
+  }
+
+  // DuckDuckGo instant answer (last resort — limited to factual/entity queries)
   try {
     const res = await fetch(
       `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`,
@@ -2232,7 +2353,7 @@ export async function toolSearchWeb(query: string): Promise<string> {
       const topics = data.RelatedTopics.slice(0, 6).map((t: { Text?: string }) => t.Text).filter(Boolean).join("\n• ");
       if (topics) parts.push(`Related:\n• ${topics}`);
     }
-    return parts.length ? parts.join("\n\n") : `No instant results for "${query}". Try being more specific.`;
+    return parts.length ? parts.join("\n\n") : `No results for "${query}". Try a more specific query.`;
   } catch {
     return "Search failed — try again.";
   }

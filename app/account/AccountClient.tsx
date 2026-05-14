@@ -245,16 +245,11 @@ export default function AccountClient({ user, subscription, userId }: Props & { 
             )}
 
             <div className="p-3 rounded-xl text-xs" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.2)" }}>
-              <p className="text-white/50 mb-2 leading-relaxed">Install the Chrome Extension to let Lyra control your browser, click around, fill forms, and work autonomously.</p>
-              <a
-                href="https://chrome.google.com/webstore"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-violet-300 hover:text-violet-200 transition-colors font-medium"
-              >
-                <ExternalLink className="w-3 h-3" />
-                Install Lyra Extension
-              </a>
+              <p className="text-white/50 mb-2 leading-relaxed">Browser agent — lets Lyra control your browser, click around, fill forms, and work autonomously.</p>
+              <span className="inline-flex items-center gap-1.5 text-violet-400/60 font-medium cursor-default select-none">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide" style={{ background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.25)" }}>Coming soon</span>
+                Extension in development
+              </span>
             </div>
           </div>
         </div>

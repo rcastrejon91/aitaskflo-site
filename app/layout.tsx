@@ -28,13 +28,13 @@ export const metadata: Metadata = {
     siteName: "Lyra by AITaskFlo",
     title: "Lyra — AI That Actually Learns How to Help You",
     description: "Self-improving AI with persistent memory, reflection engine, and agent evolution. Start free.",
-    images: [{ url: `${siteUrl}/og.png`, width: 1200, height: 630, alt: "Lyra by AITaskFlo" }],
+    images: [{ url: `${siteUrl}/opengraph-image`, width: 1200, height: 630, alt: "Lyra by AITaskFlo" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Lyra — AI That Actually Learns How to Help You",
     description: "Self-improving AI with persistent memory. Start free.",
-    images: [`${siteUrl}/og.png`],
+    images: [`${siteUrl}/opengraph-image`],
   },
 };
 

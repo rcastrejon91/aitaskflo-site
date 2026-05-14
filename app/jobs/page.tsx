@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/lyra/AppShell";
 import {
   Briefcase, Clock, CheckCircle2, XCircle, Star,
@@ -287,6 +288,13 @@ export default function JobsPage() {
               <p className="text-white/20 text-xs mt-2 max-w-xs mx-auto">
                 Try: <em>"Set my job profile — I'm a React developer looking for remote work, $90k+"</em>
               </p>
+            )}
+            {filter === "all" && (
+              <Link href="/lyra?q=Set+my+job+profile+and+start+finding+remote+jobs"
+                className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-full text-xs font-medium transition-all"
+                style={{ background: "rgba(109,40,217,0.15)", border: "1px solid rgba(139,92,246,0.3)", color: "rgba(167,139,250,0.9)" }}>
+                Open Lyra → set job profile
+              </Link>
             )}
           </div>
         ) : (

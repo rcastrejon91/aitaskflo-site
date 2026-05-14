@@ -456,6 +456,78 @@ function initSchema(db: BetterSqlite3Db) {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_skills_status ON lyra_skills(status)`);
   } catch { /* ignore */ }
 
+  // ── Pawhaus ───────────────────────────────────────────────────────────────
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS pawhaus_locations (
+        id           TEXT PRIMARY KEY,
+        city         TEXT NOT NULL,
+        state        TEXT NOT NULL,
+        address      TEXT,
+        status       TEXT NOT NULL DEFAULT 'planned',
+        lat          REAL,
+        lng          REAL,
+        sq_ft        INTEGER,
+        monthly_rent INTEGER,
+        open_date    TEXT,
+        created_at   TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS pawhaus_residents (
+        id           TEXT PRIMARY KEY,
+        location_id  TEXT NOT NULL,
+        name         TEXT NOT NULL,
+        breed        TEXT,
+        age_years    REAL,
+        bio          TEXT,
+        photo_url    TEXT,
+        status       TEXT NOT NULL DEFAULT 'available',
+        adopted_at   TEXT,
+        created_at   TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS pawhaus_reservations (
+        id           TEXT PRIMARY KEY,
+        location_id  TEXT NOT NULL,
+        name         TEXT NOT NULL,
+        email        TEXT NOT NULL,
+        date         TEXT NOT NULL,
+        time_slot    TEXT NOT NULL,
+        guests       INTEGER NOT NULL DEFAULT 1,
+        tier         TEXT NOT NULL DEFAULT 'standard',
+        status       TEXT NOT NULL DEFAULT 'pending',
+        created_at   TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS pawhaus_waitlist (
+        id         TEXT PRIMARY KEY,
+        email      TEXT NOT NULL UNIQUE,
+        city       TEXT,
+        tier       TEXT NOT NULL DEFAULT 'founding',
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_residents_location ON pawhaus_residents(location_id, status);
+      CREATE INDEX IF NOT EXISTS idx_reservations_location ON pawhaus_reservations(location_id, date);
+    `);
+  } catch { /* ignore */ }
+
+  // lyra_notebook — Lyra's research journal / task log
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS lyra_notebook (
+        id          TEXT PRIMARY KEY,
+        type        TEXT NOT NULL DEFAULT 'journal',
+        title       TEXT NOT NULL,
+        body        TEXT NOT NULL,
+        tags        TEXT NOT NULL DEFAULT '[]',
+        source      TEXT,
+        created_at  TEXT NOT NULL
+      )
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_notebook_type ON lyra_notebook(type, created_at DESC)`);
+  } catch { /* ignore */ }
+
   // lyra_experiments — AI research lab
   try {
     db.exec(`
@@ -493,6 +565,10 @@ function initSchema(db: BetterSqlite3Db) {
   try {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_importance ON facts(user_id, importance DESC)`);
   } catch { /* ignore */ }
+
+  // Migrate auth_users — password reset token columns
+  try { db.exec(`ALTER TABLE auth_users ADD COLUMN reset_token TEXT`); } catch { /* already exists */ }
+  try { db.exec(`ALTER TABLE auth_users ADD COLUMN reset_token_expires_at TEXT`); } catch { /* already exists */ }
 
   // ── Skill Library (additive) ───────────────────────────────────────────────
   try {
@@ -613,6 +689,28 @@ function initSchema(db: BetterSqlite3Db) {
         updated_at      TEXT DEFAULT (datetime('now'))
       );
       CREATE INDEX IF NOT EXISTS idx_role_bots_user ON role_bots(user_id, status);
+    `);
+  } catch { /* ignore */ }
+
+  // ── Job Applications ──────────────────────────────────────────────────────
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS job_applications (
+        id              TEXT PRIMARY KEY,
+        name            TEXT NOT NULL,
+        email           TEXT NOT NULL,
+        role            TEXT NOT NULL,
+        linkedin        TEXT,
+        github          TEXT,
+        about           TEXT,
+        ai_summary      TEXT,
+        ai_score        INTEGER,
+        ai_strengths    TEXT,
+        ai_concerns     TEXT,
+        status          TEXT DEFAULT 'pending',
+        submitted_at    TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_applications_status ON job_applications(status, submitted_at DESC);
     `);
   } catch { /* ignore */ }
 
@@ -1012,6 +1110,87 @@ export function upsertCrmContact(name: string, phone?: string, email?: string, n
   }
 }
 
+// ── Client Pipeline ───────────────────────────────────────────────────────────
+
+export type PipelineStatus = "prospect" | "contacted" | "demo_sent" | "closed_won" | "closed_lost";
+export type PipelineVertical = "content_creator" | "small_business" | "ecom" | "other";
+
+export interface PipelineClient {
+  id: number;
+  name: string;
+  business: string | null;
+  vertical: PipelineVertical;
+  status: PipelineStatus;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
+  demo_url: string | null;
+  follow_up: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function ensurePipelineTable(db: ReturnType<typeof getDb>) {
+  if (!db) return;
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS client_pipeline (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT NOT NULL,
+      business   TEXT,
+      vertical   TEXT NOT NULL DEFAULT 'other',
+      status     TEXT NOT NULL DEFAULT 'prospect',
+      email      TEXT,
+      phone      TEXT,
+      notes      TEXT,
+      demo_url   TEXT,
+      follow_up  TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+}
+
+export function listPipelineClients(): PipelineClient[] {
+  const db = getDb();
+  if (!db) return [];
+  ensurePipelineTable(db);
+  try {
+    return db.prepare("SELECT * FROM client_pipeline ORDER BY updated_at DESC").all() as PipelineClient[];
+  } catch { return []; }
+}
+
+export function upsertPipelineClient(data: Omit<PipelineClient, "id" | "created_at" | "updated_at"> & { id?: number }): PipelineClient {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const stub: PipelineClient = { id: 0, created_at: now, updated_at: now, ...data } as PipelineClient;
+  if (!db) return stub;
+  ensurePipelineTable(db);
+  try {
+    if (data.id) {
+      db.prepare(`
+        UPDATE client_pipeline SET name=?, business=?, vertical=?, status=?, email=?, phone=?, notes=?, demo_url=?, follow_up=?, updated_at=?
+        WHERE id=?
+      `).run(data.name, data.business ?? null, data.vertical, data.status, data.email ?? null, data.phone ?? null, data.notes ?? null, data.demo_url ?? null, data.follow_up ?? null, now, data.id);
+      return db.prepare("SELECT * FROM client_pipeline WHERE id=?").get(data.id) as PipelineClient;
+    }
+    const r = db.prepare(`
+      INSERT INTO client_pipeline (name, business, vertical, status, email, phone, notes, demo_url, follow_up, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(data.name, data.business ?? null, data.vertical, data.status, data.email ?? null, data.phone ?? null, data.notes ?? null, data.demo_url ?? null, data.follow_up ?? null, now, now);
+    return db.prepare("SELECT * FROM client_pipeline WHERE id=?").get(r.lastInsertRowid) as PipelineClient;
+  } catch (e) {
+    console.error("[Lyra DB] pipeline error:", e);
+    return stub;
+  }
+}
+
+export function deletePipelineClient(id: number): void {
+  const db = getDb();
+  if (!db) return;
+  ensurePipelineTable(db);
+  try { db.prepare("DELETE FROM client_pipeline WHERE id=?").run(id); } catch { /* ignore */ }
+}
+
 export function searchCrmContacts(query?: string): DbCrmContact[] {
   const db = getDb();
   if (!db) return [];
@@ -1094,6 +1273,31 @@ export function updateAuthUserPassword(userId: string, newPasswordHash: string):
     console.error("[Lyra DB] updateAuthUserPassword error:", err instanceof Error ? err.message : err);
     return false;
   }
+}
+
+export function setResetToken(userId: string, token: string, expiresAt: string): boolean {
+  const db = getDb();
+  if (!db) return false;
+  try {
+    db.prepare("UPDATE auth_users SET reset_token = ?, reset_token_expires_at = ? WHERE id = ?").run(token, expiresAt, userId);
+    return true;
+  } catch { return false; }
+}
+
+export function getAuthUserByResetToken(token: string): AuthUser | null {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    return db.prepare("SELECT * FROM auth_users WHERE reset_token = ?").get(token) as AuthUser | null;
+  } catch { return null; }
+}
+
+export function clearResetToken(userId: string): void {
+  const db = getDb();
+  if (!db) return;
+  try {
+    db.prepare("UPDATE auth_users SET reset_token = NULL, reset_token_expires_at = NULL WHERE id = ?").run(userId);
+  } catch { /* ignore */ }
 }
 
 // ── Tasks ─────────────────────────────────────────────────────────────────────
@@ -1857,6 +2061,158 @@ export function getExperiment(id: string): DbExperiment | null {
   } catch { return null; }
 }
 
+// ── Pawhaus ───────────────────────────────────────────────────────────────────
+
+export interface PawhausLocation {
+  id: string; city: string; state: string; address: string | null;
+  status: string; lat: number | null; lng: number | null;
+  sq_ft: number | null; monthly_rent: number | null;
+  open_date: string | null; created_at: string;
+}
+
+export interface PawhausResident {
+  id: string; location_id: string; name: string; breed: string | null;
+  age_years: number | null; bio: string | null; photo_url: string | null;
+  status: string; adopted_at: string | null; created_at: string;
+}
+
+export interface PawhausReservation {
+  id: string; location_id: string; name: string; email: string;
+  date: string; time_slot: string; guests: number; tier: string;
+  status: string; created_at: string;
+}
+
+export function listPawhausLocations(): PawhausLocation[] {
+  const db = getDb(); if (!db) return [];
+  try { return db.prepare("SELECT * FROM pawhaus_locations ORDER BY created_at ASC").all() as PawhausLocation[]; }
+  catch { return []; }
+}
+
+export function savePawhausLocation(loc: Omit<PawhausLocation, "id" | "created_at">): string {
+  const db = getDb(); if (!db) return "";
+  const id = randomUUID();
+  try {
+    db.prepare(`INSERT INTO pawhaus_locations (id,city,state,address,status,lat,lng,sq_ft,monthly_rent,open_date,created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(
+      id, loc.city, loc.state, loc.address ?? null, loc.status,
+      loc.lat ?? null, loc.lng ?? null, loc.sq_ft ?? null,
+      loc.monthly_rent ?? null, loc.open_date ?? null, new Date().toISOString()
+    );
+  } catch { return ""; }
+  return id;
+}
+
+export function listPawhausResidents(locationId?: string): PawhausResident[] {
+  const db = getDb(); if (!db) return [];
+  try {
+    if (locationId)
+      return db.prepare("SELECT * FROM pawhaus_residents WHERE location_id = ? ORDER BY created_at ASC").all(locationId) as PawhausResident[];
+    return db.prepare("SELECT * FROM pawhaus_residents ORDER BY created_at ASC").all() as PawhausResident[];
+  } catch { return []; }
+}
+
+export function savePawhausResident(r: Omit<PawhausResident, "id" | "created_at">): string {
+  const db = getDb(); if (!db) return "";
+  const id = randomUUID();
+  try {
+    db.prepare(`INSERT INTO pawhaus_residents (id,location_id,name,breed,age_years,bio,photo_url,status,adopted_at,created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
+      id, r.location_id, r.name, r.breed ?? null, r.age_years ?? null,
+      r.bio ?? null, r.photo_url ?? null, r.status, r.adopted_at ?? null, new Date().toISOString()
+    );
+  } catch { return ""; }
+  return id;
+}
+
+export function addPawhausWaitlist(email: string, city?: string): boolean {
+  const db = getDb(); if (!db) return false;
+  try {
+    db.prepare(`INSERT OR IGNORE INTO pawhaus_waitlist (id,email,city,tier,created_at) VALUES (?,?,?,?,?)`)
+      .run(randomUUID(), email.toLowerCase().trim(), city ?? null, "founding", new Date().toISOString());
+    return true;
+  } catch { return false; }
+}
+
+export function getPawhausWaitlistCount(): number {
+  const db = getDb(); if (!db) return 0;
+  try { return (db.prepare("SELECT COUNT(*) as c FROM pawhaus_waitlist").get() as { c: number }).c; }
+  catch { return 0; }
+}
+
+export function createPawhausReservation(r: Omit<PawhausReservation, "id" | "created_at">): string {
+  const db = getDb(); if (!db) return "";
+  const id = randomUUID();
+  try {
+    db.prepare(`INSERT INTO pawhaus_reservations (id,location_id,name,email,date,time_slot,guests,tier,status,created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
+      id, r.location_id, r.name, r.email, r.date, r.time_slot,
+      r.guests, r.tier, r.status, new Date().toISOString()
+    );
+  } catch { return ""; }
+  return id;
+}
+
+// ── Lyra Notebook ─────────────────────────────────────────────────────────────
+
+export interface DbNotebookEntry {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  tags: string;
+  source: string | null;
+  created_at: string;
+}
+
+export function saveNotebookEntry(entry: {
+  type?: string;
+  title: string;
+  body: string;
+  tags?: string[];
+  source?: string;
+}): string {
+  const db = getDb();
+  if (!db) return "";
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  try {
+    db.prepare(`
+      INSERT INTO lyra_notebook (id, type, title, body, tags, source, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      entry.type ?? "journal",
+      entry.title,
+      entry.body,
+      JSON.stringify(entry.tags ?? []),
+      entry.source ?? null,
+      now,
+    );
+  } catch { return ""; }
+  return id;
+}
+
+export function listNotebookEntries(limit = 30, type?: string): DbNotebookEntry[] {
+  const db = getDb();
+  if (!db) return [];
+  try {
+    if (type) {
+      return db.prepare("SELECT * FROM lyra_notebook WHERE type = ? ORDER BY created_at DESC LIMIT ?")
+        .all(type, limit) as DbNotebookEntry[];
+    }
+    return db.prepare("SELECT * FROM lyra_notebook ORDER BY created_at DESC LIMIT ?")
+      .all(limit) as DbNotebookEntry[];
+  } catch { return []; }
+}
+
+export function getNotebookEntry(id: string): DbNotebookEntry | null {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    return (db.prepare("SELECT * FROM lyra_notebook WHERE id = ?").get(id) as DbNotebookEntry | undefined) ?? null;
+  } catch { return null; }
+}
+
 // ── Job Applications ──────────────────────────────────────────────────────────
 
 function ensureJobsTable(db: import("better-sqlite3").Database) {
@@ -2252,5 +2608,69 @@ export function deleteRoleBot(id: string, userId: string): boolean {
   const db = getDb();
   if (!db) return false;
   try { db.prepare("UPDATE role_bots SET status = 'deleted' WHERE id = ? AND user_id = ?").run(id, userId); return true; }
+  catch { return false; }
+}
+
+// ── Job Applications ─────────────────────────────────────────────────────────
+
+export interface JobApplication {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  linkedin: string | null;
+  github: string | null;
+  about: string | null;
+  ai_summary: string | null;
+  ai_score: number | null;
+  ai_strengths: string | null;
+  ai_concerns: string | null;
+  status: string;
+  submitted_at: string;
+}
+
+export function saveApplication(fields: {
+  name: string; email: string; role: string;
+  linkedin?: string; github?: string; about?: string;
+  aiSummary?: string; aiScore?: number; aiStrengths?: string[]; aiConcerns?: string[];
+}): JobApplication | null {
+  const db = getDb();
+  if (!db) return null;
+  const id = randomUUID();
+  try {
+    db.prepare(`
+      INSERT INTO job_applications (id, name, email, role, linkedin, github, about, ai_summary, ai_score, ai_strengths, ai_concerns, status, submitted_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `).run(
+      id, fields.name, fields.email, fields.role,
+      fields.linkedin ?? null, fields.github ?? null, fields.about ?? null,
+      fields.aiSummary ?? null, fields.aiScore ?? null,
+      JSON.stringify(fields.aiStrengths ?? []), JSON.stringify(fields.aiConcerns ?? []),
+      "pending", new Date().toISOString(),
+    );
+    return db.prepare("SELECT * FROM job_applications WHERE id = ?").get(id) as JobApplication;
+  } catch { return null; }
+}
+
+export function listApplications(status?: string): JobApplication[] {
+  const db = getDb();
+  if (!db) return [];
+  try {
+    if (status) return db.prepare("SELECT * FROM job_applications WHERE status = ? ORDER BY submitted_at DESC").all(status) as JobApplication[];
+    return db.prepare("SELECT * FROM job_applications ORDER BY submitted_at DESC").all() as JobApplication[];
+  } catch { return []; }
+}
+
+export function getApplication(id: string): JobApplication | null {
+  const db = getDb();
+  if (!db) return null;
+  try { return (db.prepare("SELECT * FROM job_applications WHERE id = ?").get(id) as JobApplication | undefined) ?? null; }
+  catch { return null; }
+}
+
+export function updateApplicationStatus(id: string, status: string): boolean {
+  const db = getDb();
+  if (!db) return false;
+  try { db.prepare("UPDATE job_applications SET status = ? WHERE id = ?").run(status, id); return true; }
   catch { return false; }
 }

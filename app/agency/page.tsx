@@ -182,6 +182,7 @@ const AGENCY_PLANS = [
     key: "agency_starter",
     name: "Starter",
     price: 497,
+    roi: "Saves ~8 hrs/week on repetitive work",
     highlight: false,
     accent: "text-violet-300",
     border: "border-violet-500/30",
@@ -193,6 +194,7 @@ const AGENCY_PLANS = [
     key: "agency_growth",
     name: "Growth",
     price: 997,
+    roi: "Replaces a part-time VA — at a fraction of the cost",
     highlight: true,
     accent: "text-fuchsia-300",
     border: "border-fuchsia-500/40",
@@ -204,6 +206,7 @@ const AGENCY_PLANS = [
     key: "agency_full",
     name: "Agency",
     price: 2497,
+    roi: "Full AI operations team — custom-built for your business",
     highlight: false,
     accent: "text-purple-300",
     border: "border-purple-500/30",
@@ -216,9 +219,11 @@ const AGENCY_PLANS = [
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function AgencyPage() {
   const [loading, setLoading] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   async function checkout(plan: string) {
     setLoading(plan);
+    setCheckoutError(null);
     try {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
@@ -229,10 +234,10 @@ export default function AgencyPage() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        alert(data.error ?? "Something went wrong");
+        setCheckoutError(data.error ?? "Something went wrong — try again.");
       }
     } catch {
-      alert("Checkout failed — try again");
+      setCheckoutError("Checkout failed — please try again.");
     } finally {
       setLoading(null);
     }
@@ -329,10 +334,11 @@ export default function AgencyPage() {
                   <h3 className={`text-sm font-semibold tracking-wide uppercase mb-3 ${plan.accent}`}>
                     {plan.name}
                   </h3>
-                  <div className="flex items-end gap-1">
+                  <div className="flex items-end gap-1 mb-2">
                     <span className="text-4xl font-bold text-white">${plan.price.toLocaleString()}</span>
                     <span className="text-white/35 text-sm mb-1">/mo</span>
                   </div>
+                  <p className="text-xs text-white/40 leading-relaxed">{plan.roi}</p>
                 </div>
 
                 <ul className="space-y-3 mb-8 flex-1">
@@ -355,6 +361,12 @@ export default function AgencyPage() {
             ))}
           </div>
         </div>
+
+        {checkoutError && (
+          <p className="text-center text-red-400 text-sm mt-6 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 max-w-md mx-auto">
+            {checkoutError}
+          </p>
+        )}
 
         <p className="text-center text-white/25 text-xs mt-8">
           Cancel anytime · Secure payments via Stripe · Results guaranteed or we work until they are
