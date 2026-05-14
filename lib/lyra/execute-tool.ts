@@ -296,16 +296,14 @@ export async function executeTool(
       },
       background
     );
-    // Use Claude to actually write the cover letter
+    // Use the available AI provider to write the cover letter
     try {
-      const Anthropic = (await import("@anthropic-ai/sdk")).default;
-      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-      const msg = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 800,
+      const { complete, getChatProvider } = await import("@/lib/lyra/providers");
+      const letter = await complete({
+        config: getChatProvider(),
         messages: [{ role: "user", content: prompt }],
+        maxTokens: 800,
       });
-      const letter = msg.content[0]?.type === "text" ? msg.content[0].text : "Could not generate cover letter.";
       const card = JSON.stringify({ tool: "application", job: input.job_title, company: input.company });
       controller.enqueue(encoder.encode(`\n${card}`));
       return `Here's your cover letter for **${input.job_title}** at **${input.company}**:\n\n---\n\n${letter}\n\n---\n\nWant me to adjust the tone, add anything, or help you find where to submit this?`;
@@ -325,20 +323,18 @@ export async function executeTool(
   if (name === "tailor_resume") {
     controller.enqueue(encoder.encode("\n✍️ Tailoring your resume…\n"));
     try {
-      const Anthropic = (await import("@anthropic-ai/sdk")).default;
-      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      const { complete, getChatProvider } = await import("@/lib/lyra/providers");
       const prompt = buildTailorPrompt(
         input.resume ?? "",
         input.job_description ?? "",
         input.job_title ?? "",
         input.company ?? ""
       );
-      const msg = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 2000,
+      const tailored = await complete({
+        config: getChatProvider(),
         messages: [{ role: "user", content: prompt }],
+        maxTokens: 2000,
       });
-      const tailored = msg.content[0]?.type === "text" ? msg.content[0].text : "Could not tailor resume.";
       const card = JSON.stringify({ tool: "resume", job: input.job_title, company: input.company });
       controller.enqueue(encoder.encode(`\n${card}`));
       return tailored;
@@ -960,13 +956,9 @@ Reason: ${reason}`;
 
     controller.enqueue(encoder.encode(`\n📂 Read ${snippets.length} source files — generating walkthrough…\n`));
 
-    // Use Claude to write a real walkthrough
-    const Anthropic = (await import("@anthropic-ai/sdk")).default;
-    const ai = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-    const msg = await ai.messages.create({
-      model: "claude-opus-4-6",
-      max_tokens: 3000,
+    const { complete, getChatProvider } = await import("@/lib/lyra/providers");
+    const walkthrough = await complete({
+      config: getChatProvider(),
       messages: [{
         role: "user",
         content: `You are Lyra, a witty and knowledgeable game guide. Read the following source code from the game "${gameName}" and write a comprehensive, fun, player-friendly walkthrough guide.
@@ -985,9 +977,8 @@ Be enthusiastic and helpful. Use emoji. Reference specific mechanics you found i
 ---
 ${snippets.join("\n\n")}`,
       }],
+      maxTokens: 3000,
     });
-
-    const walkthrough = msg.content[0].type === "text" ? msg.content[0].text : "Could not generate walkthrough.";
     return `## 🎮 ${gameName} — Complete Walkthrough\n\n${walkthrough}`;
   }
 
@@ -1004,8 +995,7 @@ ${snippets.join("\n\n")}`,
 
     progress(`Researching "${topic}" in ${field}…`);
 
-    const Anthropic = (await import("@anthropic-ai/sdk")).default;
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const { complete: completeProvider, getChatProvider: getProvider } = await import("@/lib/lyra/providers");
 
     const wordTarget = depth === "brief" ? 1500 : depth === "comprehensive" ? 5000 : 2500;
 
@@ -1036,18 +1026,11 @@ Generate exactly ${sectionCount} sections: Introduction, Literature Review, ${se
 
     progress("Writing paper sections…");
 
-    let paperJson = "";
-    const stream = await client.messages.stream({
-      model: "claude-sonnet-4-6",
-      max_tokens: 8000,
+    const paperJson = await completeProvider({
+      config: getProvider(),
       messages: [{ role: "user", content: paperPrompt }],
+      maxTokens: 8000,
     });
-
-    for await (const event of stream) {
-      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-        paperJson += event.delta.text;
-      }
-    }
 
     // Parse JSON
     let paper: {
@@ -2180,15 +2163,13 @@ Return ONLY valid JSON:
         `## EMAIL BODY (4 sentences, ${toneDesc} tone, personalized to ${clientName})`,
       ].join("\n");
 
-      // Use the main LLM to generate the script
-      const Anthropic = (await import("@anthropic-ai/sdk")).default;
-      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-      const scriptRes = await anthropic.messages.create({
-        model: "claude-haiku-4-5",
-        max_tokens: 1200,
+      // Use the available AI provider to generate the script
+      const { complete: completeLLM, getChatProvider: chatProvider } = await import("@/lib/lyra/providers");
+      const script = await completeLLM({
+        config: chatProvider(),
         messages: [{ role: "user", content: scriptPrompt }],
+        maxTokens: 1200,
       });
-      const script = scriptRes.content[0].type === "text" ? scriptRes.content[0].text : "";
 
       progress(`✅ Scripts generated`);
 
@@ -2363,15 +2344,13 @@ Return ONLY valid JSON:
     let finalLyrics = lyrics;
     if (!finalLyrics) {
       try {
-        const Anthropic = (await import("@anthropic-ai/sdk")).default;
-        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const { complete: completeSong, getChatProvider: songProvider } = await import("@/lib/lyra/providers");
         const lang = input.language ?? "English";
-        const msg = await client.messages.create({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 400,
+        finalLyrics = await completeSong({
+          config: songProvider(),
           messages: [{ role: "user", content: `Write short song lyrics (2 verses + chorus) in ${lang} for a ${style} song. Topic: ${input.topic ?? "life and love"}. Just the lyrics, no stage directions.` }],
+          maxTokens: 400,
         });
-        finalLyrics = msg.content[0]?.type === "text" ? msg.content[0].text : "La la la, singing for you.";
       } catch {
         finalLyrics = "La la la, singing for you, the world is beautiful and bright.";
       }

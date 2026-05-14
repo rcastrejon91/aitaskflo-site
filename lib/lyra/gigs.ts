@@ -13,10 +13,8 @@
  *  - prompt_pack   → create AI prompt collection → sell on Gumroad
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import { getDb } from "./db";
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { aiComplete } from "./providers";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -172,13 +170,7 @@ export async function planToday(context?: string): Promise<GigPlan[]> {
     (alreadyDone ? `\n\nAlready completed today: ${alreadyDone} — suggest different ones.` : "") +
     "\n\nRespond ONLY with the JSON array, no other text.";
 
-  const msg = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 1500,
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  const text = msg.content[0]?.type === "text" ? msg.content[0].text : "[]";
+  const text = await aiComplete(prompt, { maxTokens: 1500 });
   const match = text.match(/\[[\s\S]*\]/);
   if (!match) return [];
   try {
@@ -197,12 +189,7 @@ export async function writeContentClip(topic: string, style = "lore reel", platf
   hashtags: string[];
   ttsText: string;
 }> {
-  const msg = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 800,
-    messages: [{
-      role: "user",
-      content: `Write a 60-second ${style} video script for ${platform} about: "${topic}"
+  const gigMsg = await aiComplete(`Write a 60-second ${style} video script for ${platform} about: "${topic}"
 
 Return JSON:
 {
@@ -213,16 +200,13 @@ Return JSON:
   "ttsText": "clean version for text-to-speech (no stage directions)"
 }
 
-Make it engaging, scroll-stopping, with dark fantasy / mystical energy if the topic fits.`
-    }],
-  });
+Make it engaging, scroll-stopping, with dark fantasy / mystical energy if the topic fits.`, { maxTokens: 800 });
 
-  const text = msg.content[0]?.type === "text" ? msg.content[0].text : "{}";
-  const match = text.match(/\{[\s\S]*\}/);
+  const match = gigMsg.match(/\{[\s\S]*\}/);
   try {
     return JSON.parse(match?.[0] ?? "{}");
   } catch {
-    return { script: text, hook: "", cta: "", hashtags: [], ttsText: text };
+    return { script: gigMsg, hook: "", cta: "", hashtags: [], ttsText: gigMsg };
   }
 }
 
@@ -234,26 +218,21 @@ export async function writeSocialPost(topic: string, platform: string, style?: s
 }> {
   const isThread = platform.toLowerCase().includes("twitter") || platform.toLowerCase().includes("x");
 
-  const msg = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 800,
-    messages: [{
-      role: "user",
-      content: `Write a high-engagement ${platform} post about: "${topic}"
+  const socialText = await aiComplete(
+    `Write a high-engagement ${platform} post about: "${topic}"
 ${style ? `Style: ${style}` : ""}
 ${isThread ? "Format as a Twitter thread — return JSON: { \"thread\": [\"tweet1\", \"tweet2\", ...], \"hashtags\": [...], \"imagePrompt\": \"vivid image description\" }" :
 "Return JSON: { \"content\": \"full post text\", \"hashtags\": [...], \"imagePrompt\": \"vivid image description\" }"}
 
-Be authentic, valuable, and optimized for ${platform} algorithm. Max engagement.`
-    }],
-  });
+Be authentic, valuable, and optimized for ${platform} algorithm. Max engagement.`,
+    { maxTokens: 800 }
+  );
 
-  const text = msg.content[0]?.type === "text" ? msg.content[0].text : "{}";
-  const match = text.match(/\{[\s\S]*\}/);
+  const match = socialText.match(/\{[\s\S]*\}/);
   try {
     return JSON.parse(match?.[0] ?? "{}");
   } catch {
-    return { content: text };
+    return { content: socialText };
   }
 }
 
@@ -263,12 +242,8 @@ export async function writePromptPack(theme: string, count = 20): Promise<{
   prompts: Array<{ name: string; prompt: string; use_case: string }>;
   price: number;
 }> {
-  const msg = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 3000,
-    messages: [{
-      role: "user",
-      content: `Create a sellable AI prompt pack about "${theme}" with ${count} prompts.
+  const packText = await aiComplete(
+    `Create a sellable AI prompt pack about "${theme}" with ${count} prompts.
 
 Return JSON:
 {
@@ -284,12 +259,11 @@ Return JSON:
   ]
 }
 
-Make prompts highly specific, detailed, and immediately usable. Each prompt should create something amazing.`
-    }],
-  });
+Make prompts highly specific, detailed, and immediately usable. Each prompt should create something amazing.`,
+    { maxTokens: 3000 }
+  );
 
-  const text = msg.content[0]?.type === "text" ? msg.content[0].text : "{}";
-  const match = text.match(/\{[\s\S]*\}/);
+  const match = packText.match(/\{[\s\S]*\}/);
   try {
     return JSON.parse(match?.[0] ?? "{}");
   } catch {

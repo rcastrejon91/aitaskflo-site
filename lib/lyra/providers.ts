@@ -128,3 +128,17 @@ export async function complete(opts: CompletionOptions): Promise<string> {
   });
   return res.content[0]?.type === "text" ? res.content[0].text : "";
 }
+
+/** Drop-in helper — routes to best available provider instead of hardcoding Claude */
+export async function aiComplete(
+  userMessage: string,
+  opts: { system?: string; maxTokens?: number; temperature?: number } = {}
+): Promise<string> {
+  return complete({
+    config: getChatProvider(),
+    system: opts.system,
+    messages: [{ role: "user", content: userMessage }],
+    maxTokens: opts.maxTokens ?? 1024,
+    temperature: opts.temperature ?? 0.7,
+  });
+}

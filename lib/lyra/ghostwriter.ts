@@ -73,8 +73,7 @@ export async function generateContent(params: {
   context?: string;
   userId: string;
 }): Promise<GWDoc> {
-  const { default: Anthropic } = await import("@anthropic-ai/sdk");
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const { aiComplete } = await import("./providers");
 
   const systemPrompt = `You are Lyra, an expert ghost writer powered by AITaskFlo. You write in the user's requested tone — ${params.tone}. You produce high-quality, original content that sounds authentic, not AI-generated. Never add disclaimers or meta-commentary. Just write the content directly.`;
 
@@ -86,14 +85,7 @@ ${params.context ? `Additional context: ${params.context}` : ""}
 
 Write the full content now. Do not explain what you're doing — just write it.`;
 
-  const msg = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 2000,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userPrompt }],
-  });
-
-  const content = (msg.content[0] as { type: string; text: string }).text.trim();
+  const content = (await aiComplete(userPrompt, { system: systemPrompt, maxTokens: 2000 })).trim();
   const wordCount = content.split(/\s+/).length;
 
   const doc: GWDoc = {

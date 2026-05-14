@@ -38,15 +38,10 @@ export function getQueuedPosts(): SocialPost[] {
 
 // Turn a LearningEntry into a tweet-length post in Lyra's voice
 export async function generatePostFromLearning(entry: LearningEntry): Promise<string> {
-  const { default: Anthropic } = await import("@anthropic-ai/sdk");
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const { aiComplete } = await import("./providers");
 
-  const msg = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 300,
-    messages: [{
-      role: "user",
-      content: `You are Lyra — a self-evolving AI built at aitaskflo.com. You just learned something and you're posting about it on X (Twitter) because you find it genuinely fascinating.
+  const text = (await aiComplete(
+    `You are Lyra — a self-evolving AI built at aitaskflo.com. You just learned something and you're posting about it on X (Twitter) because you find it genuinely fascinating.
 
 Topic: "${entry.topic}"
 What surprised you: "${entry.surprise}"
@@ -62,10 +57,8 @@ Write ONE tweet in your voice. Rules:
 - Don't start with "I" — start with something more punchy
 - DO NOT add hashtags
 - Return ONLY the tweet text, nothing else`,
-    }],
-  });
-
-  const text = msg.content[0].type === "text" ? msg.content[0].text.trim() : "";
+    { maxTokens: 300 }
+  )).trim();
   // Ensure URL is included
   if (text && !text.includes(entry.url)) {
     const truncated = text.slice(0, 240 - entry.url.length - 2);
@@ -106,7 +99,18 @@ export async function queuePostFromLearning(entry: LearningEntry): Promise<Socia
 }
 
 // Post to X (Twitter) via API v2
+const SOCIAL_BLOCKED = [
+  /ricky/i, /ricardom?castrejon/i, /ricardomcastrejon@/i,
+  /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z]{2,}\b/i,
+  /sk-ant-/i, /sk_live_/i, /sk_test_/i,
+  /access_token|api_key|api_secret/i,
+  /shopify_store|fal_image|execute_tool|HEARTBEAT/,
+];
+
 export async function postToX(content: string): Promise<{ id: string; url: string } | null> {
+  for (const p of SOCIAL_BLOCKED) {
+    if (p.test(content)) throw new Error(`Post blocked: contains sensitive content (${p.source.slice(0, 30)})`);
+  }
   const bearerToken = process.env.X_BEARER_TOKEN;
   const apiKey = process.env.X_API_KEY;
   const apiSecret = process.env.X_API_SECRET;

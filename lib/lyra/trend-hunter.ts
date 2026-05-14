@@ -4,9 +4,7 @@
  * Sources: Google Trends, Reddit, TikTok hashtags, Gumroad bestsellers
  */
 
-import Anthropic from "@anthropic-ai/sdk";
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { aiComplete } from "./providers";
 
 export interface TrendingProduct {
   name: string;
@@ -71,13 +69,7 @@ Return ONLY valid JSON array:
   }
 ]`;
 
-  const msg = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 2000,
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  const text = msg.content[0].type === "text" ? msg.content[0].text : "[]";
+  const text = await aiComplete(prompt, { maxTokens: 2000 });
   const match = text.match(/\[[\s\S]*\]/);
   try {
     return JSON.parse(match?.[0] ?? "[]") as TrendingProduct[];
@@ -91,12 +83,8 @@ export async function analyzeProductPerformance(products: Array<{
 }>): Promise<Array<{ id: string; title: string; action: "scale" | "keep" | "remove"; reason: string }>> {
   if (!products.length) return [];
 
-  const msg = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 1000,
-    messages: [{
-      role: "user",
-      content: `Analyze these Shopify products and decide: scale (winner), keep (needs more time), or remove (loser).
+  const text = await aiComplete(
+    `Analyze these Shopify products and decide: scale (winner), keep (needs more time), or remove (loser).
 
 Products:
 ${products.map(p => `- ${p.title}: ${p.sales} sales, $${p.revenue} revenue, ${p.daysLive} days live`).join("\n")}
@@ -107,11 +95,9 @@ Rules:
 - keep: everything else
 
 Return ONLY valid JSON array:
-[{"id": "...", "title": "...", "action": "scale|keep|remove", "reason": "..."}]`
-    }],
-  });
-
-  const text = msg.content[0].type === "text" ? msg.content[0].text : "[]";
+[{"id": "...", "title": "...", "action": "scale|keep|remove", "reason": "..."}]`,
+    { maxTokens: 1000 }
+  );
   const match = text.match(/\[[\s\S]*\]/);
   try {
     return JSON.parse(match?.[0] ?? "[]");
