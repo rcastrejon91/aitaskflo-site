@@ -129,16 +129,29 @@ export async function complete(opts: CompletionOptions): Promise<string> {
   return res.content[0]?.type === "text" ? res.content[0].text : "";
 }
 
-/** Drop-in helper — routes to best available provider instead of hardcoding Claude */
+/** Drop-in helper — tries each available provider in order until one succeeds */
 export async function aiComplete(
   userMessage: string,
   opts: { system?: string; maxTokens?: number; temperature?: number } = {}
 ): Promise<string> {
-  return complete({
-    config: getChatProvider(),
-    system: opts.system,
-    messages: [{ role: "user", content: userMessage }],
-    maxTokens: opts.maxTokens ?? 1024,
-    temperature: opts.temperature ?? 0.7,
-  });
+  const fallbacks: ProviderConfig[] = [];
+  if (process.env.GROQ_API_KEY)   fallbacks.push({ provider: "groq",   model: "llama-3.3-70b-versatile" });
+  if (process.env.OPENAI_API_KEY) fallbacks.push({ provider: "openai", model: "gpt-4o-mini" });
+  if (process.env.XAI_API_KEY || process.env.GROK_API_KEY)
+                                   fallbacks.push({ provider: "grok",   model: "grok-3-mini-fast" });
+  fallbacks.push({ provider: "claude", model: "claude-haiku-4-5-20251001" });
+
+  let lastErr: unknown;
+  for (const config of fallbacks) {
+    try {
+      return await complete({
+        config,
+        system: opts.system,
+        messages: [{ role: "user", content: userMessage }],
+        maxTokens: opts.maxTokens ?? 1024,
+        temperature: opts.temperature ?? 0.7,
+      });
+    } catch (err) { lastErr = err; }
+  }
+  throw lastErr;
 }
