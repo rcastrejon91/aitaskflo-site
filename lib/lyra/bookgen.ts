@@ -1,6 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { aiComplete } from "./providers";
 
 function pollinationsUrl(prompt: string): string {
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true&seed=${Math.floor(Math.random() * 999999)}`;
@@ -8,14 +6,9 @@ function pollinationsUrl(prompt: string): string {
 
 async function generateWithClaude(prompt: string): Promise<string> {
   try {
-    const msg = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4096,
-      messages: [{ role: "user", content: prompt }],
-    });
-    return msg.content[0].type === "text" ? msg.content[0].text : "";
+    return await aiComplete(prompt, { maxTokens: 4096 });
   } catch (e) {
-    console.error("[bookgen] Claude API error:", e instanceof Error ? e.message : String(e));
+    console.error("[bookgen] AI error:", e instanceof Error ? e.message : String(e));
     throw e;
   }
 }

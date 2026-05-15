@@ -181,7 +181,7 @@ const STATS = [
 
 // ── Passphrase gate ───────────────────────────────────────────────────────────
 const ACCESS_KEY = "inv_access";
-const PASSPHRASE = "lyra2025";
+const PASSPHRASE = process.env.NEXT_PUBLIC_INVESTOR_PASS ?? "lyra2025";
 
 function PassphraseGate({ onUnlock }: { onUnlock: () => void }) {
   const [value, setValue] = useState("");
